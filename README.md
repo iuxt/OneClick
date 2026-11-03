@@ -75,6 +75,34 @@ open RClick.xcodeproj
 - Select the **RClick** scheme, then **Product → Build** (⌘B)
 - The FinderSync extension will be automatically registered
 
+To build, install to `/Applications/RClick.app`, and launch in one step:
+
+```bash
+./build.sh
+```
+
+The script builds Release by default, quits any running RClick and its Finder
+extension after a successful build, replaces the app, then launches the new
+version. The default `local` mode needs no Apple developer account. Both targets
+remain sandboxed and receive explicit access only to
+`~/Library/Application Support/RClickLocal/` for the database and launch marker.
+Local preferences use the main app's standard defaults; the extension receives
+menu settings through IPC. Existing App Group data is left untouched, so local
+mode starts with separate settings that persist across local updates.
+
+For developer signing with App Group storage, use `BUILD_MODE=developer ./build.sh`.
+Both targets then need a valid developer certificate and profiles authorizing
+`group.cn.wflixu.RClick`. A different team must configure its own bundle and App
+Group identifiers consistently in both targets and the shared code. This mode
+verifies App Group authorization before replacing the installed app.
+
+The script asks for administrator privileges only if the installation directory
+requires them. Build output and logs are stored in `.build/`.
+
+Optional overrides: `CONFIGURATION=Debug ./build.sh`,
+`BUILD_MODE=developer DEVELOPMENT_TEAM="YOUR_TEAM_ID" ./build.sh`, or
+`INSTALL_DIR="$HOME/Applications" ./build.sh`.
+
 ### Requirements
 
 | Requirement | Details |
