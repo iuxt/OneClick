@@ -45,6 +45,10 @@ enum StartupFailure {
     ///
     /// 原始错误始终附上：定向提示只是启发式，不能替代事实。
     private static func describe(_ error: Error) -> String {
+#if RC_LOCAL_BUILD
+        return AppLocalization.localized("Unable to open the configuration database")
+            + "\n\n" + String(describing: error)
+#else
         var lines = [
             AppLocalization.localized(
                 "RClick could not access its shared App Group container, so it cannot read its settings."
@@ -62,5 +66,6 @@ enum StartupFailure {
         lines.append("")
         lines.append(String(describing: error))
         return lines.joined(separator: "\n")
+#endif
     }
 }

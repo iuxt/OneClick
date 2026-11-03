@@ -1,4 +1,4 @@
-name: Build, Sign, Notarize and Release
+name: Build and Release
 
 on:
   push:
@@ -14,22 +14,18 @@ concurrency:
 
 jobs:
   build-and-release:
-    name: Build, Sign, Notarize & Release
+    name: Build and Release (no Apple certificate required)
     runs-on: macos-15
-    timeout-minutes: 60
+    timeout-minutes: 30
     defaults:
       run:
         shell: bash
     env:
       APP_NAME: RClick
-      APP_BUNDLE_ID: cn.wflixu.RClick
       EXTENSION_NAME: FinderSyncExt
-      EXTENSION_BUNDLE_ID: cn.wflixu.RClick.FinderSyncExt
-      APP_GROUP_ID: group.cn.wflixu.RClick
-      SCHEME: RClick
-      PROJECT: RClick.xcodeproj
+      BUILD_DIR: .build/release
+
     steps:
-      # --- 0. 准备工作 ---
       - name: Checkout
         uses: actions/checkout@v5
         with:
@@ -44,10 +40,9 @@ jobs:
       - name: Get Version from Tag
         id: version
         run: |
-          # 仅允许明确的版本 tag；后缀不写入 macOS 的 CFBundleShortVersionString。
           TAG_PATTERN='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-(alpha|beta|rc)\.(0|[1-9][0-9]*))?$'
           if [[ ! "$GITHUB_REF_NAME" =~ $TAG_PATTERN ]]; then
-            echo '::error::Expected vX.Y.Z or vX.Y.Z-{alpha,beta,rc}.N (for example v2.3.3-rc.1)'
+            echo '::error::Expected vX.Y.Z or vX.Y.Z-{alpha,beta,rc}.N (for example v2.4.0-rc.1)'
             exit 1
           fi
           VERSION="${GITHUB_REF_NAME#v}"
@@ -56,445 +51,123 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "app_version=${VERSION%%-*}" >> "$GITHUB_OUTPUT"
           echo "prerelease=$PRERELEASE" >> "$GITHUB_OUTPUT"
-          echo "Will release version: $VERSION"
 
-      - name: Check Signing and Notarization Secrets
-        env:
-          MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
-          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
-          MACOS_APP_PROVISIONING_PROFILE: ${{ secrets.MACOS_APP_PROVISIONING_PROFILE }}
-          MACOS_EXTENSION_PROVISIONING_PROFILE: ${{ secrets.MACOS_EXTENSION_PROVISIONING_PROFILE }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
-          NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
-          NOTARY_PRIVATE_KEY: ${{ secrets.NOTARY_PRIVATE_KEY }}
-        run: |
-          MISSING=false
-          for NAME in MACOS_CERT_P12 MACOS_CERT_PASSWORD MACOS_APP_PROVISIONING_PROFILE \
-            MACOS_EXTENSION_PROVISIONING_PROFILE APPLE_TEAM_ID NOTARY_KEY_ID \
-            NOTARY_ISSUER_ID NOTARY_PRIVATE_KEY; do
-            if [[ -z "${!NAME}" ]]; then
-              echo "::error::Missing repository secret: $NAME"
-              MISSING=true
-            fi
-          done
-          if [[ "$MISSING" == true ]]; then exit 1; fi
-
-      # --- 1. 导入签名证书 ---
-      - name: Import Developer ID Certificate
-        env:
-          CERTIFICATE_P12: ${{ secrets.MACOS_CERT_P12 }}
-          CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
-        run: |
-          set -euo pipefail
-          KEYCHAIN_PASSWORD="$(openssl rand -hex 32)"
-          echo "::add-mask::$KEYCHAIN_PASSWORD"
-          KEYCHAIN_PATH="$RUNNER_TEMP/rclick-build.keychain-db"
-          echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
-          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
-
-          printf '%s' "$CERTIFICATE_P12" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
-          security import "$RUNNER_TEMP/certificate.p12" \
-            -k "$KEYCHAIN_PATH" \
-            -P "$CERTIFICATE_PASSWORD" \
-            -T /usr/bin/codesign
-          security set-key-partition-list \
-            -S apple-tool:,apple:,codesign: \
-            -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-
-          security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain-db
-
-          IDENTITY_INFO=$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" \
-            | awk '/"Developer ID Application:/')
-          IDENTITY_COUNT=$(printf '%s\n' "$IDENTITY_INFO" \
-            | awk 'NF { count++ } END { print count + 0 }')
-          if [ "$IDENTITY_COUNT" -ne 1 ]; then
-            echo "Expected exactly one Developer ID Application identity, found $IDENTITY_COUNT"
-            printf '%s\n' "$IDENTITY_INFO"
-            exit 1
-          fi
-
-          CERT_IDENTITY=$(printf '%s\n' "$IDENTITY_INFO" | awk '{print $2}')
-          CERT_NAME=$(printf '%s\n' "$IDENTITY_INFO" | awk -F'"' '{print $2}')
-          echo "CERT_IDENTITY=$CERT_IDENTITY" >> "$GITHUB_ENV"
-          echo "Using certificate: $CERT_NAME ($CERT_IDENTITY)"
-
-      - name: Prepare App Group Provisioning Profiles
-        env:
-          APP_PROFILE_BASE64: ${{ secrets.MACOS_APP_PROVISIONING_PROFILE }}
-          EXTENSION_PROFILE_BASE64: ${{ secrets.MACOS_EXTENSION_PROVISIONING_PROFILE }}
-          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: |
-          set -euo pipefail
-          : "${APP_PROFILE_BASE64:?Missing MACOS_APP_PROVISIONING_PROFILE secret}"
-          : "${EXTENSION_PROFILE_BASE64:?Missing MACOS_EXTENSION_PROVISIONING_PROFILE secret}"
-          : "${TEAM_ID:?Missing APPLE_TEAM_ID secret}"
-          : "${CERT_IDENTITY:?Missing Developer ID Application identity}"
-
-          mkdir -p signing
-          APP_PROFILE_PATH="$PWD/signing/${APP_NAME}.provisionprofile"
-          EXTENSION_PROFILE_PATH="$PWD/signing/${EXTENSION_NAME}.provisionprofile"
-          printf '%s' "$APP_PROFILE_BASE64" | base64 --decode > "$APP_PROFILE_PATH"
-          printf '%s' "$EXTENSION_PROFILE_BASE64" | base64 --decode > "$EXTENSION_PROFILE_PATH"
-
-          security cms -D -i "$APP_PROFILE_PATH" -o signing/app-profile.plist
-          security cms -D -i "$EXTENSION_PROFILE_PATH" -o signing/extension-profile.plist
-
-          validate_profile() {
-            local profile_plist="$1"
-            local expected_bundle_id="$2"
-
-            python3 - \
-              "$profile_plist" \
-              "$expected_bundle_id" \
-              "$TEAM_ID" \
-              "$APP_GROUP_ID" \
-              "$CERT_IDENTITY" <<'PY'
-          import datetime
-          import hashlib
-          import plistlib
-          import sys
-
-          profile_path, expected_bundle_id, expected_team, expected_group, signing_identity = sys.argv[1:]
-          with open(profile_path, "rb") as profile_file:
-              profile = plistlib.load(profile_file)
-
-          if profile.get("ExpirationDate", datetime.datetime.min) <= datetime.datetime.utcnow():
-              raise SystemExit("Provisioning profile has expired")
-
-          entitlements = profile.get("Entitlements", {})
-          actual_identifier = entitlements.get("com.apple.application-identifier", "")
-          _, separator, actual_bundle_id = actual_identifier.partition(".")
-          if not separator or actual_bundle_id != expected_bundle_id:
-              raise SystemExit(
-                  f"Provisioning profile does not match bundle ID "
-                  f"{expected_bundle_id}: {actual_identifier}"
-              )
-
-          actual_team = entitlements.get("com.apple.developer.team-identifier")
-          if actual_team != expected_team:
-              raise SystemExit(
-                  f"Provisioning profile team mismatch: expected {expected_team}, got {actual_team}"
-              )
-
-          actual_groups = entitlements.get("com.apple.security.application-groups")
-          if not isinstance(actual_groups, list) or expected_group not in actual_groups:
-              raise SystemExit(f"Provisioning profile does not authorize {expected_group}")
-
-          certificate_hashes = {
-              hashlib.sha1(certificate).hexdigest().upper()
-              for certificate in profile.get("DeveloperCertificates", [])
-              if isinstance(certificate, bytes)
-          }
-          if signing_identity.upper() not in certificate_hashes:
-              raise SystemExit(
-                  f"Provisioning profile does not contain signing certificate {signing_identity}"
-              )
-          PY
-          }
-
-          validate_profile signing/app-profile.plist "$APP_BUNDLE_ID"
-          validate_profile signing/extension-profile.plist "$EXTENSION_BUNDLE_ID"
-          APP_IDENTIFIER=$(/usr/libexec/PlistBuddy \
-            -c 'Print :Entitlements:com.apple.application-identifier' \
-            signing/app-profile.plist)
-          EXTENSION_IDENTIFIER=$(/usr/libexec/PlistBuddy \
-            -c 'Print :Entitlements:com.apple.application-identifier' \
-            signing/extension-profile.plist)
-
-          echo "APP_PROFILE_PATH=$APP_PROFILE_PATH" >> "$GITHUB_ENV"
-          echo "EXTENSION_PROFILE_PATH=$EXTENSION_PROFILE_PATH" >> "$GITHUB_ENV"
-          echo "APP_IDENTIFIER=$APP_IDENTIFIER" >> "$GITHUB_ENV"
-          echo "EXTENSION_IDENTIFIER=$EXTENSION_IDENTIFIER" >> "$GITHUB_ENV"
-
-      # --- 2. 构建 Release App ---
       - name: Build Release
         env:
           VERSION: ${{ steps.version.outputs.app_version }}
         run: |
-          set -euo pipefail
-
-          BUILD_NUMBER="$(date +%Y%m%d%H%M)"
+          mkdir -p "$BUILD_DIR"
           xcodebuild build \
-            -project "$PROJECT" \
-            -scheme "$SCHEME" \
+            -project RClick.xcodeproj \
+            -scheme RClick \
             -configuration Release \
-            -derivedDataPath build \
-            -destination "generic/platform=macOS" \
+            -derivedDataPath "$BUILD_DIR/DerivedData" \
+            -destination 'generic/platform=macOS' \
             ARCHS=arm64 \
             MACOSX_DEPLOYMENT_TARGET=15.6 \
             CODE_SIGNING_ALLOWED=NO \
-            SWIFT_ACTIVE_COMPILATION_CONDITIONS="" \
-            CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
+            'SWIFT_ACTIVE_COMPILATION_CONDITIONS=$(inherited) RC_LOCAL_BUILD' \
+            CURRENT_PROJECT_VERSION="$(date -u +%Y%m%d%H%M)" \
             MARKETING_VERSION="$VERSION" \
-            2>&1 | tee build-release.log
+            2>&1 | tee "$BUILD_DIR/build.log"
 
-          APP_PATH="$PWD/build/Build/Products/Release/${APP_NAME}.app"
-          if [ ! -x "$APP_PATH/Contents/MacOS/${APP_NAME}" ]; then
-            echo "Error: App not found in build output"
-            exit 1
-          fi
-          echo "APP_PATH=$APP_PATH" >> "$GITHUB_ENV"
-          echo "Built app at: $APP_PATH"
-
-          echo "Main app architecture:"
+          APP_PATH="$PWD/$BUILD_DIR/DerivedData/Build/Products/Release/${APP_NAME}.app"
+          test -x "$APP_PATH/Contents/MacOS/${APP_NAME}"
           lipo -verify_arch arm64 "$APP_PATH/Contents/MacOS/${APP_NAME}"
           lipo -verify_arch arm64 "$APP_PATH/Contents/PlugIns/${EXTENSION_NAME}.appex/Contents/MacOS/${EXTENSION_NAME}"
+          echo "APP_PATH=$APP_PATH" >> "$GITHUB_ENV"
 
-      # --- 3. 分层代码签名 ---
-      - name: Code Sign
-        env:
-          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      - name: Ad-hoc Sign App and Finder Extension
         run: |
-          set -euo pipefail
+          # 保留沙盒；无证书构建改用单独授权的数据目录，不申请 App Group。
+          python3 - "$BUILD_DIR/Signing" <<'PYTHON'
+          import pathlib
+          import plistlib
+          import sys
 
-          echo "Signing with identity: $CERT_IDENTITY"
+          output = pathlib.Path(sys.argv[1])
+          output.mkdir(parents=True, exist_ok=True)
+          for name in ("RClick", "FinderSyncExt"):
+              entitlements = plistlib.loads(pathlib.Path(name, f"{name}.entitlements").read_bytes())
+              entitlements.pop("com.apple.security.application-groups", None)
+              entitlements["com.apple.security.temporary-exception.files.home-relative-path.read-write"] = [
+                  "/Library/Application Support/RClickLocal/"
+              ]
+              (output / f"{name}.entitlements").write_bytes(plistlib.dumps(entitlements))
+          PYTHON
 
-          MAIN_ENTITLEMENTS="signing/${APP_NAME}.entitlements"
-          EXTENSION_ENTITLEMENTS="signing/${EXTENSION_NAME}.entitlements"
-          cp "${APP_NAME}/${APP_NAME}.entitlements" "$MAIN_ENTITLEMENTS"
-          cp "${EXTENSION_NAME}/${EXTENSION_NAME}.entitlements" "$EXTENSION_ENTITLEMENTS"
-          /usr/libexec/PlistBuddy \
-            -c "Add :com.apple.application-identifier string $APP_IDENTIFIER" \
-            "$MAIN_ENTITLEMENTS"
-          /usr/libexec/PlistBuddy \
-            -c "Add :com.apple.developer.team-identifier string $TEAM_ID" \
-            "$MAIN_ENTITLEMENTS"
-          /usr/libexec/PlistBuddy \
-            -c "Add :com.apple.application-identifier string $EXTENSION_IDENTIFIER" \
-            "$EXTENSION_ENTITLEMENTS"
-          /usr/libexec/PlistBuddy \
-            -c "Add :com.apple.developer.team-identifier string $TEAM_ID" \
-            "$EXTENSION_ENTITLEMENTS"
-
-          # 1) 签名所有 framework
-          if [ -d "$APP_PATH/Contents/Frameworks" ]; then
-            echo "Signing frameworks..."
-            find "$APP_PATH/Contents/Frameworks" -type f -perm +111 \
-              -exec codesign --force --options runtime \
-                --timestamp \
-                --sign "$CERT_IDENTITY" {} \;
-          fi
-
-          # 2) 签名扩展 (FinderSyncExt.appex)
-          echo "Signing FinderSync extension..."
           EXT_PATH="$APP_PATH/Contents/PlugIns/${EXTENSION_NAME}.appex"
-          if [ -d "$EXT_PATH" ]; then
-            cp "$EXTENSION_PROFILE_PATH" "$EXT_PATH/Contents/embedded.provisionprofile"
-            codesign --force --options runtime \
-              --timestamp \
-              --entitlements "$EXTENSION_ENTITLEMENTS" \
-              --sign "$CERT_IDENTITY" \
-              "$EXT_PATH"
-          else
-            echo "FinderSync extension not found at $EXT_PATH"
-            exit 1
-          fi
+          rm -f "$APP_PATH/Contents/embedded.provisionprofile" "$EXT_PATH/Contents/embedded.provisionprofile"
+          codesign --force --options runtime --timestamp=none --sign - \
+            --entitlements "$BUILD_DIR/Signing/${EXTENSION_NAME}.entitlements" "$EXT_PATH"
+          codesign --force --options runtime --timestamp=none --sign - \
+            --entitlements "$BUILD_DIR/Signing/${APP_NAME}.entitlements" "$APP_PATH"
+          codesign --verify --deep --strict --verbose=2 "$APP_PATH"
 
-          # 3) 嵌入主 App profile 并签名
-          echo "Signing main app..."
-          cp "$APP_PROFILE_PATH" "$APP_PATH/Contents/embedded.provisionprofile"
-          codesign --force --options runtime \
-            --timestamp \
-            --entitlements "$MAIN_ENTITLEMENTS" \
-            --sign "$CERT_IDENTITY" \
-            "$APP_PATH"
-
-          # 验证签名、profile 和 App Group 身份声明
-          echo "Verifying signatures and App Group authorization..."
-          test -f "$APP_PATH/Contents/embedded.provisionprofile"
-          test -f "$EXT_PATH/Contents/embedded.provisionprofile"
-          APP_SIGNED_ENTITLEMENTS=$(codesign -d --entitlements - "$APP_PATH" 2>&1)
-          EXTENSION_SIGNED_ENTITLEMENTS=$(codesign -d --entitlements - "$EXT_PATH" 2>&1)
-          grep -Fq "$APP_IDENTIFIER" <<< "$APP_SIGNED_ENTITLEMENTS"
-          grep -Fq "$EXTENSION_IDENTIFIER" <<< "$EXTENSION_SIGNED_ENTITLEMENTS"
-          grep -Fq "$APP_GROUP_ID" <<< "$APP_SIGNED_ENTITLEMENTS"
-          grep -Fq "$APP_GROUP_ID" <<< "$EXTENSION_SIGNED_ENTITLEMENTS"
-          codesign -dv --verbose=4 "$APP_PATH" 2>&1
-          codesign --verify --deep --strict --verbose=4 "$APP_PATH"
-
-      # --- 4. 打包为 ZIP 用于公证 ---
-      - name: Zip for Notarization
+      - name: Package DMG and App ZIP
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
-          ZIP_NAME="${APP_NAME}-v${VERSION}.notarize.zip"
-          ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "$ZIP_NAME"
-          echo "NOTARIZE_ZIP=$ZIP_NAME" >> "$GITHUB_ENV"
-
-      # --- 5. 公证 ---
-      - name: Notarize
-        env:
-          KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
-          ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
-          PRIVATE_KEY: ${{ secrets.NOTARY_PRIVATE_KEY }}
-        run: |
-          set -euo pipefail
-
-          umask 077
-          printf '%s\n' "$PRIVATE_KEY" > "$RUNNER_TEMP/notary-key.p8"
-
-          RESULT=$(xcrun notarytool submit "$NOTARIZE_ZIP" \
-            --key-id "$KEY_ID" \
-            --issuer "$ISSUER_ID" \
-            --key "$RUNNER_TEMP/notary-key.p8" \
-            --wait \
-            --timeout 20m \
-            --output-format json)
-
-          printf '%s\n' "$RESULT" | tee notarization-app.json
-
-          STATUS=$(echo "$RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status','unknown'))")
-          if [ "$STATUS" != "Accepted" ]; then
-            echo "Notarization failed: $STATUS"
-            SUBMISSION_ID=$(echo "$RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin).get('id',''))")
-            if [ -n "$SUBMISSION_ID" ]; then
-              xcrun notarytool log "$SUBMISSION_ID" \
-                --key-id "$KEY_ID" \
-                --issuer "$ISSUER_ID" \
-                --key "$RUNNER_TEMP/notary-key.p8" 2>&1 | tee notarization-app.log || true
-            fi
-            exit 1
-          fi
-
-          echo "Notarization successful"
-
-      # --- 6. 绑定公证票据 ---
-      - name: Staple
-        run: |
-          xcrun stapler staple "$APP_PATH"
-          xcrun stapler validate "$APP_PATH"
-          spctl --assess --type execute --verbose=4 "$APP_PATH"
-
-      # --- 7. 创建 DMG ---
-      - name: Install create-dmg
-        run: brew install create-dmg
-
-      - name: Create DMG
-        env:
-          VERSION: ${{ steps.version.outputs.version }}
-        run: |
-          DMG_NAME="${APP_NAME}-v${VERSION}.dmg"
-
-          DMG_STAGING="dmg-staging"
-          rm -rf "$DMG_STAGING"
-          mkdir -p "$DMG_STAGING"
+          PACKAGE_DIR="$BUILD_DIR/packages"
+          DMG_STAGING="$BUILD_DIR/dmg-staging"
+          mkdir -p "$PACKAGE_DIR" "$DMG_STAGING"
           ditto "$APP_PATH" "$DMG_STAGING/${APP_NAME}.app"
+          ln -s /Applications "$DMG_STAGING/Applications"
 
-          create-dmg \
-            --volname "${APP_NAME}" \
-            --window-pos 200 120 \
-            --window-size 600 400 \
-            --icon-size 100 \
-            --icon "${APP_NAME}.app" 150 200 \
-            --hide-extension "${APP_NAME}.app" \
-            --app-drop-link 450 200 \
-            "$DMG_NAME" \
-            "$DMG_STAGING"
+          hdiutil create \
+            -volname "$APP_NAME" \
+            -srcfolder "$DMG_STAGING" \
+            -format UDZO \
+            "$PACKAGE_DIR/${APP_NAME}-v${VERSION}.dmg" \
+            2>&1 | tee "$BUILD_DIR/package.log"
 
-          codesign --force --timestamp --sign "$CERT_IDENTITY" "$DMG_NAME"
+          ditto -c -k --sequesterRsrc --keepParent \
+            "$APP_PATH" "$PACKAGE_DIR/${APP_NAME}-v${VERSION}.app.zip"
+          (
+            cd "$PACKAGE_DIR"
+            for FILE in *.dmg *.app.zip; do
+              shasum -a 256 "$FILE" > "$FILE.sha256"
+              shasum -a 256 -c "$FILE.sha256"
+            done
+          )
 
-          rm -rf "$DMG_STAGING"
-
-          echo "DMG_NAME=$DMG_NAME" >> "$GITHUB_ENV"
-
-      # --- 7b. DMG 公证 ---
-      - name: Notarize DMG
-        env:
-          KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
-          ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
-          PRIVATE_KEY: ${{ secrets.NOTARY_PRIVATE_KEY }}
+      - name: Prepare Installation Notes
         run: |
-          set -euo pipefail
+          cat > "$BUILD_DIR/release-notes.md" <<'EOF'
+          Apple Silicon (arm64), macOS 15.6 or later.
 
-          umask 077
-          printf '%s\n' "$PRIVATE_KEY" > "$RUNNER_TEMP/notary-key.p8"
+          This build uses ad-hoc signing and is not notarized by Apple.
+          Download the DMG and drag RClick to Applications. If macOS blocks the
+          first launch, follow [Apple's instructions](https://support.apple.com/en-gb/102445)
+          to allow it in System Settings → Privacy & Security → Open Anyway.
+          Then enable RClick's Finder extension in System Settings.
 
-          RESULT=$(xcrun notarytool submit "$DMG_NAME" \
-            --key-id "$KEY_ID" \
-            --issuer "$ISSUER_ID" \
-            --key "$RUNNER_TEMP/notary-key.p8" \
-            --wait \
-            --timeout 20m \
-            --output-format json)
+          This edition stores settings separately from Developer ID builds.
+          EOF
 
-          printf '%s\n' "$RESULT" | tee notarization-dmg.json
-
-          STATUS=$(echo "$RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status','unknown'))")
-          if [ "$STATUS" != "Accepted" ]; then
-            echo "DMG notarization failed: $STATUS"
-            SUBMISSION_ID=$(echo "$RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin).get('id',''))")
-            if [ -n "$SUBMISSION_ID" ]; then
-              xcrun notarytool log "$SUBMISSION_ID" \
-                --key-id "$KEY_ID" --issuer "$ISSUER_ID" \
-                --key "$RUNNER_TEMP/notary-key.p8" 2>&1 | tee notarization-dmg.log || true
-            fi
-            exit 1
-          fi
-
-          xcrun stapler staple "$DMG_NAME"
-          xcrun stapler validate "$DMG_NAME"
-          echo "DMG notarized and stapled"
-
-      # --- 8. 创建 .app.zip（给自动更新器用）---
-      - name: Create App ZIP
-        env:
-          VERSION: ${{ steps.version.outputs.version }}
-        run: |
-          ZIP_NAME="${APP_NAME}-v${VERSION}.app.zip"
-
-          ZIP_STAGING="zip-staging"
-          rm -rf "$ZIP_STAGING"
-          mkdir -p "$ZIP_STAGING"
-          ditto "$APP_PATH" "$ZIP_STAGING/${APP_NAME}.app"
-          ditto -c -k --sequesterRsrc --keepParent "$ZIP_STAGING/${APP_NAME}.app" "$ZIP_NAME"
-          rm -rf "$ZIP_STAGING"
-
-          SHA256=$(shasum -a 256 "$ZIP_NAME" | awk '{print $1}')
-          printf '%s  %s\n' "$SHA256" "$ZIP_NAME" > "${ZIP_NAME}.sha256"
-          shasum -a 256 "$DMG_NAME" > "${DMG_NAME}.sha256"
-
-          echo "ZIP_NAME=$ZIP_NAME" >> "$GITHUB_ENV"
-
-          ls -lh "$ZIP_NAME" "${ZIP_NAME}.sha256" "$DMG_NAME"
-
-      # --- 9. 创建 GitHub Release ---
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            ${{ env.ZIP_NAME }}
-            ${{ env.ZIP_NAME }}.sha256
-            ${{ env.DMG_NAME }}
-            ${{ env.DMG_NAME }}.sha256
           tag_name: ${{ github.ref_name }}
           name: RClick ${{ github.ref_name }}
+          body_path: ${{ env.BUILD_DIR }}/release-notes.md
           generate_release_notes: true
           prerelease: ${{ steps.version.outputs.prerelease == 'true' }}
           fail_on_unmatched_files: true
+          files: |
+            ${{ env.BUILD_DIR }}/packages/*.dmg
+            ${{ env.BUILD_DIR }}/packages/*.dmg.sha256
+            ${{ env.BUILD_DIR }}/packages/*.app.zip
+            ${{ env.BUILD_DIR }}/packages/*.app.zip.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # 失败时保留 tag，直接在 Actions 页面重新运行即可。
-      - name: Upload Build and Notarization Logs
+      - name: Upload Build Logs
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
           name: release-logs-${{ github.run_id }}-${{ github.run_attempt }}
-          path: |
-            build-release.log
-            notarization-*.json
-            notarization-*.log
+          path: ${{ env.BUILD_DIR }}/*.log
           if-no-files-found: ignore
           retention-days: 14
-
-      - name: Cleanup Signing Credentials
-        if: always()
-        run: |
-          if [[ -n "${KEYCHAIN_PATH:-}" && -f "$KEYCHAIN_PATH" ]]; then
-            security delete-keychain "$KEYCHAIN_PATH"
-          fi
-          rm -f "$RUNNER_TEMP/certificate.p12" "$RUNNER_TEMP/notary-key.p8"
-          rm -rf signing

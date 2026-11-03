@@ -94,10 +94,15 @@ extension String {
 
 extension UserDefaults {
     static let group: UserDefaults = {
+#if RC_LOCAL_BUILD
+        // 配置只由主程序持久化，扩展通过 IPC 接收，无需访问受保护的 suite。
+        return .standard
+#else
         if let suite = UserDefaults(suiteName: "group.cn.wflixu.RClick") {
             return suite
         }
         return .standard
+#endif
     }()
 
     var showContextualMenuForItem: Bool {

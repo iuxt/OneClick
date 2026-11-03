@@ -87,8 +87,8 @@ class SharedDataManager {
 
     /// 定位容器目录并打开 ModelContainer。不做任何 trap，失败一律抛给调用方。
     static func makeSharedModelContainer() throws -> ModelContainer {
-        // 获取 App Group 共享目录
-        guard let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupIdentifier) else {
+        // 开发者构建使用 App Group，本地构建使用单独授权的数据目录。
+        guard let containerURL = SharedAppGroup.containerURL else {
             throw SharedStoreError.appGroupUnavailable(identifier: appGroupIdentifier)
         }
         let storeURL = containerURL.appendingPathComponent("RClickDatabase.sqlite")
@@ -102,6 +102,7 @@ class SharedDataManager {
 
         // 创建 ModelContainer，注册所有模型
         do {
+            try FileManager.default.createDirectory(at: containerURL, withIntermediateDirectories: true)
             return try ModelContainer(
                 for: AppEntity.self,
                      ActionEntity.self,
