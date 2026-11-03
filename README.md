@@ -100,6 +100,16 @@ xcodebuild -project RClick.xcodeproj -scheme RClick -configuration Release
 - **FinderSync** framework for Finder extension
 - **DistributedNotificationCenter** for IPC
 
+### Publishing a Release
+
+Push a version tag such as `v2.3.3` to trigger the release workflow. It builds an
+Apple Silicon app, signs and notarizes it, then uploads a DMG, an app ZIP, and
+SHA-256 checksums to GitHub Releases with automatically generated release notes.
+Tags such as `v2.3.3-rc.1` create prereleases instead.
+
+Configure the Apple signing and notarization secrets before the first release.
+See the [release guide](docs/releasing.md) for setup, tag commands, and retries.
+
 ### 🌐 Localization
 
 RClick supports five languages with the following priority:
