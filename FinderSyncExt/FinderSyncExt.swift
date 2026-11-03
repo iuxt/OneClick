@@ -611,6 +611,14 @@ class FinderSyncExt: FIFinderSync, @unchecked Sendable {
             let selected = FIFinderSyncController.default().selectedItemURLs() ?? []
             item.isEnabled = isHostAppRunning && currentMenuKind == .contextualMenuForItems && !selected.isEmpty
         }
+        if ["compress-zip", "compress-targz", "compress-zip-encrypted", "compress-7z-encrypted", "extract"].contains(action.id) {
+            let selected = FIFinderSyncController.default().selectedItemURLs() ?? []
+            let hasSelection = currentMenuKind == .contextualMenuForItems && !selected.isEmpty
+            item.isEnabled = isHostAppRunning && hasSelection
+            if action.id == "extract" {
+                item.isEnabled = item.isEnabled && selected.allSatisfy { ArchiveFormat.suffix(for: $0) != nil }
+            }
+        }
         return item
     }
 

@@ -216,8 +216,13 @@ extension RCAction {
     static let unhideFileDir = RCAction(id: "unhide", name: "Unhide", enabled: false, idx: 3, icon: "eye")
     static let airdrop = RCAction(id: "airdrop", name: "AirDrop", enabled: false, idx: 4, icon: "paperplane")
     static let checksum = RCAction(id: "checksum", name: "File Checksums", enabled: true, idx: 5, icon: "number.square")
+    static let compressZip = RCAction(id: "compress-zip", name: "Compress to ZIP", idx: 6, icon: "archivebox")
+    static let compressTarGzip = RCAction(id: "compress-targz", name: "Compress to TAR.GZ", idx: 7, icon: "archivebox")
+    static let extract = RCAction(id: "extract", name: "Extract Here", idx: 8, icon: "shippingbox")
+    static let compressEncryptedZip = RCAction(id: "compress-zip-encrypted", name: "Compress to Encrypted ZIP…", idx: 9, icon: "lock.doc")
+    static let compressEncryptedSevenZip = RCAction(id: "compress-7z-encrypted", name: "Compress to Encrypted 7Z…", idx: 10, icon: "lock.doc")
 
-    static let all: [RCAction] = [.copyPath, .deleteDirect, .airdrop, .hideFileDir, .unhideFileDir, .checksum]
+    static let all: [RCAction] = [.copyPath, .deleteDirect, .airdrop, .hideFileDir, .unhideFileDir, .checksum, .compressZip, .compressTarGzip, .extract, .compressEncryptedZip, .compressEncryptedSevenZip]
 }
 
 // New File Type
@@ -406,6 +411,11 @@ extension RCAction {
         case "unhide": return AppLocalization.localized("Unhide")
         case "airdrop": return AppLocalization.localized("AirDrop")
         case "checksum": return AppLocalization.localized("File Checksums")
+        case "compress-zip": return AppLocalization.localized("Compress to ZIP")
+        case "compress-targz": return AppLocalization.localized("Compress to TAR.GZ")
+        case "extract": return AppLocalization.localized("Extract Here")
+        case "compress-zip-encrypted": return AppLocalization.localized("Compress to Encrypted ZIP…")
+        case "compress-7z-encrypted": return AppLocalization.localized("Compress to Encrypted 7Z…")
         default: return name
         }
     }

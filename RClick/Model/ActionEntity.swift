@@ -53,6 +53,11 @@ final class ActionEntity {
             ActionEntity(id: "unhide", name: "Unhide", icon: "eye", isEnabled: false, sortOrder: 3),
             ActionEntity(id: "airdrop", name: "AirDrop", icon: "paperplane", isEnabled: false, sortOrder: 4),
             ActionEntity(id: "checksum", name: "File Checksums", icon: "number.square", isEnabled: true, sortOrder: 5),
+            ActionEntity(id: "compress-zip", name: "Compress to ZIP", icon: "archivebox", isEnabled: true, sortOrder: 6),
+            ActionEntity(id: "compress-targz", name: "Compress to TAR.GZ", icon: "archivebox", isEnabled: true, sortOrder: 7),
+            ActionEntity(id: "extract", name: "Extract Here", icon: "shippingbox", isEnabled: true, sortOrder: 8),
+            ActionEntity(id: "compress-zip-encrypted", name: "Compress to Encrypted ZIP…", icon: "lock.doc", isEnabled: true, sortOrder: 9),
+            ActionEntity(id: "compress-7z-encrypted", name: "Compress to Encrypted 7Z…", icon: "lock.doc", isEnabled: true, sortOrder: 10),
         ]
     }
 }

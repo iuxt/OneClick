@@ -21,13 +21,16 @@ final class ActionService {
     private let permission: PermissionProviding
     private let confirmation: DeleteConfirmationProviding
     private let checksums: ChecksumPresenting
+    private let archives: ArchivePresenting
 
     init(state: ActionStateProviding, permission: PermissionProviding, confirmation: DeleteConfirmationProviding,
-         checksums: ChecksumPresenting = ChecksumWindowPresenter.shared) {
+         checksums: ChecksumPresenting = ChecksumWindowPresenter.shared,
+         archives: ArchivePresenting = ArchiveWindowPresenter.shared) {
         self.state = state
         self.permission = permission
         self.confirmation = confirmation
         self.checksums = checksums
+        self.archives = archives
     }
 
     // MARK: - SystemActions
@@ -146,8 +149,37 @@ final class ActionService {
             await showAirDrop(target, trigger)
         case "checksum":
             await showChecksums(target)
+        case "compress-zip", "compress-targz", "compress-zip-encrypted", "compress-7z-encrypted", "extract":
+            guard trigger == "ctx-items", let operation = ArchiveOperation(rawValue: rcitem.id) else { return }
+            await showArchives(target, operation: operation)
         default:
             logger.warning("no action id matched")
+        }
+    }
+
+    func showArchives(_ target: [String], operation: ArchiveOperation) async {
+        let urls = target.map { URL(fileURLWithPath: $0) }
+        guard !urls.isEmpty else { return }
+        var denied: Set<URL> = []
+        var checked: Set<URL> = []
+        for url in urls {
+            let parent = url.deletingLastPathComponent().resolvingSymlinksInPath()
+            guard checked.insert(parent).inserted else { continue }
+            if !permission.hasAccess(to: parent) {
+                let chosen = await permission.promptForPermission(for: parent)
+                if chosen == nil || !permission.hasAccess(to: parent) { denied.insert(parent) }
+            }
+        }
+        let accessError = AppLocalization.localized("File access was not granted.")
+        if operation == .extract {
+            archives.show(requests: urls.map { url in
+                ArchiveRequest(operation: operation, urls: [url],
+                               error: denied.contains(url.deletingLastPathComponent().resolvingSymlinksInPath()) ? accessError : nil)
+            })
+        } else {
+            // A compression request is all-or-nothing: never silently omit a
+            // selected item when authorization for one of its folders is denied.
+            archives.show(requests: [ArchiveRequest(operation: operation, urls: urls, error: denied.isEmpty ? nil : accessError)])
         }
     }
 

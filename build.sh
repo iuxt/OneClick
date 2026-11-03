@@ -105,6 +105,8 @@ for name in ("RClick", "FinderSyncExt"):
 PY
     rm -f "$APP_PATH/Contents/embedded.provisionprofile" "$EXTENSION_PATH/Contents/embedded.provisionprofile"
     codesign --force --options runtime --timestamp=none --sign - \
+        --entitlements "$ROOT_DIR/Vendor/7zip/7zz.entitlements" "$APP_PATH/Contents/Helpers/7zz"
+    codesign --force --options runtime --timestamp=none --sign - \
         --entitlements "$BUILD_DIR/Signing/FinderSyncExt.entitlements" "$EXTENSION_PATH"
     codesign --force --options runtime --timestamp=none --sign - \
         --entitlements "$BUILD_DIR/Signing/RClick.entitlements" "$APP_PATH"
