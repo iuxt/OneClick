@@ -288,7 +288,7 @@ private struct ArchiveView: View {
             HStack(spacing: 12) {
                 Spacer()
                 if model.isRunning || pendingRow != nil {
-                    Button(AppLocalization.localized("Cancel")) { model.cancel() }
+                    Button(AppLocalization.localized("Cancel"), action: close)
                         .keyboardShortcut(.cancelAction)
                     if pendingRow != nil {
                         Button(AppLocalization.localized(submitTitle), action: submit)

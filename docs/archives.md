@@ -14,9 +14,10 @@ compression shortcuts remain available there. Existing enabled/disabled choices
 are preserved when the new Compress… action is added.
 They require selected items; Finder's empty-space and toolbar menus disable them.
 
-The operation window shows current activity, errors, cancellation, and a
-**Show in Finder** button for each completed result. Closing the window cancels
-unfinished work. Folder authorization uses RClick's existing bookmark service.
+The operation window shows current activity, errors, and a
+**Show in Finder** button for each completed result. **Cancel** closes the window.
+Closing the window cancels unfinished work. Folder authorization uses RClick's
+existing bookmark service.
 Cancelling authorization never produces a partially selected compression archive.
 
 ## Password protection

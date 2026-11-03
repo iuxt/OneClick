@@ -48,7 +48,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "压缩…"
+            "value": "自定义压缩"
           }
         },
         "ja": {
@@ -468,7 +468,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "点击“压缩…”后，可在窗口中调整这些选项并设置密码。"
+            "value": "点击“自定义压缩”后，可在窗口中调整这些选项并设置密码。"
           }
         },
         "ja": {
