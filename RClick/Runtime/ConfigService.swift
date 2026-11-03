@@ -61,6 +61,20 @@ final class ConfigService {
             )
         } ?? []
 
+        // Add the new built-in action to existing installations without changing
+        // saved ordering or re-enabling a checksum action the user disabled.
+        if !data.actions.isEmpty && !data.actions.contains(where: { $0.id == RCAction.checksum.id }) {
+            var action = RCAction.checksum
+            action.idx = (data.actions.map(\.idx).max() ?? -1) + 1
+            data.actions.append(action)
+            modelContext.insert(ActionEntity(from: action))
+            do {
+                try modelContext.save()
+            } catch {
+                logger.error("Could not save checksum action: \(error.localizedDescription)")
+            }
+        }
+
         // NewFiles
         let newFileDescriptor = FetchDescriptor<NewFileTypeEntity>(sortBy: [SortDescriptor(\.sortOrder)])
         data.newFiles = (try? modelContext.fetch(newFileDescriptor))?.map { entity in

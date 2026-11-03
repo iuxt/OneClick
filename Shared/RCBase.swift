@@ -215,8 +215,9 @@ extension RCAction {
     static let hideFileDir = RCAction(id: "hide", name: "Hide", enabled: false, idx: 2, icon: "eye.slash")
     static let unhideFileDir = RCAction(id: "unhide", name: "Unhide", enabled: false, idx: 3, icon: "eye")
     static let airdrop = RCAction(id: "airdrop", name: "AirDrop", enabled: false, idx: 4, icon: "paperplane")
+    static let checksum = RCAction(id: "checksum", name: "File Checksums", enabled: true, idx: 5, icon: "number.square")
 
-    static let all: [RCAction] = [.copyPath, .deleteDirect, .airdrop, .hideFileDir, .unhideFileDir]
+    static let all: [RCAction] = [.copyPath, .deleteDirect, .airdrop, .hideFileDir, .unhideFileDir, .checksum]
 }
 
 // New File Type
@@ -404,6 +405,7 @@ extension RCAction {
         case "hide": return AppLocalization.localized("Hide")
         case "unhide": return AppLocalization.localized("Unhide")
         case "airdrop": return AppLocalization.localized("AirDrop")
+        case "checksum": return AppLocalization.localized("File Checksums")
         default: return name
         }
     }

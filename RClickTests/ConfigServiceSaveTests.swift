@@ -71,4 +71,20 @@ struct ConfigServiceSaveTests {
 
         #expect(try context.fetch(FetchDescriptor<AppEntity>()).count == 2)
     }
+
+    @Test func existingConfigGetsChecksumActionOnceAndKeepsDisabledChoice() throws {
+        let (service, context) = try makeService()
+        try service.save(payload)
+        let first = service.load()
+        #expect(first.actions.map(\.id) == ["copy-path", "checksum"])
+        #expect(first.actions.last?.enabled == true)
+        #expect(first.actions.last?.idx == 1)
+        _ = service.load()
+        #expect(try context.fetch(FetchDescriptor<ActionEntity>()).count == 2)
+
+        var disabled = first
+        disabled.actions[1].enabled = false
+        try service.save(disabled)
+        #expect(service.load().actions.last?.enabled == false)
+    }
 }

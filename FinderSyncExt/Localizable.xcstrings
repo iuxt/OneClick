@@ -1,6 +1,41 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "File Checksums": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "File Checksums"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文件校验码"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ファイルのチェックサム"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sumas de verificación"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sommes de contrôle"
+          }
+        }
+      }
+    },
     "%@ (skip confirmation)": {
       "extractionState": "manual",
       "localizations": {

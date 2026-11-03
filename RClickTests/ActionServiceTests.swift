@@ -66,8 +66,52 @@ final class ActionServiceTests {
         var showCommonDirs = false
 
         func getAppItem(rid: String) -> OpenWithApp? { nil }
-        func getActionItem(rid: String) -> RCAction? { nil }
+        func getActionItem(rid: String) -> RCAction? { actions.first { $0.id == rid } }
         func getFileType(rid: String) -> NewFile? { nil }
+    }
+
+    @MainActor
+    private final class MockChecksums: ChecksumPresenting {
+        var inputs: [ChecksumInput] = []
+        func show(inputs: [ChecksumInput]) { self.inputs = inputs }
+    }
+
+    @Test func checksumActionKeepsLiteralPercentPathsAndRequestsPermission() async {
+        let permission = MockPermission()
+        permission.promptResult = URL(fileURLWithPath: "/tmp")
+        let checksums = MockChecksums()
+        let state = MockState()
+        state.actions = [.checksum]
+        let service = ActionService(state: state, permission: permission, confirmation: MockConfirmation(), checksums: checksums)
+
+        await service.actionHandler(rid: "checksum", target: ["/tmp/literal%20.txt"], trigger: "ctx-items")
+
+        #expect(permission.promptCalls.count == 1)
+        #expect(checksums.inputs.first?.url.lastPathComponent == "literal%20.txt")
+        #expect(checksums.inputs.first?.error == nil)
+    }
+
+    @Test func cancelledChecksumAuthorizationIsReportedWithoutRepeatedPrompts() async {
+        let permission = MockPermission()
+        let checksums = MockChecksums()
+        let service = ActionService(state: MockState(), permission: permission, confirmation: MockConfirmation(), checksums: checksums)
+
+        await service.showChecksums(["/tmp/a.txt", "/tmp/b.txt"])
+
+        #expect(permission.promptCalls.count == 1)
+        #expect(checksums.inputs.count == 2)
+        #expect(checksums.inputs.allSatisfy { $0.error != nil })
+    }
+
+    @Test func unrelatedChecksumAuthorizationDoesNotAllowReading() async {
+        let permission = MockPermission()
+        permission.promptResult = URL(fileURLWithPath: "/unrelated")
+        let checksums = MockChecksums()
+        let service = ActionService(state: MockState(), permission: permission, confirmation: MockConfirmation(), checksums: checksums)
+
+        await service.showChecksums(["/tmp/a.txt"])
+
+        #expect(checksums.inputs.first?.error != nil)
     }
 
     private func makeTempFile() throws -> (dir: URL, file: URL) {

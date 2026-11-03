@@ -17,6 +17,7 @@ Enhance your macOS Finder context menu with custom actions. Built with Swift 6.2
 
 - [x] **Open with External App** — Open files or directories with any installed application, with support for custom arguments and environment variables. Ships with presets for popular editors, terminals and IDEs, per-app visibility for the toolbar and context menus, and none/simple/original icon styles.
 - [x] **Copy Path** — Copy the full path of selected files or folders to clipboard.
+- [x] **File Checksums** — Right-click selected files to calculate MD5, SHA1, and SHA256 with bounded multi-core parallelism, streaming reads, progress, cancellation, and copyable results. Available by default; toggle it in Settings → Actions.
 - [x] **Delete Direct** — Delete files or folders directly, bypassing Trash. RClick asks for confirmation first; hold **Option** while choosing the action to skip it.
 - [x] **Hide / Unhide** — Toggle file visibility in Finder.
 - [x] **AirDrop** — Share files instantly via AirDrop.
