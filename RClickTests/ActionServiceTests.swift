@@ -76,6 +76,63 @@ final class ActionServiceTests {
         func show(inputs: [ChecksumInput]) { self.inputs = inputs }
     }
 
+    @MainActor
+    private final class MockArchives: ArchivePresenting {
+        var requests: [ArchiveRequest] = []
+        func show(requests: [ArchiveRequest]) { self.requests = requests }
+    }
+
+    @Test func archiveDispatchKeepsLiteralNamesAndRejectsEmptySpaceMenus() async {
+        let permission = MockPermission()
+        permission.hasAccessResult = true
+        let archives = MockArchives()
+        let state = MockState()
+        state.actions = [.compressZip, .compressTarGzip, .extract]
+        let service = ActionService(state: state, permission: permission, confirmation: MockConfirmation(), archives: archives)
+        await service.actionHandler(rid: "compress-zip", target: ["/tmp/literal%20.txt"], trigger: "ctx-container")
+        #expect(archives.requests.isEmpty)
+        await service.actionHandler(rid: "compress-zip", target: ["/tmp/literal%20.txt"], trigger: "ctx-items")
+        #expect(archives.requests.first?.urls.first?.lastPathComponent == "literal%20.txt")
+        #expect(archives.requests.first?.operation == .zip)
+        #expect(archives.requests.first?.error == nil)
+    }
+
+    @Test func cancelledArchiveAuthorizationPromptsOnceAndFailsWholeCompression() async {
+        let permission = MockPermission()
+        let archives = MockArchives()
+        let service = ActionService(state: MockState(), permission: permission, confirmation: MockConfirmation(), archives: archives)
+        await service.showArchives(["/tmp/a.txt", "/tmp/b.txt"], operation: .tarGzip)
+        #expect(permission.promptCalls.count == 1)
+        #expect(archives.requests.count == 1)
+        #expect(archives.requests.first?.urls.count == 2)
+        #expect(archives.requests.first?.error != nil)
+    }
+
+    @Test(arguments: [ArchiveOperation.encryptedZip, .encryptedSevenZip])
+    func encryptedArchiveActionsDispatchToPasswordWindow(operation: ArchiveOperation) async {
+        let permission = MockPermission()
+        permission.hasAccessResult = true
+        let archives = MockArchives()
+        let state = MockState()
+        state.actions = [.compressEncryptedZip, .compressEncryptedSevenZip]
+        let service = ActionService(state: state, permission: permission, confirmation: MockConfirmation(), archives: archives)
+        await service.actionHandler(rid: operation.rawValue, target: ["/tmp/file.txt"], trigger: "ctx-items")
+        #expect(archives.requests.count == 1)
+        #expect(archives.requests.first?.operation == operation)
+        #expect(archives.requests.first?.error == nil)
+    }
+
+    @Test func unrelatedArchivePermissionDoesNotAllowExtraction() async {
+        let permission = MockPermission()
+        permission.promptResult = URL(fileURLWithPath: "/unrelated")
+        let archives = MockArchives()
+        let service = ActionService(state: MockState(), permission: permission, confirmation: MockConfirmation(), archives: archives)
+        await service.showArchives(["/tmp/a.zip", "/tmp/b.tar.gz"], operation: .extract)
+        #expect(permission.promptCalls.count == 1)
+        #expect(archives.requests.count == 2)
+        #expect(archives.requests.allSatisfy { $0.error != nil })
+    }
+
     @Test func checksumActionKeepsLiteralPercentPathsAndRequestsPermission() async {
         let permission = MockPermission()
         permission.promptResult = URL(fileURLWithPath: "/tmp")

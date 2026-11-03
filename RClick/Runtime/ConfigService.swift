@@ -61,17 +61,21 @@ final class ConfigService {
             )
         } ?? []
 
-        // Add the new built-in action to existing installations without changing
-        // saved ordering or re-enabling a checksum action the user disabled.
-        if !data.actions.isEmpty && !data.actions.contains(where: { $0.id == RCAction.checksum.id }) {
-            var action = RCAction.checksum
+        // Append newly introduced actions once, preserving saved ordering and
+        // disabled choices on subsequent loads.
+        let newActions: [RCAction] = [.checksum, .compressZip, .compressTarGzip, .extract, .compressEncryptedZip, .compressEncryptedSevenZip]
+        var addedActions = false
+        for var action in newActions where !data.actions.isEmpty && !data.actions.contains(where: { $0.id == action.id }) {
             action.idx = (data.actions.map(\.idx).max() ?? -1) + 1
             data.actions.append(action)
             modelContext.insert(ActionEntity(from: action))
+            addedActions = true
+        }
+        if addedActions {
             do {
                 try modelContext.save()
             } catch {
-                logger.error("Could not save checksum action: \(error.localizedDescription)")
+                logger.error("Could not save built-in actions: \(error.localizedDescription)")
             }
         }
 

@@ -72,19 +72,24 @@ struct ConfigServiceSaveTests {
         #expect(try context.fetch(FetchDescriptor<AppEntity>()).count == 2)
     }
 
-    @Test func existingConfigGetsChecksumActionOnceAndKeepsDisabledChoice() throws {
+    @Test func existingConfigGetsNewActionsOnceAndKeepsDisabledChoices() throws {
         let (service, context) = try makeService()
         try service.save(payload)
         let first = service.load()
-        #expect(first.actions.map(\.id) == ["copy-path", "checksum"])
-        #expect(first.actions.last?.enabled == true)
-        #expect(first.actions.last?.idx == 1)
+        #expect(first.actions.map(\.id) == ["copy-path", "checksum", "compress-zip", "compress-targz", "extract", "compress-zip-encrypted", "compress-7z-encrypted"])
+        #expect(first.actions.dropFirst().allSatisfy { $0.enabled })
+        #expect(first.actions.map(\.idx) == [0, 1, 2, 3, 4, 5, 6])
         _ = service.load()
-        #expect(try context.fetch(FetchDescriptor<ActionEntity>()).count == 2)
+        #expect(try context.fetch(FetchDescriptor<ActionEntity>()).count == 7)
 
         var disabled = first
         disabled.actions[1].enabled = false
+        disabled.actions[2].enabled = false
+        disabled.actions[3].enabled = false
+        disabled.actions[4].enabled = false
+        disabled.actions[5].enabled = false
+        disabled.actions[6].enabled = false
         try service.save(disabled)
-        #expect(service.load().actions.last?.enabled == false)
+        #expect(service.load().actions.dropFirst().allSatisfy { !$0.enabled })
     }
 }

@@ -184,6 +184,7 @@
 				5C8A28D62F83D65900FE687C /* Sources */,
 				5C8A28D72F83D65900FE687C /* Frameworks */,
 				5C8A28D82F83D65900FE687C /* Resources */,
+				7A1100000000000000000001 /* Embed Archive Tool */,
 				5C8A29202F83D74A00FE687C /* Embed Foundation Extensions */,
 			);
 			buildRules = (
@@ -315,6 +316,32 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		7A1100000000000000000001 /* Embed Archive Tool */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = ();
+			inputPaths = (
+				"$(SRCROOT)/scripts/embed-archive-tool.sh",
+				"$(SRCROOT)/Vendor/7zip/7zz",
+				"$(SRCROOT)/Vendor/7zip/7zz.entitlements",
+				"$(SRCROOT)/Vendor/7zip/License.txt",
+				"$(SRCROOT)/Vendor/7zip/COPYING.LESSER",
+				"$(SRCROOT)/Vendor/7zip/README.md",
+				"$(SRCROOT)/Vendor/7zip/7zip-26.05-src.tar.xz",
+			);
+			name = "Embed Archive Tool";
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Helpers",
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/7zip",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/bash;
+			shellScript = "\"$SRCROOT/scripts/embed-archive-tool.sh\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		5C8A28D62F83D65900FE687C /* Sources */ = {
@@ -495,6 +522,7 @@
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = RClick;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
@@ -533,6 +561,7 @@
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = RClick;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
