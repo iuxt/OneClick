@@ -20,11 +20,14 @@ final class ActionService {
     private let state: ActionStateProviding
     private let permission: PermissionProviding
     private let confirmation: DeleteConfirmationProviding
+    private let checksums: ChecksumPresenting
 
-    init(state: ActionStateProviding, permission: PermissionProviding, confirmation: DeleteConfirmationProviding) {
+    init(state: ActionStateProviding, permission: PermissionProviding, confirmation: DeleteConfirmationProviding,
+         checksums: ChecksumPresenting = ChecksumWindowPresenter.shared) {
         self.state = state
         self.permission = permission
         self.confirmation = confirmation
+        self.checksums = checksums
     }
 
     // MARK: - SystemActions
@@ -141,9 +144,38 @@ final class ActionService {
             await hideFilesAndDirs(target, trigger)
         case "airdrop":
             await showAirDrop(target, trigger)
+        case "checksum":
+            await showChecksums(target)
         default:
             logger.warning("no action id matched")
         }
+    }
+
+    func showChecksums(_ target: [String]) async {
+        var inputs: [ChecksumInput] = []
+        var deniedDirectories: Set<URL> = []
+        for path in target {
+            // Finder sends native paths, so a literal "%20" in a filename must
+            // not be percent-decoded into a different file.
+            let url = URL(fileURLWithPath: path)
+            let directory = url.resolvingSymlinksInPath().deletingLastPathComponent()
+            if !permission.hasAccess(to: directory) {
+                let granted: Bool
+                if deniedDirectories.contains(directory) {
+                    granted = false
+                } else {
+                    let chosen = await permission.promptForPermission(for: directory)
+                    granted = chosen != nil && permission.hasAccess(to: directory)
+                }
+                if !granted {
+                    deniedDirectories.insert(directory)
+                    inputs.append(ChecksumInput(url: url, error: AppLocalization.localized("File access was not granted.")))
+                    continue
+                }
+            }
+            inputs.append(ChecksumInput(url: url))
+        }
+        checksums.show(inputs: inputs)
     }
 
     func showAirDrop(_ target: [String], _ trigger: String) async {

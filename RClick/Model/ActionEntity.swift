@@ -44,7 +44,7 @@ final class ActionEntity {
         )
     }
 
-    // 预定义动作的工厂方法（默认只开启前两个）
+    // 预定义动作的工厂方法
     static func createDefaultActions() -> [ActionEntity] {
         return [
             ActionEntity(id: "copy-path", name: "Copy Path", icon: "doc.on.doc", isEnabled: true, sortOrder: 0),
@@ -52,6 +52,7 @@ final class ActionEntity {
             ActionEntity(id: "hide", name: "Hide", icon: "eye.slash", isEnabled: false, sortOrder: 2),
             ActionEntity(id: "unhide", name: "Unhide", icon: "eye", isEnabled: false, sortOrder: 3),
             ActionEntity(id: "airdrop", name: "AirDrop", icon: "paperplane", isEnabled: false, sortOrder: 4),
+            ActionEntity(id: "checksum", name: "File Checksums", icon: "number.square", isEnabled: true, sortOrder: 5),
         ]
     }
 }

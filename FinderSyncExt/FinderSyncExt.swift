@@ -607,6 +607,10 @@ class FinderSyncExt: FIFinderSync, @unchecked Sendable {
         if !isHostAppRunning && action.id != Self.copyPathActionId {
             item.isEnabled = false
         }
+        if action.id == "checksum" {
+            let selected = FIFinderSyncController.default().selectedItemURLs() ?? []
+            item.isEnabled = isHostAppRunning && currentMenuKind == .contextualMenuForItems && !selected.isEmpty
+        }
         return item
     }
 
