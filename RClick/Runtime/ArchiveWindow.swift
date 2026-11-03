@@ -34,7 +34,7 @@ private final class ArchiveWindowController: NSWindowController, NSWindowDelegat
         let window = NSWindow(contentViewController: NSHostingController(rootView: ArchiveView(model: model)))
         window.title = AppLocalization.localized("Archives")
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
-        window.setContentSize(NSSize(width: 640, height: 400))
+        window.setContentSize(NSSize(width: 640, height: requests.contains(where: { $0.operation == .compress }) ? 520 : 400))
         window.minSize = NSSize(width: 520, height: 300)
         window.center()
         super.init(window: window)
@@ -53,11 +53,12 @@ private final class ArchiveWindowController: NSWindowController, NSWindowDelegat
 final class ArchiveViewModel: ObservableObject {
     struct Row: Identifiable {
         let id: Int
-        let request: ArchiveRequest
+        var request: ArchiveRequest
         var output: URL?
         var error: String?
         var isRunning = false
         var needsPassword = false
+        var needsConfiguration = false
     }
 
     @Published private(set) var rows: [Row]
@@ -71,14 +72,30 @@ final class ArchiveViewModel: ObservableObject {
     init(requests: [ArchiveRequest]) {
         rows = requests.enumerated().map {
             Row(id: $0.offset, request: $0.element, error: $0.element.error,
-                needsPassword: $0.element.operation.isEncryptedCompression && $0.element.error == nil)
+                needsPassword: $0.element.operation.isEncryptedCompression && $0.element.error == nil,
+                needsConfiguration: $0.element.operation == .compress && $0.element.error == nil)
         }
     }
 
     func start() {
         guard !hasStarted, !rows.isEmpty else { return }
         hasStarted = true
-        run(indices: rows.indices.filter { !rows[$0].needsPassword && rows[$0].error == nil })
+        run(indices: rows.indices.filter { !rows[$0].needsPassword && !rows[$0].needsConfiguration && rows[$0].error == nil })
+    }
+
+    func submitCompression(for index: Int, format: ArchiveCompressionFormat,
+                           level: ArchiveCompressionLevel, password: String?) {
+        guard !isRunning, rows.indices.contains(index), rows[index].needsConfiguration else { return }
+        // Never silently discard a requested password for an unsupported format.
+        guard format != .tarGzip || password == nil else {
+            rows[index].error = ArchiveError.encryptionNotSupported.localizedDescription
+            return
+        }
+        rows[index].request = ArchiveRequest(operation: format.operation(encrypted: password != nil),
+                                             urls: rows[index].request.urls, compressionLevel: level)
+        rows[index].error = nil
+        rows[index].needsConfiguration = false
+        run(indices: [index], password: password)
     }
 
     func submitPassword(for index: Int, password: String) {
@@ -134,11 +151,13 @@ final class ArchiveViewModel: ObservableObject {
     }
 
     func cancel() {
+        hasStarted = true
         task?.cancel()
         progress?.cancel()
-        for index in rows.indices where rows[index].output == nil && (rows[index].error == nil || rows[index].needsPassword) {
+        for index in rows.indices where rows[index].output == nil && (rows[index].error == nil || rows[index].needsPassword || rows[index].needsConfiguration) {
             rows[index].error = AppLocalization.localized("Cancelled")
             rows[index].needsPassword = false
+            rows[index].needsConfiguration = false
         }
         // Keep isRunning until the worker exits and cleans its staging folder.
     }
@@ -153,7 +172,7 @@ private struct ArchiveView: View {
                 Label(AppLocalization.localized("Archives"), systemImage: "archivebox")
                     .font(.title2.bold())
                 Spacer()
-                if model.isRunning || model.rows.contains(where: \.needsPassword) {
+                if model.isRunning || model.rows.contains(where: { $0.needsPassword || $0.needsConfiguration }) {
                     Button(AppLocalization.localized("Cancel")) { model.cancel() }
                 }
             }
@@ -180,8 +199,13 @@ private struct ArchiveView: View {
                             } else {
                                 if let error = row.error {
                                     Text(error).foregroundStyle(.secondary).textSelection(.enabled)
-                                } else if !row.isRunning && !row.needsPassword {
+                                } else if !row.isRunning && !row.needsPassword && !row.needsConfiguration {
                                     Text(appLocalized: "Waiting…").foregroundStyle(.secondary)
+                                }
+                                if row.needsConfiguration {
+                                    ArchiveCompressionForm(disabled: model.isRunning) { format, level, password in
+                                        model.submitCompression(for: row.id, format: format, level: level, password: password)
+                                    }
                                 }
                                 if row.needsPassword {
                                     ArchivePasswordForm(operation: row.request.operation,
@@ -199,6 +223,100 @@ private struct ArchiveView: View {
         .padding(20)
         .frame(minWidth: 480, minHeight: 260)
         .onAppear { model.start() }
+    }
+}
+
+private struct ArchiveCompressionForm: View {
+    let disabled: Bool
+    let submit: (ArchiveCompressionFormat, ArchiveCompressionLevel, String?) -> Void
+    @State private var format = ArchiveCompressionFormat(rawValue: UserDefaults.group.string(forKey: "archiveCompressionFormat") ?? "") ?? .zip
+    @State private var level = ArchiveCompressionLevel(rawValue: UserDefaults.group.integer(forKey: "archiveCompressionLevel")) ?? .normal
+    @State private var encrypted = false
+    @State private var password = ""
+    @State private var confirmation = ""
+
+    private var passwordError: String? {
+        guard encrypted else { return nil }
+        if password.isEmpty { return nil }
+        if password.utf8.count > 1_024 || password.contains(where: { $0 == "\n" || $0 == "\r" || $0 == "\0" }) {
+            return ArchiveError.invalidPassword.localizedDescription
+        }
+        if format == .zip && !ArchiveService.isValidZIPPassword(password) {
+            return ArchiveError.invalidZIPPassword.localizedDescription
+        }
+        if !confirmation.isEmpty && password != confirmation {
+            return AppLocalization.localized("Passwords do not match.")
+        }
+        return nil
+    }
+
+    private var canSubmit: Bool {
+        !disabled && (!encrypted || (!password.isEmpty && password == confirmation && passwordError == nil && format != .tarGzip))
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            LabeledContent(AppLocalization.localized("Archive Format")) {
+                Picker(AppLocalization.localized("Archive Format"), selection: $format) {
+                    ForEach(ArchiveCompressionFormat.allCases, id: \.self) { format in
+                        Text(verbatim: format.rawValue).tag(format)
+                    }
+                }
+                .labelsHidden()
+                .frame(width: 200)
+            }
+            LabeledContent(AppLocalization.localized("Compression Level")) {
+                Picker(AppLocalization.localized("Compression Level"), selection: $level) {
+                    ForEach(ArchiveCompressionLevel.allCases, id: \.self) { level in
+                        Text(level.title).tag(level)
+                    }
+                }
+                .labelsHidden()
+                .frame(width: 200)
+            }
+            Text(appLocalized: "Higher compression levels can create smaller archives but take more time.")
+                .font(.caption).foregroundStyle(.secondary)
+            Toggle(AppLocalization.localized("Password Protection"), isOn: $encrypted)
+                .disabled(format == .tarGzip)
+            if format == .tarGzip {
+                Text(appLocalized: "TAR.GZ does not support passwords.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            if encrypted {
+                SecureField(AppLocalization.localized("Password"), text: $password)
+                SecureField(AppLocalization.localized("Confirm Password"), text: $confirmation)
+                Text(appLocalized: format == .sevenZip
+                     ? "AES-256 protects file contents and file names."
+                     : "AES-256 protects file contents. File names remain visible.")
+                    .font(.caption).foregroundStyle(.secondary)
+                if let passwordError {
+                    Text(passwordError).font(.caption).foregroundStyle(.red)
+                }
+            }
+            HStack {
+                Spacer()
+                Button(AppLocalization.localized("Create Archive")) {
+                    guard canSubmit else { return }
+                    let value = encrypted ? password : nil
+                    password = ""
+                    confirmation = ""
+                    submit(format, level, value)
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(!canSubmit)
+            }
+        }
+        .textFieldStyle(.roundedBorder)
+        .disabled(disabled)
+        .onChange(of: format) {
+            if format == .tarGzip { encrypted = false }
+        }
+        .onChange(of: encrypted) {
+            if !encrypted {
+                password = ""
+                confirmation = ""
+            }
+        }
     }
 }
 

@@ -37,6 +37,7 @@ class AppState: ObservableObject, ActionStateProviding {
     // 它们原本在 UserDefaults.standard，靠 init 里那一次 migrateLayoutToggles 搬过来。
     @AppStorage("foldAppsMenu", store: .group) var foldAppsMenu: Bool = false
     @AppStorage("foldActionsMenu", store: .group) var foldActionsMenu: Bool = false
+    @AppStorage("foldArchivesMenu", store: .group) var foldArchivesMenu: Bool = false
     @AppStorage("foldNewFileMenu", store: .group) var foldNewFileMenu: Bool = true
     @AppStorage("foldCommonDirMenu", store: .group) var foldCommonDirMenu: Bool = true
     // 常用文件夹总开关（默认关闭）
@@ -194,6 +195,23 @@ class AppState: ObservableObject, ActionStateProviding {
 
     @MainActor func resetActionItems() {
         actions = RCAction.all
+        persist()
+    }
+
+    /// Reorder only the visible category, retaining every other category's slots.
+    @MainActor func moveActions(from source: IndexSet, to destination: Int, archives: Bool) {
+        let slots = actions.indices.filter { actions[$0].isArchive == archives }
+        var items = slots.map { actions[$0] }
+        items.move(fromOffsets: source, toOffset: destination)
+        for (slot, item) in zip(slots, items) { actions[slot] = item }
+        for index in actions.indices { actions[index].idx = index }
+        persist()
+    }
+
+    @MainActor func resetActionItems(archives: Bool) {
+        actions.removeAll { $0.isArchive == archives }
+        actions.append(contentsOf: RCAction.all.filter { $0.isArchive == archives })
+        for index in actions.indices { actions[index].idx = index }
         persist()
     }
 

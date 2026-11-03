@@ -149,7 +149,7 @@ final class ActionService {
             await showAirDrop(target, trigger)
         case "checksum":
             await showChecksums(target)
-        case "compress-zip", "compress-targz", "compress-zip-encrypted", "compress-7z-encrypted", "extract":
+        case "compress", "compress-zip", "compress-targz", "compress-zip-encrypted", "compress-7z-encrypted", "extract":
             guard trigger == "ctx-items", let operation = ArchiveOperation(rawValue: rcitem.id) else { return }
             await showArchives(target, operation: operation)
         default:

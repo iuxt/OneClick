@@ -3,6 +3,25 @@ import Testing
 @testable import RClick
 
 struct ArchiveServiceTests {
+    @Test(arguments: ArchiveCompressionFormat.allCases)
+    func compressionLevelChangesOutputAndPreservesContents(format: ArchiveCompressionFormat) async throws {
+        let root = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = root.appendingPathComponent("repeated.txt")
+        let text = (0..<20_000).map { "Row \($0 % 997): \($0 % 131) abcdefghijklmnopqrstuvwxyz \($0 % 53)\n" }.joined()
+        let data = Data(text.utf8)
+        try data.write(to: source)
+        let fastest = try await ArchiveService.perform(ArchiveRequest(operation: format.operation(encrypted: false), urls: [source], compressionLevel: .fastest))
+        let maximum = try await ArchiveService.perform(ArchiveRequest(operation: format.operation(encrypted: false), urls: [source], compressionLevel: .maximum))
+        // This mixed sample exercises different match lengths. Uniform repeated
+        // text can produce equal-sized ZIP output at different levels.
+        #expect(try Data(contentsOf: maximum).count != Data(contentsOf: fastest).count)
+        for archive in [fastest, maximum] {
+            let output = try await ArchiveService.perform(ArchiveRequest(operation: .extract, urls: [archive]))
+            #expect(try Data(contentsOf: output.appendingPathComponent("repeated.txt")) == data)
+        }
+    }
+
     private func temporaryDirectory() throws -> URL {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("rclick-archives-\(UUID())")
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)

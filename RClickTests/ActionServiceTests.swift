@@ -87,7 +87,7 @@ final class ActionServiceTests {
         permission.hasAccessResult = true
         let archives = MockArchives()
         let state = MockState()
-        state.actions = [.compressZip, .compressTarGzip, .extract]
+        state.actions = [.compress, .compressZip, .compressTarGzip, .extract]
         let service = ActionService(state: state, permission: permission, confirmation: MockConfirmation(), archives: archives)
         await service.actionHandler(rid: "compress-zip", target: ["/tmp/literal%20.txt"], trigger: "ctx-container")
         #expect(archives.requests.isEmpty)
@@ -95,6 +95,8 @@ final class ActionServiceTests {
         #expect(archives.requests.first?.urls.first?.lastPathComponent == "literal%20.txt")
         #expect(archives.requests.first?.operation == .zip)
         #expect(archives.requests.first?.error == nil)
+        await service.actionHandler(rid: "compress", target: ["/tmp/literal%20.txt"], trigger: "ctx-items")
+        #expect(archives.requests.first?.operation == .compress)
     }
 
     @Test func cancelledArchiveAuthorizationPromptsOnceAndFailsWholeCompression() async {

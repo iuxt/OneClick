@@ -2,7 +2,9 @@ import Foundation
 import Darwin
 
 nonisolated enum ArchiveOperation: String, Sendable, CaseIterable {
+    case compress = "compress"
     case zip = "compress-zip"
+    case sevenZip = "compress-7z"
     case tarGzip = "compress-targz"
     case encryptedZip = "compress-zip-encrypted"
     case encryptedSevenZip = "compress-7z-encrypted"
@@ -10,7 +12,9 @@ nonisolated enum ArchiveOperation: String, Sendable, CaseIterable {
 
     var title: String {
         let key = switch self {
+        case .compress: "Compress…"
         case .zip: "Compress to ZIP"
+        case .sevenZip: "Compress to 7Z"
         case .tarGzip: "Compress to TAR.GZ"
         case .encryptedZip: "Compress to Encrypted ZIP…"
         case .encryptedSevenZip: "Compress to Encrypted 7Z…"
@@ -22,7 +26,7 @@ nonisolated enum ArchiveOperation: String, Sendable, CaseIterable {
     var fileExtension: String {
         switch self {
         case .tarGzip: "tar.gz"
-        case .encryptedSevenZip: "7z"
+        case .sevenZip, .encryptedSevenZip: "7z"
         default: "zip"
         }
     }
@@ -30,17 +34,48 @@ nonisolated enum ArchiveOperation: String, Sendable, CaseIterable {
     var isEncryptedCompression: Bool { self == .encryptedZip || self == .encryptedSevenZip }
 }
 
+nonisolated enum ArchiveCompressionFormat: String, CaseIterable, Sendable {
+    case zip = "ZIP"
+    case sevenZip = "7Z"
+    case tarGzip = "TAR.GZ"
+
+    func operation(encrypted: Bool) -> ArchiveOperation {
+        switch self {
+        case .zip: encrypted ? .encryptedZip : .zip
+        case .sevenZip: encrypted ? .encryptedSevenZip : .sevenZip
+        case .tarGzip: .tarGzip
+        }
+    }
+}
+
+nonisolated enum ArchiveCompressionLevel: Int, CaseIterable, Sendable {
+    case fastest = 1, fast = 3, normal = 5, maximum = 9
+
+    var title: String {
+        let key = switch self {
+        case .fastest: "Fastest"
+        case .fast: "Fast"
+        case .normal: "Normal"
+        case .maximum: "Maximum"
+        }
+        return AppLocalization.localized(key)
+    }
+}
+
 nonisolated struct ArchiveRequest: Sendable {
     let operation: ArchiveOperation
     let urls: [URL]
     var error: String? = nil
+    var compressionLevel: ArchiveCompressionLevel? = nil
 }
 
 nonisolated enum ArchiveError: LocalizedError, Equatable {
-    case invalidSelection, notArchive, passwordRequired, incorrectPassword, invalidPassword, invalidZIPPassword, encryptionNotSupported, toolUnavailable, failed(String)
+    case invalidSelection, notArchive, configurationRequired, passwordRequired, incorrectPassword, invalidPassword, invalidZIPPassword, encryptionNotSupported, toolUnavailable, failed(String)
 
     var errorDescription: String? {
         switch self {
+        case .configurationRequired:
+            AppLocalization.localized("Choose compression options before creating the archive.")
         case .invalidSelection:
             AppLocalization.localized("Select files or folders from the same directory to compress.")
         case .notArchive:
@@ -125,6 +160,7 @@ nonisolated enum ArchiveService {
         try await withTaskCancellationHandler {
             try Task.checkCancellation()
             if let error = request.error { throw ArchiveError.failed(error) }
+            guard request.operation != .compress else { throw ArchiveError.configurationRequired }
             if let password {
                 guard !password.isEmpty, password.utf8.count <= 1_024,
                       !password.contains(where: { $0 == "\n" || $0 == "\r" || $0 == "\0" }) else {
@@ -181,7 +217,8 @@ nonisolated enum ArchiveService {
                                  "--no-same-owner", "--no-same-permissions", "--no-acls", "--no-xattrs", "--no-fflags"]
                 }
             } else {
-                useSevenZip = request.operation.isEncryptedCompression
+                useSevenZip = request.operation.isEncryptedCompression || request.operation == .sevenZip
+                    || (request.operation == .zip && request.compressionLevel != nil)
                 result = staging.appendingPathComponent(useSevenZip ? "archive." + request.operation.fileExtension : "archive")
                 name = request.urls.count == 1 ? first.lastPathComponent : AppLocalization.localized("Archive")
                 ext = "." + request.operation.fileExtension
@@ -189,11 +226,16 @@ nonisolated enum ArchiveService {
                 // ./ also prevents bsdtar's special @archive syntax and options
                 // from interpreting filenames such as @file or -file.
                 if useSevenZip {
-                    let encryption = request.operation == .encryptedZip ? ["-tzip", "-mem=AES256"] : ["-t7z", "-mhe=on", "-mmt=2"]
-                    arguments = ["a"] + encryption + ["-p", "-snl", "-y", "-bd", "-bb1", result.path, "--"]
+                    let isZIP = request.operation == .zip || request.operation == .encryptedZip
+                    let formatOptions = isZIP ? ["-tzip"] : ["-t7z", "-mmt=2"]
+                    let encryption = request.operation.isEncryptedCompression
+                        ? (isZIP ? ["-mem=AES256", "-p"] : ["-mhe=on", "-p"]) : []
+                    let level = request.compressionLevel.map { ["-mx=\($0.rawValue)"] } ?? []
+                    arguments = ["a"] + formatOptions + encryption + level + ["-snl", "-y", "-bd", "-bb1", result.path, "--"]
                         + request.urls.map { "./" + $0.lastPathComponent }
                 } else {
-                    arguments = ["-cvf", result.path] + format + ["-C", parent.path, "--"]
+                    let level = request.compressionLevel.map { ["--options", "gzip:compression-level=\($0.rawValue)"] } ?? []
+                    arguments = ["-cvf", result.path] + format + level + ["-C", parent.path, "--"]
                         + request.urls.map { "./" + $0.lastPathComponent }
                 }
             }

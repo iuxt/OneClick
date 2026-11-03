@@ -27,6 +27,7 @@ final class MenuService {
                 CommonDirMenuItem(id: $0.id, name: $0.displayName, icon: $0.icon, url: $0.url.path)
             } : [],
             actionsCollapsed: state.foldActionsMenu,
+            archivesCollapsed: state.foldArchivesMenu,
             appsCollapsed: state.foldAppsMenu,
             newFilesCollapsed: state.foldNewFileMenu,
             commonDirsCollapsed: state.foldCommonDirMenu,

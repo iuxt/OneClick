@@ -452,13 +452,15 @@ class FinderSyncExt: FIFinderSync, @unchecked Sendable {
             return menu
         }
 
+        let archiveActions = config.actions.filter { RCAction.archiveIDs.contains($0.id) }
+        let regularActions = config.actions.filter { !RCAction.archiveIDs.contains($0.id) }
         // 构建动作菜单
-        if !config.actions.isEmpty {
+        if !regularActions.isEmpty {
             if config.actionsCollapsed {
                 // 折叠：使用子菜单
                 let actionsTitle = AppLocalization.localized("Actions")
                 let actionsSubMenu = NSMenu(title: actionsTitle)
-                for action in config.actions {
+                for action in regularActions {
                     let item = makeActionItem(action)
                     actionsSubMenu.addItem(item)
                 }
@@ -468,10 +470,25 @@ class FinderSyncExt: FIFinderSync, @unchecked Sendable {
                 menu.addItem(actionsItem)
             } else {
                 // 不折叠：直接显示菜单项
-                for action in config.actions {
+                for action in regularActions {
                     let item = makeActionItem(action)
                     menu.addItem(item)
                 }
+            }
+        }
+
+        if !archiveActions.isEmpty {
+            if config.archivesCollapsed {
+                let title = AppLocalization.localized("Compression & Extraction")
+                let submenu = NSMenu(title: title)
+                submenu.autoenablesItems = false
+                for action in archiveActions { submenu.addItem(makeActionItem(action)) }
+                let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+                item.submenu = submenu
+                item.image = templateSymbol("archivebox")
+                menu.addItem(item)
+            } else {
+                for action in archiveActions { menu.addItem(makeActionItem(action)) }
             }
         }
 
@@ -611,7 +628,7 @@ class FinderSyncExt: FIFinderSync, @unchecked Sendable {
             let selected = FIFinderSyncController.default().selectedItemURLs() ?? []
             item.isEnabled = isHostAppRunning && currentMenuKind == .contextualMenuForItems && !selected.isEmpty
         }
-        if ["compress-zip", "compress-targz", "compress-zip-encrypted", "compress-7z-encrypted", "extract"].contains(action.id) {
+        if RCAction.archiveIDs.contains(action.id) {
             let selected = FIFinderSyncController.default().selectedItemURLs() ?? []
             let hasSelection = currentMenuKind == .contextualMenuForItems && !selected.isEmpty
             item.isEnabled = isHostAppRunning && hasSelection

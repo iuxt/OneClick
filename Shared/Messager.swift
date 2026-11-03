@@ -51,6 +51,7 @@ struct MenuConfigPayload: Codable {
     let commonDirs: [CommonDirMenuItem]
     /// 是否折叠动作菜单（默认 false）
     let actionsCollapsed: Bool
+    let archivesCollapsed: Bool
     /// 是否折叠应用菜单（默认 false）
     let appsCollapsed: Bool
     /// 是否折叠新建文件菜单（默认 true）
@@ -67,6 +68,7 @@ struct MenuConfigPayload: Codable {
         newFiles: [NewFileMenuItem] = [],
         commonDirs: [CommonDirMenuItem] = [],
         actionsCollapsed: Bool = false,
+        archivesCollapsed: Bool = false,
         appsCollapsed: Bool = false,
         newFilesCollapsed: Bool = true,
         commonDirsCollapsed: Bool = true,
@@ -78,6 +80,7 @@ struct MenuConfigPayload: Codable {
         self.newFiles = newFiles
         self.commonDirs = commonDirs
         self.actionsCollapsed = actionsCollapsed
+        self.archivesCollapsed = archivesCollapsed
         self.appsCollapsed = appsCollapsed
         self.newFilesCollapsed = newFilesCollapsed
         self.commonDirsCollapsed = commonDirsCollapsed
@@ -86,7 +89,7 @@ struct MenuConfigPayload: Codable {
 
     private enum CodingKeys: String, CodingKey {
         case version, actions, apps, newFiles, commonDirs
-        case actionsCollapsed, appsCollapsed, newFilesCollapsed, commonDirsCollapsed
+        case actionsCollapsed, archivesCollapsed, appsCollapsed, newFilesCollapsed, commonDirsCollapsed
         case iconStyle
     }
 
@@ -98,6 +101,7 @@ struct MenuConfigPayload: Codable {
         newFiles = try values.decode([NewFileMenuItem].self, forKey: .newFiles)
         commonDirs = try values.decode([CommonDirMenuItem].self, forKey: .commonDirs)
         actionsCollapsed = try values.decode(Bool.self, forKey: .actionsCollapsed)
+        archivesCollapsed = try values.decodeIfPresent(Bool.self, forKey: .archivesCollapsed) ?? false
         appsCollapsed = try values.decode(Bool.self, forKey: .appsCollapsed)
         newFilesCollapsed = try values.decode(Bool.self, forKey: .newFilesCollapsed)
         commonDirsCollapsed = try values.decode(Bool.self, forKey: .commonDirsCollapsed)

@@ -12,6 +12,7 @@ enum Tabs: String, CaseIterable, Identifiable {
     case general = "General"
     case apps = "Apps"
     case actions = "Actions"
+    case archives = "Compression & Extraction"
     case newFile = "New File"
     case cdirs = "Common Dir"
     case about = "About"
@@ -23,6 +24,7 @@ enum Tabs: String, CaseIterable, Identifiable {
         case .general: "gearshape"
         case .apps: "app.badge"
         case .actions: "bolt.square"
+        case .archives: "archivebox"
         case .newFile: "doc.badge.plus"
         case .cdirs: "folder.badge.gearshape"
         case .about: "info.circle"
@@ -35,6 +37,7 @@ enum Tabs: String, CaseIterable, Identifiable {
         case .general: .blue
         case .apps: .indigo
         case .actions: .orange
+        case .archives: .brown
         case .newFile: .green
         case .cdirs: .teal
         case .about: .purple
@@ -69,7 +72,7 @@ struct SettingsView: View {
             .padding(.top, 20)
             .padding(.bottom, 16)
 
-            // 六个 tab 垂直排列，间距完全由代码控制（无原生 List 隐藏 inset）
+            // 侧边栏 tab 垂直排列。
             VStack(spacing: 4) {
                 ForEach(Tabs.allCases, id: \.self) { tab in
                     sidebarButton(tab)
@@ -126,6 +129,8 @@ struct SettingsView: View {
                 AppsSettingsTabView()
             case .actions:
                 ActionSettingsTabView()
+            case .archives:
+                ArchiveSettingsTabView()
             case .newFile:
                 NewFileSettingsTabView()
             case .cdirs:

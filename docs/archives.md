@@ -1,9 +1,17 @@
 # Finder compression and extraction
 
-Select files or folders in Finder and choose **Compress to ZIP** or **Compress to
-TAR.GZ**. Multiple selections are stored together in one archive. Select archives
+Select files or folders in Finder and choose **Compress…**. The window lets you
+choose ZIP, 7Z or TAR.GZ, a compression level (Fastest, Fast, Normal or Maximum),
+and optional password protection for ZIP and 7Z. Compression starts only when you
+click **Compress**. Higher levels generally trade processing time for smaller
+archives; the actual result depends on the input. Multiple selections are stored
+together in one archive. Select archives
 and choose **Extract Here** to extract each into its own folder beside the archive.
-These actions are enabled by default and can be toggled in Settings → Actions.
+These actions can be toggled and reordered in Settings → Compression & Extraction,
+which also provides default format and compression level settings, and an
+independent menu-collapse switch. The existing direct ZIP/TAR.GZ and encrypted
+compression shortcuts remain available there. Existing enabled/disabled choices
+are preserved when the new Compress… action is added.
 They require selected items; Finder's empty-space and toolbar menus disable them.
 
 The operation window shows current activity, errors, cancellation, and a
@@ -36,9 +44,10 @@ translations, binaries and issue tracking rather than the complete application
 source. This implementation is independent; it does not copy Keka code or require
 Keka to be installed.
 
-`ArchiveService` uses Apple's `/usr/bin/tar` (bsdtar/libarchive) for ordinary
-compression and TAR-family extraction, and an unmodified, bundled official
-7-Zip 26.05 universal macOS executable for encrypted compression and ZIP/7Z/RAR
+`ArchiveService` uses Apple's `/usr/bin/tar` (bsdtar/libarchive) for TAR.GZ and the
+direct ZIP shortcut, and TAR-family extraction. An unmodified, bundled official
+7-Zip 26.05 universal macOS executable handles configurable ZIP/7Z compression,
+encrypted compression and ZIP/7Z/RAR
 extraction. Each is launched by `Process` with separate arguments and no shell.
 The helper is signed with sandbox-inheritance entitlements. Operations run off
 the main actor and stream bounded diagnostic output. File data is handled by the
@@ -58,6 +67,7 @@ ownership, ACLs, extended attributes, file flags or privileged permissions.
 
 - Create ZIP and gzip-compressed PAX/TAR archives, including nested folders,
   empty folders, hidden files, and symbolic links without following them.
+- Create ordinary 7Z archives and configure compression levels for ZIP, 7Z and TAR.GZ.
 - Create AES-256 encrypted ZIP and 7Z archives. The latter encrypts headers too.
 - Recognize ZIP/ZIPX, 7Z, RAR, TAR, TAR.GZ/TGZ, TAR.BZ2/TBZ/TBZ2, TAR.XZ/TXZ,
   TAR.LZMA, TAR.Z, JAR, WAR, APK, IPA, XPI, CAB, ISO, CPIO and CPGZ.

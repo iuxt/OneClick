@@ -62,6 +62,12 @@ final class ChecksumViewModel: ObservableObject {
         var error: String?
     }
 
+    struct FileGroup: Identifiable {
+        let id: Int
+        let url: URL
+        let rows: [Row]
+    }
+
     @Published private(set) var rows: [Row]
     @Published private(set) var isRunning = false
     private let inputs: [ChecksumInput]
@@ -79,6 +85,14 @@ final class ChecksumViewModel: ObservableObject {
 
     var progress: Double {
         rows.isEmpty ? 0 : rows.reduce(0) { $0 + $1.fraction } / Double(rows.count)
+    }
+
+    var fileGroups: [FileGroup] {
+        let algorithmCount = ChecksumAlgorithm.allCases.count
+        return inputs.enumerated().map { index, input in
+            let start = index * algorithmCount
+            return FileGroup(id: index, url: input.url, rows: Array(rows[start..<(start + algorithmCount)]))
+        }
     }
 
     var copyText: String {
@@ -144,26 +158,44 @@ private struct ChecksumView: View {
                 }
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 16) {
-                        ForEach(model.rows) { row in
-                            VStack(alignment: .leading, spacing: 6) {
-                                HStack {
-                                    Text(row.url.lastPathComponent).font(.headline)
-                                    Text(row.algorithm.rawValue).foregroundStyle(.secondary)
-                                    Spacer()
-                                    if let digest = row.digest {
-                                        Button(AppLocalization.localized("Copy")) { model.copy(digest) }
+                        ForEach(model.fileGroups) { file in
+                            VStack(alignment: .leading, spacing: 0) {
+                                HStack(spacing: 10) {
+                                    Image(systemName: "doc")
+                                        .font(.title2)
+                                        .foregroundStyle(.secondary)
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(file.url.lastPathComponent)
+                                            .font(.headline)
+                                        Text(file.url.deletingLastPathComponent().path)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    .lineLimit(1)
+                                    .truncationMode(.middle)
+                                    .textSelection(.enabled)
+                                    Spacer(minLength: 0)
+                                }
+                                .padding(14)
+                                .help(file.url.path)
+
+                                Divider()
+
+                                VStack(spacing: 12) {
+                                    ForEach(file.rows) { row in
+                                        ChecksumResultRow(row: row, copy: model.copy)
+                                        if row.id != file.rows.last?.id {
+                                            Divider()
+                                        }
                                     }
                                 }
-                                Text(row.url.path).font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
-                                if let digest = row.digest {
-                                    Text(digest).font(.system(.body, design: .monospaced)).textSelection(.enabled)
-                                } else if let error = row.error {
-                                    Text(error).foregroundStyle(.secondary).textSelection(.enabled)
-                                } else {
-                                    ProgressView(value: row.fraction)
-                                }
+                                .padding(14)
                             }
-                            Divider()
+                            .background(.background, in: RoundedRectangle(cornerRadius: 10))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 10)
+                                    .strokeBorder(.quaternary, lineWidth: 1)
+                            }
                         }
                     }
                 }
@@ -172,5 +204,40 @@ private struct ChecksumView: View {
         .padding(20)
         .frame(minWidth: 610, minHeight: 320)
         .onAppear { model.start() }
+    }
+}
+
+private struct ChecksumResultRow: View {
+    let row: ChecksumViewModel.Row
+    let copy: (String) -> Void
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Text(row.algorithm.rawValue)
+                .font(.system(.caption, design: .monospaced).weight(.medium))
+                .foregroundStyle(.secondary)
+                .frame(width: 56, alignment: .leading)
+
+            Group {
+                if let digest = row.digest {
+                    Text(digest)
+                        .font(.system(.callout, design: .monospaced))
+                        .textSelection(.enabled)
+                } else if let error = row.error {
+                    Text(error)
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                } else {
+                    ProgressView(value: row.fraction)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .fixedSize(horizontal: false, vertical: true)
+
+            Button(AppLocalization.localized("Copy")) {
+                if let digest = row.digest { copy(digest) }
+            }
+            .disabled(row.digest == nil)
+        }
     }
 }

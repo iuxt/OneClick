@@ -5,6 +5,16 @@ import SwiftData
 
 @MainActor
 struct MenuCompatibilityTests {
+    @Test func archiveCollapseOptionSurvivesIPCAndDefaultsForOldPayloads() throws {
+        let payload = MenuConfigPayload(archivesCollapsed: true)
+        let encoded = try JSONEncoder().encode(payload)
+        #expect(try JSONDecoder().decode(MenuConfigPayload.self, from: encoded).archivesCollapsed)
+        var oldPayload = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+        oldPayload.removeValue(forKey: "archivesCollapsed")
+        let oldData = try JSONSerialization.data(withJSONObject: oldPayload)
+        #expect(try !JSONDecoder().decode(MenuConfigPayload.self, from: oldData).archivesCollapsed)
+    }
+
     @Test func oldAppPayloadKeepsBothMenusVisible() throws {
         let json = #"{"id":"terminal","name":"Terminal","icon":"terminal","tag":0,"appURL":"/Applications/Terminal.app"}"#
         let app = try JSONDecoder().decode(AppMenuItem.self, from: Data(json.utf8))
