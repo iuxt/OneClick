@@ -210,7 +210,7 @@ struct RCAction: @MainActor RCBase {
 
 extension RCAction {
 
-    nonisolated static let archiveIDs: Set<String> = ["compress", "compress-zip", "compress-targz", "compress-zip-encrypted", "compress-7z-encrypted", "extract"]
+    nonisolated static let archiveIDs: Set<String> = ["compress", "compress-zip", "compress-zip-separately", "compress-targz", "compress-zip-encrypted", "compress-7z-encrypted", "extract"]
     var isArchive: Bool { Self.archiveIDs.contains(id) }
 
     static let copyPath = RCAction(id: "copy-path", name: "Copy Path", enabled: true, idx: 0, icon: "doc.on.doc")
@@ -225,8 +225,9 @@ extension RCAction {
     static let compressEncryptedZip = RCAction(id: "compress-zip-encrypted", name: "Compress to Encrypted ZIP…", idx: 9, icon: "lock.doc")
     static let compressEncryptedSevenZip = RCAction(id: "compress-7z-encrypted", name: "Compress to Encrypted 7Z…", idx: 10, icon: "lock.doc")
     static let compress = RCAction(id: "compress", name: "Compress…", idx: 11, icon: "archivebox")
+    static let compressZipSeparately = RCAction(id: "compress-zip-separately", name: "Compress to Separate ZIPs", idx: 12, icon: "archivebox")
 
-    static let all: [RCAction] = [.copyPath, .deleteDirect, .airdrop, .hideFileDir, .unhideFileDir, .checksum, .compressZip, .compressTarGzip, .extract, .compressEncryptedZip, .compressEncryptedSevenZip, .compress]
+    static let all: [RCAction] = [.copyPath, .deleteDirect, .airdrop, .hideFileDir, .unhideFileDir, .checksum, .compressZip, .compressTarGzip, .extract, .compressEncryptedZip, .compressEncryptedSevenZip, .compress, .compressZipSeparately]
 }
 
 // New File Type
@@ -416,6 +417,7 @@ extension RCAction {
         case "airdrop": return AppLocalization.localized("AirDrop")
         case "checksum": return AppLocalization.localized("File Checksums")
         case "compress-zip": return AppLocalization.localized("Compress to ZIP")
+        case "compress-zip-separately": return AppLocalization.localized("Compress to Separate ZIPs")
         case "compress": return AppLocalization.localized("Compress…")
         case "compress-targz": return AppLocalization.localized("Compress to TAR.GZ")
         case "extract": return AppLocalization.localized("Extract Here")

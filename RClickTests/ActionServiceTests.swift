@@ -99,6 +99,75 @@ final class ActionServiceTests {
         #expect(archives.requests.first?.operation == .compress)
     }
 
+    @Test func separateZIPActionCreatesIndependentArchivesAndContinuesAfterFailure() async throws {
+        let fm = FileManager.default
+        let root = fm.temporaryDirectory.appendingPathComponent("rclick-separate-\(UUID())")
+        try fm.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: root) }
+        let file = root.appendingPathComponent("literal%20.txt")
+        let folder = root.appendingPathComponent("folder")
+        try Data("file contents".utf8).write(to: file)
+        try fm.createDirectory(at: folder, withIntermediateDirectories: false)
+        try Data("nested contents".utf8).write(to: folder.appendingPathComponent("nested.txt"))
+        let existing = root.appendingPathComponent("literal%20.txt.zip")
+        let existingContents = Data("existing archive".utf8)
+        try existingContents.write(to: existing)
+
+        let permission = MockPermission()
+        permission.hasAccessResult = true
+        let archives = MockArchives()
+        let state = MockState()
+        state.actions = [.compressZipSeparately]
+        let service = ActionService(state: state, permission: permission, confirmation: MockConfirmation(), archives: archives)
+        let target = [root.appendingPathComponent("missing.txt").path, file.path, folder.path]
+        for trigger in ["ctx-container", "toolbar", "ctx-sidebar"] {
+            await service.actionHandler(rid: "compress-zip-separately", target: target, trigger: trigger)
+            #expect(archives.requests.isEmpty)
+        }
+        await service.actionHandler(rid: "compress-zip-separately", target: [], trigger: "ctx-items")
+        #expect(archives.requests.isEmpty)
+        await service.actionHandler(rid: "compress-zip-separately", target: target, trigger: "ctx-items")
+
+        let model = ArchiveViewModel(requests: archives.requests, compressionSettings: ArchiveCompressionSettings())
+        model.start()
+        let deadline = ContinuousClock.now + .seconds(15)
+        while model.isRunning && ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        defer { model.cancel() }
+        #expect(!model.isRunning)
+        #expect(model.rows.count == 3)
+        #expect(model.rows[0].error != nil)
+        let fileZIP = try #require(model.rows[1].output)
+        let folderZIP = try #require(model.rows[2].output)
+        #expect(fileZIP == root.appendingPathComponent("literal%20.txt (2).zip"))
+        #expect(folderZIP == root.appendingPathComponent("folder.zip"))
+        #expect(try Data(contentsOf: existing) == existingContents)
+        for (archive, expectedPath, contents) in [(fileZIP, "literal%20.txt", "file contents"), (folderZIP, "folder/nested.txt", "nested contents")] {
+            let output = try await ArchiveService.perform(ArchiveRequest(operation: .extract, urls: [archive]))
+            #expect(try String(contentsOf: output.appendingPathComponent(expectedPath), encoding: .utf8) == contents)
+            #expect(try fm.contentsOfDirectory(atPath: output.path).count == 1)
+        }
+    }
+
+    @Test func separateZIPAuthorizationFailureAffectsOnlyItsDirectory() async {
+        let permission = MockPermission()
+        let allowed = URL(fileURLWithPath: "/tmp/allowed")
+        permission.authorizedDirs = [allowed.resolvingSymlinksInPath().path]
+        let archives = MockArchives()
+        let state = MockState()
+        state.actions = [.compressZipSeparately]
+        let service = ActionService(state: state, permission: permission, confirmation: MockConfirmation(), archives: archives)
+        await service.actionHandler(rid: "compress-zip-separately",
+                                    target: ["/tmp/denied/a.txt", "/tmp/denied/b.txt", allowed.appendingPathComponent("c.txt").path],
+                                    trigger: "ctx-items")
+        #expect(permission.promptCalls.count == 1)
+        #expect(archives.requests.count == 3)
+        #expect(archives.requests[0].error != nil)
+        #expect(archives.requests[1].error != nil)
+        #expect(archives.requests[2].error == nil)
+    }
+
     @Test func cancelledArchiveAuthorizationPromptsOnceAndFailsWholeCompression() async {
         let permission = MockPermission()
         let archives = MockArchives()

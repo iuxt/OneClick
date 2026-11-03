@@ -5,11 +5,17 @@ choose ZIP, 7Z or TAR.GZ, a compression level (Fastest, Fast, Normal or Maximum)
 and optional password protection for ZIP and 7Z. Compression starts only when you
 click **Compress**. Higher levels generally trade processing time for smaller
 archives; the actual result depends on the input. Multiple selections are stored
-together in one archive. Select archives
+together in one archive. Choose **Compress to Separate ZIPs** to create one ZIP
+per selected file or folder beside its source, using the source's full name
+(for example, `notes.txt.zip`). Existing names gain a numbered suffix. Each item
+has its own progress result, so a failed item does not stop the rest of the batch.
+This shortcut uses the same compression exclusions and CPU thread setting.
+Select archives
 and choose **Extract Here** to extract each into its own folder beside the archive.
 These actions can be toggled and reordered in Settings → Compression & Extraction,
-which also provides default format and compression level settings, and an
-independent menu-collapse switch. The existing direct ZIP/TAR.GZ and encrypted
+which also provides default format and compression level settings, a compression
+CPU thread limit, an exclusion list, and an independent menu-collapse switch.
+The existing direct ZIP/TAR.GZ and encrypted
 compression shortcuts remain available there. Existing enabled/disabled choices
 are preserved when the new Compress… action is added.
 They require selected items; Finder's empty-space and toolbar menus disable them.
@@ -19,6 +25,23 @@ The operation window shows current activity, errors, and a
 Closing the window cancels unfinished work. Folder authorization uses RClick's
 existing bookmark service.
 Cancelling authorization never produces a partially selected compression archive.
+
+## Compression exclusions and CPU threads
+
+In Settings → Compression & Extraction, enable **Exclude matching files** and
+edit the **Exclusion List**, one file or folder name pattern per line. Patterns
+such as `.DS_Store`, `node_modules` and `*.tmp` apply at every folder level,
+including explicitly selected items. Matching folders and their contents are
+omitted. Empty lines and duplicate patterns are ignored. Exclusions default to
+off; the initial list contains `.DS_Store` and `__MACOSX`. Disabling exclusions
+retains the list. Extraction always restores the full archive contents.
+
+**Compression CPU Threads** defaults to **Automatic** (the available logical CPU
+count), or can be set from one to the available logical CPU count. ZIP and 7Z,
+including encrypted archives, pass this limit to 7-Zip; actual CPU use depends
+on the codec and input. TAR.GZ uses a single-threaded system gzip encoder.
+Both settings apply to **Compress…** and the direct compression shortcuts.
+**Restore Defaults** also resets these settings.
 
 ## Password protection
 
@@ -38,6 +61,28 @@ Passwords containing line breaks or null characters, or exceeding 1,024 UTF-8
 bytes, are rejected. Archives using different passwords for individual entries
 are not supported by this single-password workflow.
 
+## Split volumes and solid compression
+
+In **Compress…**, enable **Split into Volumes** for ZIP or 7Z, including encrypted
+archives. Choose **CD (700 MiB)**, **DVD (4.7 GB)**, **FAT32 (4 GiB − 1 B)**,
+or **Custom Size** with a positive whole number in B, KiB, MiB or GiB. DVD uses
+4,700,000,000 bytes; FAT32 uses 4,294,967,295 bytes to stay below its 4 GiB limit.
+The size is the maximum per volume; the last volume can be smaller. Splitting is
+off by default and is unavailable for TAR.GZ.
+
+Volumes are created beside the selected items as `name.zip.001`, `name.zip.002`,
+etc. (or `name.7z.001`, etc.). Keep the entire set together and choose
+**Extract Here** on the `.001` file. **Show in Finder** selects this first volume.
+Existing archives and volume sets, including incomplete sets, are preserved by
+giving the new set a numbered name. Failed or cancelled jobs clean up their
+staging directory and roll back volumes already moved into place.
+
+For 7Z, **Solid Compression** is on by default, matching 7-Zip's default.
+Disable it to compress files independently. Solid archives can be smaller when
+files share content, but extracting an individual file may take longer. These
+options apply to the current custom compression job; direct shortcuts retain
+their existing behavior.
+
 ## Implementation
 
 Keka's [current repository](https://github.com/aonez/Keka) provides documentation,
@@ -45,8 +90,8 @@ translations, binaries and issue tracking rather than the complete application
 source. This implementation is independent; it does not copy Keka code or require
 Keka to be installed.
 
-`ArchiveService` uses Apple's `/usr/bin/tar` (bsdtar/libarchive) for TAR.GZ and the
-direct ZIP shortcut, and TAR-family extraction. An unmodified, bundled official
+`ArchiveService` uses Apple's `/usr/bin/tar` (bsdtar/libarchive) for TAR.GZ and
+TAR-family extraction. An unmodified, bundled official
 7-Zip 26.05 universal macOS executable handles configurable ZIP/7Z compression,
 encrypted compression and ZIP/7Z/RAR
 extraction. Each is launched by `Process` with separate arguments and no shell.
@@ -74,8 +119,9 @@ ownership, ACLs, extended attributes, file flags or privileged permissions.
   TAR.LZMA, TAR.Z, JAR, WAR, APK, IPA, XPI, CAB, ISO, CPIO and CPGZ.
 - TAR-family extraction codecs depend on the libarchive version shipped with
   macOS; ZIP/7Z/RAR use the bundled 7-Zip version. Damaged archives or unsupported
-  codecs fail with a visible diagnostic. Split-volume handling and RAR creation
-  are not offered by this version. TAR.GZ does not support passwords.
+  codecs fail with a visible diagnostic. ZIP/7Z split sets created by RClick can
+  be extracted from their `.001` file. RAR creation and other split-volume naming
+  conventions are not offered. TAR.GZ does not support passwords or split volumes.
 - Single-file GZIP/BZIP2/XZ streams without a TAR container are not offered by
   this version. Disk images such as DMG should be opened with macOS.
 
@@ -86,5 +132,7 @@ destination collisions, cancellation, corrupt input and adversarial archive path
 AES ZIP encryption, Unicode 7Z passwords, encrypted 7Z headers, and upstream
 libarchive RAR4/RAR5 encrypted-data and encrypted-header fixtures.
 `ArchiveViewModelTests` checks password gating and retries across mixed batches.
+Split-volume tests verify size limits, encrypted round trips, collision handling,
+concurrent jobs and cancellation; 7Z listings verify the solid compression switch.
 `ActionServiceTests` checks authorization and selection dispatch.
 `ConfigServiceSaveTests` checks migration and preservation of disabled actions.

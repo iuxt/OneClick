@@ -4,7 +4,7 @@ import Foundation
 nonisolated enum ArchiveFormat {
     static let suffixes = [
         "tar.gz", "tar.bz2", "tar.xz", "tar.lzma", "tar.Z", "tar",
-        "tgz", "tbz2", "tbz", "txz", "zip", "zipx", "7z", "rar",
+        "tgz", "tbz2", "tbz", "txz", "zip.001", "7z.001", "zip", "zipx", "7z", "rar",
         "jar", "war", "apk", "ipa", "xpi", "cab", "iso", "cpio", "cpgz",
     ]
 

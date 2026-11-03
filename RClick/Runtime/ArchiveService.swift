@@ -62,15 +62,91 @@ nonisolated enum ArchiveCompressionLevel: Int, CaseIterable, Sendable {
     }
 }
 
+nonisolated enum ArchiveVolumeUnit: String, CaseIterable, Sendable {
+    case bytes = "B", kibibytes = "KiB", mebibytes = "MiB", gibibytes = "GiB"
+
+    var multiplier: UInt64 {
+        switch self {
+        case .bytes: 1
+        case .kibibytes: 1_024
+        case .mebibytes: 1_048_576
+        case .gibibytes: 1_073_741_824
+        }
+    }
+
+    func bytes(for text: String) -> UInt64? {
+        let text = text.trimmingCharacters(in: .whitespaces)
+        guard !text.isEmpty, text.utf8.allSatisfy({ (48...57).contains($0) }),
+              let value = UInt64(text) else { return nil }
+        let (bytes, overflow) = value.multipliedReportingOverflow(by: multiplier)
+        return !overflow && bytes > 0 && bytes <= Int64.max ? bytes : nil
+    }
+}
+
+nonisolated enum ArchiveVolumePreset: CaseIterable, Sendable {
+    case cd, dvd, fat32, custom
+
+    var title: String {
+        switch self {
+        case .cd: "CD (700 MiB)"
+        case .dvd: "DVD (4.7 GB)"
+        case .fat32: "FAT32 (4 GiB − 1 B)"
+        case .custom: AppLocalization.localized("Custom Size")
+        }
+    }
+
+    var bytes: UInt64? {
+        switch self {
+        case .cd: 700 * 1_048_576
+        case .dvd: 4_700_000_000
+        case .fat32: 4_294_967_295
+        case .custom: nil
+        }
+    }
+}
+
+nonisolated struct ArchiveCompressionSettings: Sendable {
+    static let defaultExclusionList = ".DS_Store\n__MACOSX"
+    static var maximumThreadCount: Int { max(1, ProcessInfo.processInfo.activeProcessorCount) }
+
+    var excludeFiles = false
+    var exclusionList = defaultExclusionList
+    /// Zero selects the available logical CPU count.
+    var threadCount = 0
+
+    var effectiveThreadCount: Int {
+        threadCount <= 0 ? Self.maximumThreadCount : min(threadCount, Self.maximumThreadCount)
+    }
+
+    var exclusionPatterns: [String] {
+        guard excludeFiles else { return [] }
+        var seen = Set<String>()
+        return exclusionList.components(separatedBy: .newlines).compactMap { line in
+            let pattern = line.trimmingCharacters(in: .whitespaces)
+            guard !pattern.isEmpty, !pattern.contains("\0"), seen.insert(pattern).inserted else { return nil }
+            return pattern
+        }
+    }
+
+    static func load(from defaults: UserDefaults) -> Self {
+        Self(excludeFiles: defaults.bool(forKey: "archiveExcludeFiles"),
+             exclusionList: defaults.string(forKey: "archiveExclusionList") ?? defaultExclusionList,
+             threadCount: defaults.integer(forKey: "archiveCompressionThreads"))
+    }
+}
+
 nonisolated struct ArchiveRequest: Sendable {
     let operation: ArchiveOperation
     let urls: [URL]
     var error: String? = nil
     var compressionLevel: ArchiveCompressionLevel? = nil
+    var volumeSize: UInt64? = nil
+    /// nil retains the tool's default for direct compression shortcuts.
+    var solid: Bool? = nil
 }
 
 nonisolated enum ArchiveError: LocalizedError, Equatable {
-    case invalidSelection, notArchive, configurationRequired, passwordRequired, incorrectPassword, invalidPassword, invalidZIPPassword, encryptionNotSupported, toolUnavailable, failed(String)
+    case invalidSelection, notArchive, configurationRequired, passwordRequired, incorrectPassword, invalidPassword, invalidZIPPassword, encryptionNotSupported, invalidVolumeSize, splittingNotSupported, solidNotSupported, toolUnavailable, failed(String)
 
     var errorDescription: String? {
         switch self {
@@ -90,6 +166,12 @@ nonisolated enum ArchiveError: LocalizedError, Equatable {
             AppLocalization.localized("ZIP passwords must use 1–99 printable ASCII characters. Use Encrypted 7Z for other characters.")
         case .encryptionNotSupported:
             AppLocalization.localized("Choose Encrypted ZIP or Encrypted 7Z for password protection.")
+        case .invalidVolumeSize:
+            AppLocalization.localized("Enter a positive whole-number volume size within the supported range.")
+        case .splittingNotSupported:
+            AppLocalization.localized("Split volumes are available for ZIP and 7Z only.")
+        case .solidNotSupported:
+            AppLocalization.localized("Solid compression is available for 7Z only.")
         case .toolUnavailable:
             AppLocalization.localized("The bundled archive tool is missing. Please reinstall RClick.")
         case .failed(let detail):
@@ -110,6 +192,10 @@ nonisolated final class ArchiveProgress: @unchecked Sendable {
 
     var detail: String {
         lock.withLock { String(decoding: output.suffix(2_048), as: UTF8.self) }
+    }
+
+    var isRunning: Bool {
+        lock.withLock { process?.isRunning == true }
     }
 
     fileprivate var passwordFailure: Bool {
@@ -149,18 +235,29 @@ nonisolated final class ArchiveProgress: @unchecked Sendable {
     }
 }
 
-/// System bsdtar handles ordinary compression and TAR extraction; the bundled
-/// 7-Zip helper handles AES ZIP/7Z creation and ZIP/7Z/RAR extraction. Neither is
+/// System bsdtar handles TAR compression and extraction; the bundled
+/// 7-Zip helper handles ZIP/7Z creation and ZIP/7Z/RAR extraction. Neither is
 /// invoked through a shell. Passwords travel only through a private stdin pipe.
 /// Work is staged in a private sibling directory; only successful output is
 /// published. Originals and existing destinations are never overwritten.
 nonisolated enum ArchiveService {
     @concurrent
-    static func perform(_ request: ArchiveRequest, password: String? = nil, progress: ArchiveProgress = ArchiveProgress()) async throws -> URL {
+    static func perform(_ request: ArchiveRequest, password: String? = nil,
+                        settings: ArchiveCompressionSettings = ArchiveCompressionSettings(),
+                        progress: ArchiveProgress = ArchiveProgress()) async throws -> URL {
         try await withTaskCancellationHandler {
             try Task.checkCancellation()
             if let error = request.error { throw ArchiveError.failed(error) }
             guard request.operation != .compress else { throw ArchiveError.configurationRequired }
+            if let volumeSize = request.volumeSize {
+                guard volumeSize > 0, volumeSize <= Int64.max else { throw ArchiveError.invalidVolumeSize }
+                guard [.zip, .sevenZip, .encryptedZip, .encryptedSevenZip].contains(request.operation) else {
+                    throw ArchiveError.splittingNotSupported
+                }
+            }
+            if request.solid != nil && ![.sevenZip, .encryptedSevenZip].contains(request.operation) {
+                throw ArchiveError.solidNotSupported
+            }
             if let password {
                 guard !password.isEmpty, password.utf8.count <= 1_024,
                       !password.contains(where: { $0 == "\n" || $0 == "\r" || $0 == "\0" }) else {
@@ -217,8 +314,7 @@ nonisolated enum ArchiveService {
                                  "--no-same-owner", "--no-same-permissions", "--no-acls", "--no-xattrs", "--no-fflags"]
                 }
             } else {
-                useSevenZip = request.operation.isEncryptedCompression || request.operation == .sevenZip
-                    || (request.operation == .zip && request.compressionLevel != nil)
+                useSevenZip = request.operation != .tarGzip
                 result = staging.appendingPathComponent(useSevenZip ? "archive." + request.operation.fileExtension : "archive")
                 name = request.urls.count == 1 ? first.lastPathComponent : AppLocalization.localized("Archive")
                 ext = "." + request.operation.fileExtension
@@ -227,15 +323,19 @@ nonisolated enum ArchiveService {
                 // from interpreting filenames such as @file or -file.
                 if useSevenZip {
                     let isZIP = request.operation == .zip || request.operation == .encryptedZip
-                    let formatOptions = isZIP ? ["-tzip"] : ["-t7z", "-mmt=2"]
+                    let formatOptions = [isZIP ? "-tzip" : "-t7z", "-mmt=\(settings.effectiveThreadCount)"]
                     let encryption = request.operation.isEncryptedCompression
                         ? (isZIP ? ["-mem=AES256", "-p"] : ["-mhe=on", "-p"]) : []
                     let level = request.compressionLevel.map { ["-mx=\($0.rawValue)"] } ?? []
-                    arguments = ["a"] + formatOptions + encryption + level + ["-snl", "-y", "-bd", "-bb1", result.path, "--"]
+                    let exclusions = settings.exclusionPatterns.map { "-xr!" + $0 }
+                    let volumes = request.volumeSize.map { ["-v\($0)b"] } ?? []
+                    let solid = request.solid.map { [$0 ? "-ms=on" : "-ms=off"] } ?? []
+                    arguments = ["a"] + formatOptions + encryption + level + exclusions + volumes + solid + ["-snl", "-y", "-bd", "-bb1", result.path, "--"]
                         + request.urls.map { "./" + $0.lastPathComponent }
                 } else {
                     let level = request.compressionLevel.map { ["--options", "gzip:compression-level=\($0.rawValue)"] } ?? []
-                    arguments = ["-cvf", result.path] + format + level + ["-C", parent.path, "--"]
+                    let exclusions = settings.exclusionPatterns.flatMap { ["--exclude", $0] }
+                    arguments = ["-cvf", result.path] + format + level + exclusions + ["-C", parent.path, "--"]
                         + request.urls.map { "./" + $0.lastPathComponent }
                 }
             }
@@ -243,6 +343,9 @@ nonisolated enum ArchiveService {
             try run(executable: executable, arguments: arguments, directory: parent,
                     password: useSevenZip ? password : nil, progress: progress)
             try Task.checkCancellation()
+            if request.volumeSize != nil {
+                return try publishVolumes(of: result, to: parent, name: name, extension: ext)
+            }
             // moveItem refuses existing paths. Retry collisions, including races
             // with other jobs, without replacing the user's files or folders.
             for index in 0...10_000 {
@@ -263,7 +366,53 @@ nonisolated enum ArchiveService {
     }
 
     static func usesSevenZip(for url: URL) -> Bool {
-        ["zip", "zipx", "7z", "rar", "jar", "war", "apk", "ipa", "xpi"].contains(ArchiveFormat.suffix(for: url) ?? "")
+        ["zip", "zip.001", "zipx", "7z", "7z.001", "rar", "jar", "war", "apk", "ipa", "xpi"].contains(ArchiveFormat.suffix(for: url) ?? "")
+    }
+
+    private static func publishVolumes(of archive: URL, to parent: URL, name: String, extension ext: String) throws -> URL {
+        let fm = FileManager.default
+        let prefix = archive.lastPathComponent + "."
+        let volumes = try fm.contentsOfDirectory(at: archive.deletingLastPathComponent(), includingPropertiesForKeys: nil)
+            .filter { $0.lastPathComponent.hasPrefix(prefix) }
+            .sorted { $0.lastPathComponent.compare($1.lastPathComponent, options: .numeric) == .orderedAscending }
+        guard volumes.first?.lastPathComponent == prefix + "001" else {
+            throw ArchiveError.failed("No archive volumes were produced.")
+        }
+        for index in 0...10_000 {
+            try Task.checkCancellation()
+            let suffix = index == 0 ? "" : " (\(index + 1))"
+            let base = name + suffix + ext
+            // An existing later volume also reserves the name, even if .001
+            // was removed. Never mix a new set with an older incomplete set.
+            let existing = try fm.contentsOfDirectory(atPath: parent.path)
+            if existing.contains(where: { entry in
+                if entry.compare(base, options: .caseInsensitive) == .orderedSame { return true }
+                guard entry.range(of: base + ".", options: [.anchored, .caseInsensitive]) != nil else { return false }
+                let number = entry.dropFirst(base.count + 1)
+                return number.count >= 3 && number.utf8.allSatisfy { (48...57).contains($0) }
+            }) { continue }
+            var moved: [(source: URL, destination: URL)] = []
+            do {
+                for volume in volumes {
+                    try Task.checkCancellation()
+                    let number = String(volume.lastPathComponent.dropFirst(prefix.count))
+                    let destination = parent.appendingPathComponent(base + "." + number)
+                    try fm.moveItem(at: volume, to: destination)
+                    moved.append((volume, destination))
+                }
+                try Task.checkCancellation()
+                return moved[0].destination
+            } catch {
+                // Roll back only files this job moved. Returning them to staging
+                // allows a collision retry; the outer defer cleans up failures.
+                for item in moved.reversed() {
+                    try fm.moveItem(at: item.destination, to: item.source)
+                }
+                if let error = error as? CocoaError, error.code == .fileWriteFileExists { continue }
+                throw error
+            }
+        }
+        throw CocoaError(.fileWriteFileExists)
     }
 
     static func isValidZIPPassword(_ password: String) -> Bool {

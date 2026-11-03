@@ -4,6 +4,79 @@ import Testing
 
 @MainActor
 struct ArchiveViewModelTests {
+    @Test func volumePresetsAndCustomSizeValidation() {
+        #expect(ArchiveVolumePreset.cd.bytes == 734_003_200)
+        #expect(ArchiveVolumePreset.dvd.bytes == 4_700_000_000)
+        #expect(ArchiveVolumePreset.fat32.bytes == 4_294_967_295)
+        var form = ArchiveFormState()
+        form.format = .sevenZip
+        #expect(!form.splitVolumes)
+        #expect(form.solid)
+        form.splitVolumes = true
+        #expect(form.volumeSize == ArchiveVolumePreset.cd.bytes)
+        form.volumePreset = .custom
+        form.volumeUnit = .mebibytes
+        form.customVolumeSize = " 25 "
+        #expect(form.volumeSize == 26_214_400)
+        #expect(form.canCompress)
+        for invalid in ["", "0", "-1", "1.5", "NaN", "1m", "18446744073709551615", "999999999999999999999"] {
+            form.customVolumeSize = invalid
+            #expect(form.volumeSize == nil)
+            #expect(form.volumeSizeError != nil)
+            #expect(!form.canCompress)
+        }
+        form.splitVolumes = false
+        #expect(form.canCompress)
+    }
+
+    @Test func customVolumeAndSolidOptionsReachWorker() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("rclick-volume-view-\(UUID())")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = root.appendingPathComponent("file.txt")
+        let contents = Data((0..<8_192).map { _ in UInt8.random(in: .min ... .max) })
+        try contents.write(to: source)
+        let model = ArchiveViewModel(requests: [ArchiveRequest(operation: .compress, urls: [source])])
+        model.start()
+        model.submitCompression(for: 0, format: .tarGzip, level: .fast, password: nil, volumeSize: 1_024)
+        #expect(model.rows[0].needsConfiguration)
+        #expect(!model.isRunning)
+        #expect(model.rows[0].error == ArchiveError.splittingNotSupported.localizedDescription)
+        model.submitCompression(for: 0, format: .sevenZip, level: .fast, password: nil, volumeSize: 1_024, solid: false)
+        try await waitUntilIdle(model)
+        #expect(model.rows[0].request.volumeSize == 1_024)
+        #expect(model.rows[0].request.solid == false)
+        let archive = try #require(model.rows[0].output)
+        #expect(archive.lastPathComponent.hasSuffix(".7z.001"))
+        let output = try await ArchiveService.perform(ArchiveRequest(operation: .extract, urls: [archive]))
+        #expect(try Data(contentsOf: output.appendingPathComponent("file.txt")) == contents)
+    }
+
+    @Test(arguments: [ArchiveOperation.compress, .zip, .sevenZip, .tarGzip, .encryptedZip, .encryptedSevenZip])
+    func compressionSettingsReachEveryEntryPoint(operation: ArchiveOperation) async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("rclick-settings-view-\(UUID())")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = root.appendingPathComponent("project")
+        try FileManager.default.createDirectory(at: source, withIntermediateDirectories: true)
+        try Data("keep".utf8).write(to: source.appendingPathComponent("keep.txt"))
+        try Data("skip".utf8).write(to: source.appendingPathComponent(".DS_Store"))
+        let model = ArchiveViewModel(requests: [ArchiveRequest(operation: operation, urls: [source])],
+                                     compressionSettings: ArchiveCompressionSettings(excludeFiles: true, threadCount: 1))
+        model.start()
+        let password = operation.isEncryptedCompression ? "test-password" : nil
+        if operation == .compress {
+            model.submitCompression(for: 0, format: .zip, level: .fast, password: nil)
+        } else if let password {
+            model.submitPassword(for: 0, password: password)
+        }
+        try await waitUntilIdle(model)
+        let archive = try #require(model.rows[0].output)
+        let output = try await ArchiveService.perform(ArchiveRequest(operation: .extract, urls: [archive]), password: password)
+        #expect(try String(contentsOf: output.appendingPathComponent("project/keep.txt"), encoding: .utf8) == "keep")
+        #expect(!FileManager.default.fileExists(atPath: output.appendingPathComponent("project/.DS_Store").path))
+    }
+
     @Test(arguments: ArchiveCompressionFormat.allCases, [false, true])
     func configurableCompressionWaitsForSubmission(format: ArchiveCompressionFormat, encrypted: Bool) async throws {
         if format == .tarGzip && encrypted { return }

@@ -149,6 +149,9 @@ final class ActionService {
             await showAirDrop(target, trigger)
         case "checksum":
             await showChecksums(target)
+        case "compress-zip-separately":
+            guard trigger == "ctx-items" else { return }
+            await showArchives(target, operation: .zip, separately: true)
         case "compress", "compress-zip", "compress-targz", "compress-zip-encrypted", "compress-7z-encrypted", "extract":
             guard trigger == "ctx-items", let operation = ArchiveOperation(rawValue: rcitem.id) else { return }
             await showArchives(target, operation: operation)
@@ -157,7 +160,7 @@ final class ActionService {
         }
     }
 
-    func showArchives(_ target: [String], operation: ArchiveOperation) async {
+    func showArchives(_ target: [String], operation: ArchiveOperation, separately: Bool = false) async {
         let urls = target.map { URL(fileURLWithPath: $0) }
         guard !urls.isEmpty else { return }
         var denied: Set<URL> = []
@@ -171,7 +174,7 @@ final class ActionService {
             }
         }
         let accessError = AppLocalization.localized("File access was not granted.")
-        if operation == .extract {
+        if operation == .extract || separately {
             archives.show(requests: urls.map { url in
                 ArchiveRequest(operation: operation, urls: [url],
                                error: denied.contains(url.deletingLastPathComponent().resolvingSymlinksInPath()) ? accessError : nil)

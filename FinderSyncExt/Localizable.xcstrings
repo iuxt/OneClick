@@ -176,6 +176,41 @@
         }
       }
     },
+    "Compress to Separate ZIPs": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Compress to Separate ZIPs"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "压缩到单独的 ZIP"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "個別の ZIP に圧縮"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Comprimir en ZIP separados"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Compresser en ZIP séparés"
+          }
+        }
+      }
+    },
     "Compress to TAR.GZ": {
       "extractionState": "manual",
       "localizations": {

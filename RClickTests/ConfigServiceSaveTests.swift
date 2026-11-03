@@ -76,11 +76,11 @@ struct ConfigServiceSaveTests {
         let (service, context) = try makeService()
         try service.save(payload)
         let first = service.load()
-        #expect(first.actions.map(\.id) == ["copy-path", "checksum", "compress-zip", "compress-targz", "extract", "compress-zip-encrypted", "compress-7z-encrypted", "compress"])
+        #expect(first.actions.map(\.id) == ["copy-path", "checksum", "compress-zip", "compress-targz", "extract", "compress-zip-encrypted", "compress-7z-encrypted", "compress", "compress-zip-separately"])
         #expect(first.actions.dropFirst().allSatisfy { $0.enabled })
-        #expect(first.actions.map(\.idx) == [0, 1, 2, 3, 4, 5, 6, 7])
+        #expect(first.actions.map(\.idx) == [0, 1, 2, 3, 4, 5, 6, 7, 8])
         _ = service.load()
-        #expect(try context.fetch(FetchDescriptor<ActionEntity>()).count == 8)
+        #expect(try context.fetch(FetchDescriptor<ActionEntity>()).count == 9)
 
         var disabled = first
         disabled.actions[1].enabled = false
@@ -90,6 +90,7 @@ struct ConfigServiceSaveTests {
         disabled.actions[5].enabled = false
         disabled.actions[6].enabled = false
         disabled.actions[7].enabled = false
+        disabled.actions[8].enabled = false
         try service.save(disabled)
         #expect(service.load().actions.dropFirst().allSatisfy { !$0.enabled })
     }

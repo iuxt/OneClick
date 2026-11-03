@@ -38,7 +38,7 @@ private final class ArchiveWindowController: NSWindowController, NSWindowDelegat
         window.title = AppLocalization.localized("Archives")
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
         let contentHeight: CGFloat = if requests.contains(where: { $0.operation == .compress }) {
-            440
+            640
         } else if requests.contains(where: { $0.operation.isEncryptedCompression }) {
             320
         } else {
@@ -78,8 +78,10 @@ final class ArchiveViewModel: ObservableObject {
     private var polling: Task<Void, Never>?
     private var progress: ArchiveProgress?
     private var hasStarted = false
+    private let compressionSettings: ArchiveCompressionSettings
 
-    init(requests: [ArchiveRequest]) {
+    init(requests: [ArchiveRequest], compressionSettings: ArchiveCompressionSettings = .load(from: .group)) {
+        self.compressionSettings = compressionSettings
         rows = requests.enumerated().map {
             Row(id: $0.offset, request: $0.element, error: $0.element.error,
                 needsPassword: $0.element.operation.isEncryptedCompression && $0.element.error == nil,
@@ -94,15 +96,29 @@ final class ArchiveViewModel: ObservableObject {
     }
 
     func submitCompression(for index: Int, format: ArchiveCompressionFormat,
-                           level: ArchiveCompressionLevel, password: String?) {
+                           level: ArchiveCompressionLevel, password: String?,
+                           volumeSize: UInt64? = nil, solid: Bool? = nil) {
         guard !isRunning, rows.indices.contains(index), rows[index].needsConfiguration else { return }
         // Never silently discard a requested password for an unsupported format.
         guard format != .tarGzip || password == nil else {
             rows[index].error = ArchiveError.encryptionNotSupported.localizedDescription
             return
         }
+        if let volumeSize, volumeSize == 0 || volumeSize > Int64.max {
+            rows[index].error = ArchiveError.invalidVolumeSize.localizedDescription
+            return
+        }
+        guard format != .tarGzip || volumeSize == nil else {
+            rows[index].error = ArchiveError.splittingNotSupported.localizedDescription
+            return
+        }
+        guard format == .sevenZip || solid == nil else {
+            rows[index].error = ArchiveError.solidNotSupported.localizedDescription
+            return
+        }
         rows[index].request = ArchiveRequest(operation: format.operation(encrypted: password != nil),
-                                             urls: rows[index].request.urls, compressionLevel: level)
+                                             urls: rows[index].request.urls, compressionLevel: level,
+                                             volumeSize: volumeSize, solid: solid)
         rows[index].error = nil
         rows[index].needsConfiguration = false
         run(indices: [index], password: password)
@@ -137,7 +153,8 @@ final class ArchiveViewModel: ObservableObject {
                     }
                 }
                 do {
-                    self.rows[index].output = try await ArchiveService.perform(self.rows[index].request, password: password, progress: progress)
+                    self.rows[index].output = try await ArchiveService.perform(self.rows[index].request, password: password,
+                                                                             settings: self.compressionSettings, progress: progress)
                 } catch is CancellationError {
                     self.rows[index].error = AppLocalization.localized("Cancelled")
                 } catch let error as ArchiveError {
@@ -174,12 +191,26 @@ final class ArchiveViewModel: ObservableObject {
 }
 
 /// Credentials remain in view state and are cleared whenever an attempt is submitted.
-private struct ArchiveFormState {
+struct ArchiveFormState {
     var format = ArchiveCompressionFormat(rawValue: UserDefaults.group.string(forKey: "archiveCompressionFormat") ?? "") ?? .zip
     var level = ArchiveCompressionLevel(rawValue: UserDefaults.group.integer(forKey: "archiveCompressionLevel")) ?? .normal
     var encrypted = false
     var password = ""
     var confirmation = ""
+    var splitVolumes = false
+    var volumePreset = ArchiveVolumePreset.cd
+    var customVolumeSize = "100"
+    var volumeUnit = ArchiveVolumeUnit.mebibytes
+    var solid = true
+
+    var volumeSize: UInt64? {
+        guard splitVolumes, format != .tarGzip else { return nil }
+        return volumePreset.bytes ?? volumeUnit.bytes(for: customVolumeSize)
+    }
+
+    var volumeSizeError: String? {
+        splitVolumes && format != .tarGzip && volumeSize == nil ? ArchiveError.invalidVolumeSize.localizedDescription : nil
+    }
 
     var passwordError: String? {
         guard encrypted, !password.isEmpty else { return nil }
@@ -196,7 +227,7 @@ private struct ArchiveFormState {
     }
 
     var canCompress: Bool {
-        !encrypted || (!password.isEmpty && password == confirmation && passwordError == nil && format != .tarGzip)
+        volumeSizeError == nil && (!encrypted || (!password.isEmpty && password == confirmation && passwordError == nil && format != .tarGzip))
     }
 
     func canSubmitPassword(for operation: ArchiveOperation) -> Bool {
@@ -310,7 +341,10 @@ private struct ArchiveView: View {
         .onAppear { model.start() }
         .onChange(of: pendingRow?.id) { form.clearPassword() }
         .onChange(of: form.format) {
-            if form.format == .tarGzip { form.encrypted = false }
+            if form.format == .tarGzip {
+                form.encrypted = false
+                form.splitVolumes = false
+            }
         }
         .onChange(of: form.encrypted) {
             if !form.encrypted { form.clearPassword() }
@@ -365,7 +399,8 @@ private struct ArchiveView: View {
         form.clearPassword()
         if row.needsConfiguration {
             model.submitCompression(for: row.id, format: form.format, level: form.level,
-                                    password: form.encrypted ? password : nil)
+                                    password: form.encrypted ? password : nil,
+                                    volumeSize: form.volumeSize, solid: form.format == .sevenZip ? form.solid : nil)
         } else {
             model.submitPassword(for: row.id, password: password)
         }
@@ -407,6 +442,46 @@ private struct ArchiveCompressionForm: View {
                 Text(appLocalized: "Higher compression levels can create smaller archives but take more time.")
                     .font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Divider()
+
+            VStack(alignment: .leading, spacing: 10) {
+                Toggle(AppLocalization.localized("Split into Volumes"), isOn: $form.splitVolumes)
+                    .disabled(form.format == .tarGzip)
+                if form.format == .tarGzip {
+                    Text(appLocalized: "Split volumes are available for ZIP and 7Z only.")
+                        .font(.caption).foregroundStyle(.secondary)
+                } else if form.splitVolumes {
+                    Picker(AppLocalization.localized("Volume Size"), selection: $form.volumePreset) {
+                        ForEach(ArchiveVolumePreset.allCases, id: \.self) { preset in
+                            Text(verbatim: preset.title).tag(preset)
+                        }
+                    }
+                    if form.volumePreset == .custom {
+                        HStack {
+                            TextField(AppLocalization.localized("Volume Size"), text: $form.customVolumeSize)
+                            Picker(AppLocalization.localized("Size Unit"), selection: $form.volumeUnit) {
+                                ForEach(ArchiveVolumeUnit.allCases, id: \.self) { unit in
+                                    Text(verbatim: unit.rawValue).tag(unit)
+                                }
+                            }
+                            .labelsHidden()
+                            .frame(width: 100)
+                        }
+                    }
+                    Text(appLocalized: "Keep all volumes together. Open the .001 file to extract.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    if let error = form.volumeSizeError {
+                        Text(error).font(.caption).foregroundStyle(.red)
+                    }
+                }
+                if form.format == .sevenZip {
+                    Toggle(AppLocalization.localized("Solid Compression"), isOn: $form.solid)
+                    Text(appLocalized: "Compresses files together for smaller archives. Extracting individual files may take longer.")
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
 
             Divider()
