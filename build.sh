@@ -89,8 +89,11 @@ EXTENSION_PATH="$APP_PATH/Contents/PlugIns/FinderSyncExt.appex"
 if [[ "$BUILD_MODE" == local ]]; then
     log '本地签名（无需开发者账号，保留沙盒）'
     python3 - "$ROOT_DIR" "$BUILD_DIR/Signing" <<'PY'
+import json
+import os
 import pathlib
 import plistlib
+import pwd
 import sys
 
 root, output = map(pathlib.Path, sys.argv[1:])
@@ -100,6 +103,13 @@ for name in ("RClick", "FinderSyncExt"):
     entitlements.pop("com.apple.security.application-groups", None)
     entitlements["com.apple.security.temporary-exception.files.home-relative-path.read-write"] = [
         "/Library/Application Support/RClickLocal/"
+    ]
+    # Ad-hoc builds lack a provisioned App Group. Limit the local development
+    # IPC exception to this installation's single socket; retain the sandbox.
+    ipc_path = pathlib.Path(pwd.getpwuid(os.getuid()).pw_dir) / "Library/Application Support/RClickLocal/ipc.sock"
+    operations = "network-bind network-outbound" if name == "RClick" else "network-outbound"
+    entitlements["com.apple.security.temporary-exception.sbpl"] = [
+        f"(allow {operations} (literal {json.dumps(str(ipc_path.resolve()), ensure_ascii=False)}))"
     ]
     (output / f"{name}.entitlements").write_bytes(plistlib.dumps(entitlements))
 PY

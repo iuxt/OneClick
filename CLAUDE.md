@@ -12,7 +12,7 @@ RClick is a macOS desktop application that extends Finder's context menu with cu
 - AppKit (system integration only, no UI)
 - SwiftData (persistence)
 - FinderSync framework (Finder extension)
-- DistributedNotificationCenter (inter-process communication)
+- Authenticated UNIX-domain stream (inter-process communication)
 - Xcode 26+ (required for development)
 
 ## Architecture
@@ -33,10 +33,10 @@ RClick follows a dual-process architecture:
 - Entry point: [FinderSyncExt.swift](FinderSyncExt/FinderSyncExt.swift)
 
 ### 3. Communication Layer
-The main app and extension communicate via `DistributedNotificationCenter`:
+The main app and extension communicate over a UNIX-domain stream (`LocalIPCTransport`):
 - **Extension → App**: `RClick.ExtensionToMain` (click events, heartbeat, requestConfig)
 - **App → Extension**: `RClick.MainToExtension` (menu config, running, quit, actionAck)
-- Messages are HMAC-SHA256 signed (`MessageSecurity`) and JSON-encoded via `Messager`
+- Peers are authenticated by kernel audit token and installed code-signing requirement; versioned JSON frames reject stale/replayed messages. No communication key or Keychain access is used. See `docs/ipc-security.md`.
 - Implementation: [Messager.swift](Shared/Messager.swift)
 
 ### 4. State Management

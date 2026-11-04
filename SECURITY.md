@@ -46,7 +46,7 @@ We follow a coordinated disclosure process:
 As a macOS Finder extension, RClick has these security-sensitive areas:
 
 - **File System Access** — RClick is sandboxed and uses security-scoped bookmarks for per-folder authorization: file operations check `PermissionService.hasAccess(to:)`; un-authorized folders trigger a one-time `NSOpenPanel` grant that is cached as a bookmark. Full Disk Access is not used.
-- **Inter-Process Communication** — Messages between the main app and FinderSync Extension use `DistributedNotificationCenter`. Protocol v2 authenticates the complete envelope with random Keychain-backed credentials and rejects stale or replayed messages. See [IPC authentication](docs/ipc-security.md) for signing and local-build behavior.
+- **Inter-Process Communication** — The main app and Finder extension use a local stream with mutual code-signature checks against the kernel-provided peer audit token. No communication keys or Keychain access are required. Versioned frames reject stale and replayed messages. See [IPC authentication](docs/ipc-security.md).
 - **Third-Party App Launching** — RClick can launch external applications with custom arguments. Arguments are properly escaped to prevent injection.
 
 ## Responsible Disclosure Hall of Fame
