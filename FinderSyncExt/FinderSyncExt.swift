@@ -709,7 +709,10 @@ class FinderSyncExt: FIFinderSync, @unchecked Sendable {
 
         // 获取选中的文件/目录
         let selectedItems = FIFinderSyncController.default().selectedItemURLs() ?? []
-        let itemPaths = selectedItems.map { $0.path }
+        let itemPaths = FinderActionTargets.resolve(
+            trigger: getTriggerForMenuKind(), selected: selectedItems,
+            container: FIFinderSyncController.default().targetedURL()
+        )
         logger.info("[Action] selectedItemURLs 返回 \(selectedItems.count) 个文件: \(itemPaths)")
 
         // 快链路：复制路径是纯剪贴板操作，扩展内直接完成（零 IPC）

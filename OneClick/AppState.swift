@@ -221,11 +221,17 @@ class AppState: ObservableObject, ActionStateProviding {
     }
 
     @MainActor func refresh() {
-        let data = configService.load()
+        applyConfiguration(configService.load())
+    }
+
+    /// Apply a snapshot only after SettingsManagementService has committed it.
+    func applyConfiguration(_ data: AppConfigData) {
         apps = data.apps
         actions = data.actions
         newFiles = data.newFiles
         cdirs = data.commonDirs
+        lastSaveError = nil
+        NotificationCenter.default.post(name: .menuConfigShouldUpdate, object: nil)
     }
 
     @MainActor func sync() {

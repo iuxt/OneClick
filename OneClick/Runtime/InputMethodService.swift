@@ -146,6 +146,14 @@ final class InputMethodService: ObservableObject {
         switching = false
     }
 
+    func reloadConfiguration() {
+        if let data = defaults.data(forKey: Self.storageKey) {
+            do { configuration = try JSONDecoder().decode(InputMethodConfiguration.self, from: data); error = nil }
+            catch { self.error = error.localizedDescription; return }
+        } else { configuration = InputMethodConfiguration(); error = nil }
+        activateCurrentApp()
+    }
+
     func refresh() {
         sources = provider.sources()
         currentSourceID = provider.currentID()

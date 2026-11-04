@@ -135,13 +135,6 @@ struct SettingsView: View {
         } detail: {
             self.detailView
                 .navigationTitle(AppLocalization.localized(selectedTab.titleKey))
-                .toolbar {
-                    if selectedTab == .home || selectedTab == .archives {
-                        ToolbarItem(placement: .primaryAction) {
-                            ArchiveLaunchControls(presentation: .toolbar)
-                        }
-                    }
-                }
         }
         .navigationSplitViewStyle(.balanced)
         // A failed write used to be invisible: the change stayed on screen but was

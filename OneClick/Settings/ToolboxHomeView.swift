@@ -51,11 +51,6 @@ struct ToolboxHomeView: View {
                     }
                 }
 
-                VStack(alignment: .leading, spacing: 14) {
-                    Text(appLocalized: "Quick Start").font(.headline)
-                    ArchiveLaunchControls()
-                }
-
                 Label(AppLocalization.localized("Always close at hand in your menu bar."), systemImage: "menubar.rectangle")
                     .font(.caption)
                     .foregroundStyle(.secondary)

@@ -3,58 +3,6 @@ import CoreServices
 import SwiftUI
 import UniformTypeIdentifiers
 
-@available(macOS 27, *)
-struct ArchiveLaunchControls: View {
-    enum Presentation { case inline, toolbar }
-    var presentation: Presentation = .inline
-
-    @State private var choosingArchive = false
-    @State private var choosingFiles = false
-    @State private var error: String?
-
-    var body: some View {
-        Group {
-            if presentation == .toolbar {
-                Menu {
-                    // Text-only items keep the native menu quiet and easy to scan.
-                    Button(AppLocalization.localized("Open Archive…")) { choosingArchive = true }
-                    Button(AppLocalization.localized("Create Archive")) { choosingFiles = true }
-                } label: {
-                    Label(AppLocalization.localized("Archive Tools"), systemImage: "archivebox")
-                }
-                .help(AppLocalization.localized("Archive Tools"))
-            } else {
-                GlassEffectContainer(spacing: 12) {
-                    HStack(spacing: 12) {
-                        Button(AppLocalization.localized("Open Archive…"), systemImage: "archivebox") { choosingArchive = true }
-                            .buttonStyle(.glassProminent)
-                        Button(AppLocalization.localized("Create Archive"), systemImage: "plus") { choosingFiles = true }
-                            .buttonStyle(.glass)
-                    }
-                    .controlSize(.large)
-                }
-            }
-        }
-        .fileImporter(isPresented: $choosingArchive, allowedContentTypes: [.item], allowsMultipleSelection: true) { result in
-            switch result {
-            case .success(let urls):
-                for url in urls { ArchiveBrowserPresenter.shared.open(url) }
-            case .failure(let failure): error = failure.localizedDescription
-            }
-        }
-        .fileImporter(isPresented: $choosingFiles, allowedContentTypes: [.item], allowsMultipleSelection: true) { result in
-            switch result {
-            case .success(let urls):
-                Task { await RCRuntime.shared.actionService.showArchives(urls.map(\.path), operation: .compress) }
-            case .failure(let failure): error = failure.localizedDescription
-            }
-        }
-        .alert(AppLocalization.localized("Archives"), isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
-            Button(AppLocalization.localized("OK"), role: .cancel) { error = nil }
-        } message: { Text(error ?? "") }
-    }
-}
-
 nonisolated struct ArchiveAssociationFormat: Identifiable, Sendable {
     let id: String
     let typeID: String

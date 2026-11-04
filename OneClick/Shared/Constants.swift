@@ -9,10 +9,10 @@ import Foundation
 
 
 public enum Constants {
-    static let HomedirPath = Utils.getRealHomeDir()
+    nonisolated static let HomedirPath = Utils.getRealHomeDir()
     /// The identifier for the settings window.
     static let settingsWindowID = "oneclick-settings"
-    static let protectedDirs = [
+    nonisolated static let protectedDirs = [
         HomedirPath + "/Desktop/",
         HomedirPath + "/Desktop/danger/",
         HomedirPath + "/Applications/",

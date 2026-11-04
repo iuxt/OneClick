@@ -352,15 +352,15 @@ nonisolated enum ArchiveService {
             if request.volumeSize != nil {
                 return try publishVolumes(of: result, to: parent, name: name, extension: ext)
             }
-            // moveItem refuses existing paths. Retry collisions, including races
-            // with other jobs, without replacing the user's files or folders.
+            // Reserve each destination with an exclusive rename. A separate
+            // existence check followed by rename can overwrite a concurrent job.
             var published: URL?
             for index in 0...10_000 {
                 try Task.checkCancellation()
                 let suffix = index == 0 ? "" : " (\(index + 1))"
                 let destination = parent.appendingPathComponent(name + suffix + ext)
                 do {
-                    try fm.moveItem(at: result, to: destination)
+                    try moveExclusively(from: result, to: destination)
                     published = destination
                     break
                 } catch let error as CocoaError where error.code == .fileWriteFileExists {
@@ -387,6 +387,15 @@ nonisolated enum ArchiveService {
 
     static func usesSevenZip(for url: URL) -> Bool {
         ["zip", "zip.001", "zipx", "7z", "7z.001", "rar", "jar", "war", "apk", "ipa", "xpi"].contains(ArchiveFormat.suffix(for: url) ?? "")
+    }
+
+    private static func moveExclusively(from source: URL, to destination: URL) throws {
+        // Staging is a sibling of the destination, so this never crosses devices.
+        guard renamex_np(source.path, destination.path, UInt32(RENAME_EXCL)) == 0 else {
+            let code = errno
+            if code == EEXIST { throw CocoaError(.fileWriteFileExists) }
+            throw NSError(domain: NSPOSIXErrorDomain, code: Int(code), userInfo: [NSFilePathErrorKey: destination.path])
+        }
     }
 
     private static func publishVolumes(of archive: URL, to parent: URL, name: String, extension ext: String) throws -> URL {
@@ -417,7 +426,7 @@ nonisolated enum ArchiveService {
                     try Task.checkCancellation()
                     let number = String(volume.lastPathComponent.dropFirst(prefix.count))
                     let destination = parent.appendingPathComponent(base + "." + number)
-                    try fm.moveItem(at: volume, to: destination)
+                    try moveExclusively(from: volume, to: destination)
                     moved.append((volume, destination))
                 }
                 try Task.checkCancellation()
@@ -426,7 +435,7 @@ nonisolated enum ArchiveService {
                 // Roll back only files this job moved. Returning them to staging
                 // allows a collision retry; the outer defer cleans up failures.
                 for item in moved.reversed() {
-                    try fm.moveItem(at: item.destination, to: item.source)
+                    try moveExclusively(from: item.destination, to: item.source)
                 }
                 if let error = error as? CocoaError, error.code == .fileWriteFileExists { continue }
                 throw error

@@ -1,6 +1,461 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+  "Working on files…": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Working on files…"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "正在处理文件…"
+        }
+      },
+      "ja": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "ファイルを処理中…"
+        }
+      },
+      "es": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Procesando archivos…"
+        }
+      },
+      "fr": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Traitement des fichiers…"
+        }
+      }
+    }
+  },
+  "Some files could not be processed": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Some files could not be processed"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "部分文件未能处理"
+        }
+      },
+      "ja": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "一部のファイルを処理できませんでした"
+        }
+      },
+      "es": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "No se pudieron procesar algunos archivos"
+        }
+      },
+      "fr": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Certains fichiers n’ont pas pu être traités"
+        }
+      }
+    }
+  },
+  "This is not a supported OneClick settings backup.": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "This is not a supported OneClick settings backup."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "此文件不是受支持的 OneClick 设置备份。"
+        }
+      },
+      "ja": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "このファイルは対応する OneClick 設定バックアップではありません。"
+        }
+      },
+      "es": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Este archivo no es una copia de seguridad compatible de OneClick."
+        }
+      },
+      "fr": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Ce fichier n’est pas une sauvegarde de réglages OneClick prise en charge."
+        }
+      }
+    }
+  },
+  "Settings backups are limited to 64 MiB of template data and 10,000 files.": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Settings backups are limited to 64 MiB of template data and 10,000 files."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "设置备份最多包含 64 MiB 模板数据和 10,000 个文件。"
+        }
+      },
+      "ja": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "設定バックアップの上限はテンプレートデータ 64 MiB、ファイル数 10,000 です。"
+        }
+      },
+      "es": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Las copias se limitan a 64 MiB de plantillas y 10.000 archivos."
+        }
+      },
+      "fr": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Les sauvegardes sont limitées à 64 Mio de modèles et 10 000 fichiers."
+        }
+      }
+    }
+  },
+  "Backups include app settings and templates. Folder permissions, login items and file associations are managed separately.": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Backups include app settings and templates. Folder permissions, login items and file associations are managed separately."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "备份包含应用设置和模板。文件夹权限、登录项和文件关联由各自入口单独管理。"
+        }
+      },
+      "ja": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "バックアップにはアプリの設定とテンプレートが含まれます。フォルダのアクセス権、ログイン項目、ファイルの関連付けは個別に管理されます。"
+        }
+      },
+      "es": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Las copias incluyen ajustes y plantillas. Los permisos de carpetas, elementos de inicio y asociaciones de archivos se gestionan por separado."
+        }
+      },
+      "fr": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Les sauvegardes incluent les réglages et les modèles. Les autorisations de dossiers, éléments de connexion et associations de fichiers sont gérés séparément."
+        }
+      }
+    }
+  },
+  "Working on settings…": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Working on settings…"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "正在处理设置…"
+        }
+      },
+      "ja": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "設定を処理中…"
+        }
+      },
+      "es": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Procesando ajustes…"
+        }
+      },
+      "fr": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Traitement des réglages…"
+        }
+      }
+    }
+  },
+  "Settings operation failed": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Settings operation failed"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "设置操作失败"
+        }
+      },
+      "ja": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "設定の操作に失敗しました"
+        }
+      },
+      "es": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Error al procesar los ajustes"
+        }
+      },
+      "fr": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Échec de l’opération sur les réglages"
+        }
+      }
+    }
+  },
+  "Settings exported.": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Settings exported."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "设置已导出。"
+        }
+      },
+      "ja": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "設定を書き出しました。"
+        }
+      },
+      "es": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Ajustes exportados."
+        }
+      },
+      "fr": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Réglages exportés."
+        }
+      }
+    }
+  },
+  "Importing a backup replaces the current app settings.": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Importing a backup replaces the current app settings."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "导入备份将替换当前应用设置。"
+        }
+      },
+      "ja": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "バックアップを読み込むと現在のアプリ設定が置き換えられます。"
+        }
+      },
+      "es": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Importar una copia sustituye los ajustes actuales."
+        }
+      },
+      "fr": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "L’importation d’une sauvegarde remplace les réglages actuels."
+        }
+      }
+    }
+  },
+  "Settings imported.": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Settings imported."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "设置已导入。"
+        }
+      },
+      "ja": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "設定を読み込みました。"
+        }
+      },
+      "es": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Ajustes importados."
+        }
+      },
+      "fr": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Réglages importés."
+        }
+      }
+    }
+  },
+  "Logs exported.": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Logs exported."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "日志已导出。"
+        }
+      },
+      "ja": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "ログを書き出しました。"
+        }
+      },
+      "es": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Registros exportados."
+        }
+      },
+      "fr": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Journaux exportés."
+        }
+      }
+    }
+  },
+  "This restores default app settings. Folder permissions, login items and file associations are kept. This action cannot be undone.": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "This restores default app settings. Folder permissions, login items and file associations are kept. This action cannot be undone."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "这将恢复应用的默认设置，并保留文件夹权限、登录项和文件关联。此操作无法撤销。"
+        }
+      },
+      "ja": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "アプリの設定を初期値に戻します。フォルダのアクセス権、ログイン項目、ファイルの関連付けは保持されます。この操作は取り消せません。"
+        }
+      },
+      "es": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Se restauran los ajustes predeterminados. Se conservan los permisos de carpetas, elementos de inicio y asociaciones de archivos. Esta acción no se puede deshacer."
+        }
+      },
+      "fr": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Les réglages par défaut seront rétablis. Les autorisations de dossiers, éléments de connexion et associations de fichiers seront conservés. Cette action est irréversible."
+        }
+      }
+    }
+  },
+  "Default settings restored.": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Default settings restored."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "已恢复默认设置。"
+        }
+      },
+      "ja": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "初期設定に戻しました。"
+        }
+      },
+      "es": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Ajustes predeterminados restaurados."
+        }
+      },
+      "fr": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Réglages par défaut rétablis."
+        }
+      }
+    }
+  },
   "File Associations": {
     "extractionState": "manual",
     "localizations": {

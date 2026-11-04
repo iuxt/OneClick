@@ -53,13 +53,21 @@ private final class ChecksumWindowController: NSWindowController, NSWindowDelega
 
 @MainActor
 final class ChecksumViewModel: ObservableObject {
-    struct Row: Identifiable {
+    final class Row: ObservableObject, Identifiable {
         let id: Int
         let url: URL
         let algorithm: ChecksumAlgorithm
-        var fraction: Double = 0
-        var digest: String?
-        var error: String?
+        @Published private(set) var result: ChecksumUpdate
+        var fraction: Double { result.fraction }
+        var digest: String? { result.digest }
+        var error: String? { result.error }
+
+        init(id: Int, url: URL, algorithm: ChecksumAlgorithm) {
+            self.id = id; self.url = url; self.algorithm = algorithm
+            result = ChecksumUpdate(index: id)
+        }
+
+        func update(_ value: ChecksumUpdate) { result = value }
     }
 
     struct FileGroup: Identifiable {
@@ -68,31 +76,27 @@ final class ChecksumViewModel: ObservableObject {
         let rows: [Row]
     }
 
-    @Published private(set) var rows: [Row]
+    let rows: [Row]
+    let fileGroups: [FileGroup]
+    @Published private(set) var progress: Double = 0
+    @Published private(set) var hasResults = false
     @Published private(set) var isRunning = false
     private let inputs: [ChecksumInput]
     private var task: Task<Void, Never>?
     private var hasStarted = false
+    private var pendingUpdates: [Int: ChecksumUpdate] = [:]
+    private var polling: Task<Void, Never>?
+    private var totalFraction: Double = 0
 
     init(inputs: [ChecksumInput]) {
         self.inputs = inputs
-        rows = inputs.enumerated().flatMap { index, input in
-            ChecksumAlgorithm.allCases.enumerated().map { offset, algorithm in
+        let groups = inputs.enumerated().map { index, input in
+            FileGroup(id: index, url: input.url, rows: ChecksumAlgorithm.allCases.enumerated().map { offset, algorithm in
                 Row(id: index * ChecksumAlgorithm.allCases.count + offset, url: input.url, algorithm: algorithm)
-            }
+            })
         }
-    }
-
-    var progress: Double {
-        rows.isEmpty ? 0 : rows.reduce(0) { $0 + $1.fraction } / Double(rows.count)
-    }
-
-    var fileGroups: [FileGroup] {
-        let algorithmCount = ChecksumAlgorithm.allCases.count
-        return inputs.enumerated().map { index, input in
-            let start = index * algorithmCount
-            return FileGroup(id: index, url: input.url, rows: Array(rows[start..<(start + algorithmCount)]))
-        }
+        fileGroups = groups
+        rows = groups.flatMap(\.rows)
     }
 
     var copyText: String {
@@ -106,13 +110,20 @@ final class ChecksumViewModel: ObservableObject {
         hasStarted = true
         isRunning = true
         let inputs = self.inputs
+        polling = Task { [weak self] in
+            while !Task.isCancelled {
+                do { try await Task.sleep(for: .milliseconds(100)) } catch { return }
+                self?.flushUpdates()
+            }
+        }
         task = Task(priority: .userInitiated) { [weak self] in
             await ChecksumService.calculate(inputs: inputs) { [weak self] update in
                 guard let self, self.isRunning else { return }
-                self.rows[update.index].fraction = update.fraction
-                self.rows[update.index].digest = update.digest
-                self.rows[update.index].error = update.error
+                self.pendingUpdates[update.index] = update
             }
+            self?.flushUpdates()
+            self?.polling?.cancel()
+            self?.polling = nil
             self?.isRunning = false
             self?.task = nil
         }
@@ -121,10 +132,24 @@ final class ChecksumViewModel: ObservableObject {
     func cancel() {
         task?.cancel()
         task = nil
+        polling?.cancel()
+        polling = nil
+        flushUpdates()
         isRunning = false
-        for index in rows.indices where rows[index].digest == nil && rows[index].error == nil {
-            rows[index].error = AppLocalization.localized("Cancelled")
+        for row in rows where row.digest == nil && row.error == nil {
+            row.update(ChecksumUpdate(index: row.id, fraction: row.fraction, error: AppLocalization.localized("Cancelled")))
         }
+    }
+
+    private func flushUpdates() {
+        guard !pendingUpdates.isEmpty else { return }
+        for (index, update) in pendingUpdates {
+            totalFraction += update.fraction - rows[index].fraction
+            rows[index].update(update)
+            if update.digest != nil && !hasResults { hasResults = true }
+        }
+        pendingUpdates.removeAll(keepingCapacity: true)
+        progress = rows.isEmpty ? 0 : min(1, max(0, totalFraction / Double(rows.count)))
     }
 
     func copy(_ text: String) {
@@ -146,7 +171,7 @@ private struct ChecksumView: View {
                     Button(AppLocalization.localized("Cancel")) { model.cancel() }
                 }
                 Button(AppLocalization.localized("Copy All")) { model.copy(model.copyText) }
-                    .disabled(model.copyText.isEmpty)
+                    .disabled(!model.hasResults)
             }
             if model.rows.isEmpty {
                 ContentUnavailableView(AppLocalization.localized("Select files in Finder to calculate checksums."), systemImage: "doc")
@@ -159,43 +184,7 @@ private struct ChecksumView: View {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 16) {
                         ForEach(model.fileGroups) { file in
-                            VStack(alignment: .leading, spacing: 0) {
-                                HStack(spacing: 10) {
-                                    Image(systemName: "doc")
-                                        .font(.title2)
-                                        .foregroundStyle(.secondary)
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        Text(file.url.lastPathComponent)
-                                            .font(.headline)
-                                        Text(file.url.deletingLastPathComponent().path)
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                    }
-                                    .lineLimit(1)
-                                    .truncationMode(.middle)
-                                    .textSelection(.enabled)
-                                    Spacer(minLength: 0)
-                                }
-                                .padding(14)
-                                .help(file.url.path)
-
-                                Divider()
-
-                                VStack(spacing: 12) {
-                                    ForEach(file.rows) { row in
-                                        ChecksumResultRow(row: row, copy: model.copy)
-                                        if row.id != file.rows.last?.id {
-                                            Divider()
-                                        }
-                                    }
-                                }
-                                .padding(14)
-                            }
-                            .background(.background, in: RoundedRectangle(cornerRadius: 10))
-                            .overlay {
-                                RoundedRectangle(cornerRadius: 10)
-                                    .strokeBorder(.quaternary, lineWidth: 1)
-                            }
+                            ChecksumFileView(file: file, copy: model.copy)
                         }
                     }
                 }
@@ -207,8 +196,53 @@ private struct ChecksumView: View {
     }
 }
 
+private struct ChecksumFileView: View {
+    let file: ChecksumViewModel.FileGroup
+    let copy: (String) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 10) {
+                Image(systemName: "doc")
+                    .font(.title2)
+                    .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(file.url.lastPathComponent)
+                        .font(.headline)
+                    Text(file.url.deletingLastPathComponent().path)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .textSelection(.enabled)
+                Spacer(minLength: 0)
+            }
+            .padding(14)
+            .help(file.url.path)
+
+            Divider()
+
+            VStack(spacing: 12) {
+                ForEach(file.rows) { row in
+                    ChecksumResultRow(row: row, copy: copy)
+                    if row.id != file.rows.last?.id {
+                        Divider()
+                    }
+                }
+            }
+            .padding(14)
+        }
+        .background(.background, in: RoundedRectangle(cornerRadius: 10))
+        .overlay {
+            RoundedRectangle(cornerRadius: 10)
+                .strokeBorder(.quaternary, lineWidth: 1)
+        }
+    }
+}
+
 private struct ChecksumResultRow: View {
-    let row: ChecksumViewModel.Row
+    @ObservedObject var row: ChecksumViewModel.Row
     let copy: (String) -> Void
 
     var body: some View {

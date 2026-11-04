@@ -123,8 +123,8 @@ final class ActionServiceTests {
         #expect(try URL(fileURLWithPath: literal.path).resourceValues(forKeys: [.isHiddenKey]).isHidden == false)
         let literalDirectory = root.appendingPathComponent("folder%2Fname")
         try fm.createDirectory(at: literalDirectory, withIntermediateDirectories: false)
-        #expect(service.targetDirectoryForNewFile([literalDirectory.path]) == literalDirectory.path)
-        #expect(service.targetDirectoryForNewFile([literal.path]) == root.path)
+        #expect(await service.targetDirectoryForNewFile([literalDirectory.path]) == literalDirectory.path)
+        #expect(await service.targetDirectoryForNewFile([literal.path]) == root.path)
     }
 
     @Test func archiveDispatchKeepsLiteralNamesAndRejectsEmptySpaceMenus() async {
@@ -496,6 +496,35 @@ final class ActionServiceTests {
             #expect(loaded.openApp == file.openApp)
             try service.save(AppConfigData(newFiles: [loaded]))
         }
+    }
+
+    @Test func unhideProcessesAllSelectedItemsWithoutChangingTheirChildren() async throws {
+        let fm = FileManager.default
+        let root = fm.temporaryDirectory.appendingPathComponent("oneclick-unhide-selection-\(UUID())")
+        try fm.createDirectory(at: root, withIntermediateDirectories: false)
+        defer { try? fm.removeItem(at: root) }
+        let first = root.appendingPathComponent("first.txt")
+        let folder = root.appendingPathComponent("folder")
+        let child = folder.appendingPathComponent("child.txt")
+        try fm.createDirectory(at: folder, withIntermediateDirectories: false)
+        try Data().write(to: first)
+        try Data().write(to: child)
+        for var url in [first, folder, child] {
+            var values = URLResourceValues(); values.isHidden = true
+            try url.setResourceValues(values)
+        }
+        let permission = MockPermission()
+        permission.authorizedDirs.insert(root.resolvingSymlinksInPath().path)
+        let service = ActionService(state: MockState(), permission: permission, confirmation: MockConfirmation())
+        await service.unhideFilesAndDirs([first.path, folder.path], "ctx-items")
+        #expect(try URL(fileURLWithPath: first.path).resourceValues(forKeys: [.isHiddenKey]).isHidden == false)
+        #expect(try URL(fileURLWithPath: folder.path).resourceValues(forKeys: [.isHiddenKey]).isHidden == false)
+        #expect(try URL(fileURLWithPath: child.path).resourceValues(forKeys: [.isHiddenKey]).isHidden == true)
+        #expect(permission.promptCalls.isEmpty)
+
+        permission.authorizedDirs.insert(folder.resolvingSymlinksInPath().path)
+        await service.unhideFilesAndDirs([folder.path], "ctx-container")
+        #expect(try URL(fileURLWithPath: child.path).resourceValues(forKeys: [.isHiddenKey]).isHidden == false)
     }
 
 }

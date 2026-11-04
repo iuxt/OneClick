@@ -19,6 +19,11 @@ struct GeneralSettingsTabView: View {
     @AppLog(category: "settings-general")
     private var logger
 
+    @EnvironmentObject private var appState: AppState
+    @State private var managingSettings = false
+    @State private var managementMessage: String?
+    @State private var managementFailed = false
+
     @AppStorage(Key.showMenuBarExtra, store: .group) private var showMenuBarExtra = true
     @ObservedObject private var bookmarkManager = AppState.shared.bookmarkManager
 
@@ -139,8 +144,12 @@ struct GeneralSettingsTabView: View {
             } header: {
                 Text(appLocalized: "Settings Management")
             } footer: {
-                Text(appLocalized: "Resetting all settings restores the default configuration and cannot be undone")
+                Text(appLocalized: "Backups include app settings and templates. Folder permissions, login items and file associations are managed separately.")
                     .fixedSize(horizontal: false, vertical: true)
+            }
+            .disabled(managingSettings)
+            if managingSettings {
+                ProgressView(AppLocalization.localized("Working on settings…"))
             }
         }
         .formStyle(.grouped)
@@ -181,6 +190,11 @@ struct GeneralSettingsTabView: View {
         } message: {
             Text(appLocalized: "Folder access permission is required to use this feature.")
         }
+        .alert(Text(appLocalized: managementFailed ? "Settings operation failed" : "Settings"), isPresented: Binding(
+            get: { managementMessage != nil }, set: { if !$0 { managementMessage = nil } }
+        )) {
+            Button(AppLocalization.localized("OK"), role: .cancel) { managementMessage = nil }
+        } message: { Text(managementMessage ?? "") }
         .sheet(isPresented: $showFolderPermissionsSheet) {
             FolderPermissionsSheetView(bookmarkManager: bookmarkManager)
         }
@@ -220,8 +234,12 @@ struct GeneralSettingsTabView: View {
         savePanel.nameFieldStringValue = "OneClick_Settings.plist"
         savePanel.begin { response in
             guard response == .OK, let url = savePanel.url else { return }
-            // TODO: 实现设置导出逻辑
-            logger.info("导出设置到：\(url.path)")
+            performManagement(at: url) {
+                let snapshot = AppConfigData(apps: appState.apps, actions: appState.actions,
+                                             newFiles: appState.newFiles, commonDirs: appState.cdirs)
+                try await SettingsManagementService(config: appState.configService).export(snapshot, to: url)
+                return AppLocalization.localized("Settings exported.")
+            }
         }
     }
 
@@ -231,10 +249,15 @@ struct GeneralSettingsTabView: View {
         openPanel.canChooseFiles = true
         openPanel.canChooseDirectories = false
         openPanel.allowsMultipleSelection = false
+        openPanel.message = AppLocalization.localized("Importing a backup replaces the current app settings.")
         openPanel.begin { response in
             guard response == .OK, let url = openPanel.url else { return }
-            // TODO: 实现设置导入逻辑
-            logger.info("从以下路径导入设置：\(url.path)")
+            performManagement(at: url) {
+                let snapshot = try await SettingsManagementService(config: appState.configService).restore(from: url)
+                appState.applyConfiguration(snapshot)
+                InputMethodService.shared.reloadConfiguration()
+                return AppLocalization.localized("Settings imported.")
+            }
         }
     }
 
@@ -244,15 +267,17 @@ struct GeneralSettingsTabView: View {
         savePanel.nameFieldStringValue = "OneClick_Log.txt"
         savePanel.begin { response in
             guard response == .OK, let url = savePanel.url else { return }
-            // TODO: 实现日志导出逻辑
-            logger.info("导出日志到：\(url.path)")
+            performManagement(at: url) {
+                try await SettingsBackupIO.exportLogs(to: url)
+                return AppLocalization.localized("Logs exported.")
+            }
         }
     }
 
     private func resetAllSettings() {
         let alert = NSAlert()
         alert.messageText = AppLocalization.localized("Reset All Settings?")
-        alert.informativeText = AppLocalization.localized("This will delete all custom configurations and restore the defaults. This action cannot be undone.")
+        alert.informativeText = AppLocalization.localized("This restores default app settings. Folder permissions, login items and file associations are kept. This action cannot be undone.")
         alert.alertStyle = .warning
         alert.addButton(withTitle: AppLocalization.localized("Reset"))
         alert.addButton(withTitle: AppLocalization.localized("Cancel"))
@@ -260,10 +285,34 @@ struct GeneralSettingsTabView: View {
 
         let response = alert.runModal()
         if response == .alertFirstButtonReturn {
-            // TODO: 实现重置逻辑
-            logger.info("重置所有设置")
+            performManagement {
+                let snapshot = try SettingsManagementService(config: appState.configService).reset()
+                appState.applyConfiguration(snapshot)
+                InputMethodService.shared.reloadConfiguration()
+                return AppLocalization.localized("Default settings restored.")
+            }
         }
     }
+    private func performManagement(at url: URL? = nil, operation: @escaping @MainActor () async throws -> String) {
+        guard !managingSettings else { return }
+        managingSettings = true
+        Task { @MainActor in
+            let scoped = url?.startAccessingSecurityScopedResource() ?? false
+            defer {
+                if scoped { url?.stopAccessingSecurityScopedResource() }
+                managingSettings = false
+            }
+            do {
+                managementMessage = try await operation()
+                managementFailed = false
+            } catch {
+                managementMessage = error.localizedDescription
+                managementFailed = true
+                logger.error("Settings operation failed: \(error.localizedDescription)")
+            }
+        }
+    }
+
 }
 
 // MARK: - 权限状态枚举

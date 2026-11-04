@@ -11,7 +11,7 @@ import SwiftData
 import os.log
 
 /// 配置数据快照（AppState 持有的内存配置）
-struct AppConfigData {
+struct AppConfigData: Codable {
     var apps: [OpenWithApp] = []
     var actions: [RCAction] = []
     var newFiles: [NewFile] = []
@@ -132,30 +132,39 @@ final class ConfigService {
 
     /// 将配置数据写回 SwiftData（全量替换）
     func save(_ data: AppConfigData) throws {
-        // Apps
-        try modelContext.delete(model: AppEntity.self)
-        for (index, app) in data.apps.enumerated() {
-            modelContext.insert(AppEntity(from: app, sortOrder: index))
-        }
+        do {
+            try modelContext.transaction {
+                // Apps
+                try modelContext.delete(model: AppEntity.self)
+                for (index, app) in data.apps.enumerated() {
+                    modelContext.insert(AppEntity(from: app, sortOrder: index))
+                }
 
-        // Actions
-        try modelContext.delete(model: ActionEntity.self)
-        for action in data.actions {
-            modelContext.insert(ActionEntity(from: action))
-        }
+                // Actions
+                try modelContext.delete(model: ActionEntity.self)
+                for action in data.actions {
+                    modelContext.insert(ActionEntity(from: action))
+                }
 
-        // NewFiles
-        try modelContext.delete(model: NewFileTypeEntity.self)
-        for newFile in data.newFiles {
-            modelContext.insert(NewFileTypeEntity(from: newFile))
-        }
+                // NewFiles
+                try modelContext.delete(model: NewFileTypeEntity.self)
+                for newFile in data.newFiles {
+                    modelContext.insert(NewFileTypeEntity(from: newFile))
+                }
 
-        // CommonDirs
-        try modelContext.delete(model: CommonDirEntity.self)
-        for commonDir in data.commonDirs {
-            modelContext.insert(CommonDirEntity(from: commonDir))
-        }
+                // CommonDirs
+                try modelContext.delete(model: CommonDirEntity.self)
+                for (index, commonDir) in data.commonDirs.enumerated() {
+                    let entity = CommonDirEntity(from: commonDir)
+                    entity.sortOrder = index
+                    modelContext.insert(entity)
+                }
 
-        try modelContext.save()
+                try modelContext.save()
+            }
+        } catch {
+            modelContext.rollback()
+            throw error
+        }
     }
 }

@@ -8,7 +8,6 @@
 //
 
 import AppKit
-import ApplicationServices
 import Foundation
 import os.log
 
@@ -60,11 +59,11 @@ final class ActionService {
         for resolved in AppPresets.resolveOpenTargets(
             appPath: appUrl.path, explicit: rcitem.opensContainingDir, targetPaths: target
         ) {
-            await openWithApp(resolved.url, appUrl: appUrl, opensNewInstance: rcitem.opensNewInstance)
+            await openWithApp(resolved.url, appUrl: appUrl, options: AppLaunchOptions(app: rcitem))
         }
     }
 
-    private func openWithApp(_ url: URL, appUrl: URL, opensNewInstance: Bool) async {
+    private func openWithApp(_ url: URL, appUrl: URL, options: AppLaunchOptions) async {
         let logger = self.logger  // 捕获 Sendable logger，供完成回调使用
         var isDir: ObjCBool = false
         let exists = FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir)
@@ -78,15 +77,13 @@ final class ActionService {
             }
         }
 
-        let config = NSWorkspace.OpenConfiguration()
-        // 以新实例打开（浏览器类 app 会新开窗口而非新 tab）
-        config.createsNewApplicationInstance = opensNewInstance
+        let config = options.configuration()
         NSWorkspace.shared.open([url], withApplicationAt: appUrl, configuration: config) { [weak self] runningApp, error in
             guard let self else { return }
             if let error {
                 // 失败兜底：再弹授权并重试一次
                 Task { @MainActor in
-                    await self.openRetryAfterPermission(url: url, appUrl: appUrl, accessURL: accessURL, opensNewInstance: opensNewInstance, firstError: error)
+                    await self.openRetryAfterPermission(url: url, appUrl: appUrl, accessURL: accessURL, options: options, firstError: error)
                 }
             } else if let runningApp {
                 logger.debug("Successfully opened with application: \(runningApp.localizedName ?? "Unknown")")
@@ -94,14 +91,13 @@ final class ActionService {
         }
     }
 
-    private func openRetryAfterPermission(url: URL, appUrl: URL, accessURL: URL, opensNewInstance: Bool, firstError: Error) async {
+    private func openRetryAfterPermission(url: URL, appUrl: URL, accessURL: URL, options: AppLaunchOptions, firstError: Error) async {
         let logger = self.logger  // 捕获 Sendable logger
         guard await permission.promptForPermission(for: accessURL) != nil else {
             logger.error("打开失败且用户取消授权：\(url.path) — \(firstError.localizedDescription)")
             return
         }
-        let config = NSWorkspace.OpenConfiguration()
-        config.createsNewApplicationInstance = opensNewInstance
+        let config = options.configuration()
         NSWorkspace.shared.open([url], withApplicationAt: appUrl, configuration: config) { _, retryError in
             if let retryError {
                 logger.error("重试打开仍失败：\(url.path) — \(retryError.localizedDescription)")
@@ -280,123 +276,41 @@ final class ActionService {
     }
 
     func unhideFilesAndDirs(_ target: [String], _ trigger: String) async {
-        logger.info("开始取消隐藏文件和目录，目标路径：\(target)")
-        if let dirPath = target.first {
-            let fileManager = FileManager.default
-            let path = dirPath
-            logger.info("处理主目录：\(path)")
-            let url = URL(fileURLWithPath: path)
-
-            // 确保有目录的访问权限
-            if !permission.hasAccess(to: url) {
-                guard await permission.promptForPermission(for: url) != nil else {
-                    logger.warning("用户取消授权，跳过取消隐藏：\(path)")
-                    return
-                }
-            }
-
-            do {
-                let contents = try fileManager.contentsOfDirectory(at: url, includingPropertiesForKeys: [.isHiddenKey], options: [.skipsPackageDescendants])
-                for case var fileURL in contents {
-                    do {
-                        var resourceValues = URLResourceValues()
-                        resourceValues.isHidden = false
-                        try fileURL.setResourceValues(resourceValues)
-                        logger.info("成功取消隐藏：\(fileURL.path)")
-                    } catch {
-                        logger.error("取消隐藏失败：\(fileURL.path): \(error)")
-                    }
-                }
-            } catch {
-                logger.error("获取目录内容失败：\(error)")
-            }
-
-            do {
-                var resourceValues = URLResourceValues()
-                resourceValues.isHidden = false
-                var targetURL = url
-                try targetURL.setResourceValues(resourceValues)
-                logger.info("成功取消隐藏主目录：\(path)")
-            } catch {
-                logger.error("取消隐藏主目录失败：\(path): \(error)")
-            }
-            logger.info("取消隐藏操作完成，共处理目录：\(path)")
-        }
+        await setHidden(false, target: target, trigger: trigger)
     }
 
     func hideFilesAndDirs(_ target: [String], _ trigger: String) async {
-        logger.info("开始隐藏文件和目录，目标路径：\(target), 触发器：\(trigger)")
-        let fileManager = FileManager.default
+        await setHidden(true, target: target, trigger: trigger)
+    }
 
-        if trigger == "ctx-container", let dirPath = target.first {
-            let path = dirPath
-            logger.info("处理主目录：\(path)")
+    private func setHidden(_ hidden: Bool, target: [String], trigger: String) async {
+        guard trigger == "ctx-items" || trigger == "ctx-container" else { return }
+        let container = trigger == "ctx-container"
+        var authorized: [URL] = []
+        var denied: Set<URL> = []
+        for path in container ? Array(target.prefix(1)) : target {
             let url = URL(fileURLWithPath: path)
-
-            // 确保有目录的访问权限
-            if !permission.hasAccess(to: url) {
-                guard await permission.promptForPermission(for: url) != nil else {
-                    logger.warning("用户取消授权，跳过隐藏：\(path)")
-                    return
-                }
-            }
-
-            do {
-                let contents = try fileManager.contentsOfDirectory(at: url, includingPropertiesForKeys: [.isDirectoryKey], options: [.skipsPackageDescendants])
-                for case var fileURL in contents {
-                    if Utils.isProtectedFolder(fileURL.path) {
-                        logger.warning("跳过受保护的文件路径：\(fileURL.path)")
-                        continue
-                    }
-                    do {
-                        var resourceValues = URLResourceValues()
-                        resourceValues.isHidden = true
-                        try fileURL.setResourceValues(resourceValues)
-                        logger.info("成功隐藏：\(fileURL.path)")
-                    } catch {
-                        logger.error("隐藏失败：\(fileURL.path): \(error)")
-                    }
-                }
-            } catch {
-                logger.error("获取目录内容失败：\(error)")
-            }
-        } else if trigger == "ctx-items" {
-            for dirPath in target {
-                let path = dirPath
-                logger.info("处理路径：\(path)")
-                let url = URL(fileURLWithPath: path)
-
-                if Utils.isProtectedFolder(path) {
-                    logger.warning("跳过受保护的文件路径：\(path)")
+            if !container && Utils.isProtectedFolder(path) { continue }
+            let directory = container ? url : url.deletingLastPathComponent()
+            if !permission.hasAccess(to: directory) {
+                guard !denied.contains(directory),
+                      await permission.promptForPermission(for: directory) != nil,
+                      permission.hasAccess(to: directory) else {
+                    denied.insert(directory)
                     continue
                 }
-
-                // 确保有文件所在目录的访问权限
-                let dirURL = url.deletingLastPathComponent()
-                if !permission.hasAccess(to: dirURL) {
-                    guard await permission.promptForPermission(for: dirURL) != nil else {
-                        logger.warning("用户取消授权，跳过隐藏：\(path)")
-                        continue
-                    }
-                }
-
-                do {
-                    var resourceValues = URLResourceValues()
-                    resourceValues.isHidden = true
-                    var targetURL = url
-                    try targetURL.setResourceValues(resourceValues)
-                    logger.info("成功隐藏：\(path)")
-                } catch {
-                    logger.error("隐藏失败：\(path): \(error)")
-                }
             }
+            authorized.append(url)
         }
-        logger.info("隐藏操作完成")
+        guard !authorized.isEmpty else { return }
+        let activity = FileActionActivity()
+        let failures = await FileActionWorker.setHidden(hidden, urls: authorized, contentsOfDirectories: container)
+        activity.finish()
+        showFileFailures(failures)
     }
 
     func deleteFoldorFile(_ target: [String], _ trigger: String, optionKeyPressed: Bool = false) async {
         logger.info("---- deleteFoldorFile trigger:\(trigger) option:\(optionKeyPressed)")
-        let fm = FileManager.default
 
         if trigger == "ctx-container" {
             let alert = NSAlert()
@@ -457,16 +371,16 @@ final class ActionService {
             }
         }
 
-        for decodedPath in authorized {
-            do { try fm.removeItem(atPath: decodedPath) }
-            catch { logger.error("delete \(decodedPath) file run error \(error)") }
-        }
+        let activity = FileActionActivity()
+        let failures = await FileActionWorker.remove(authorized)
+        activity.finish()
+        showFileFailures(failures)
     }
 
     // MARK: - NewFileActions
 
     func createFile(rid: String, target: [String]) async {
-        guard let dirPath = targetDirectoryForNewFile(target) else {
+        guard let dirPath = await targetDirectoryForNewFile(target) else {
             logger.warning("when createFile, but not have target directory")
             return
         }
@@ -481,121 +395,49 @@ final class ActionService {
             }
         }
 
+        let ext: String
+        let template: URL?
         if rid == NewFileMenuItem.customFileId {
-            let filePath = getUniqueFilePath(dir: dirPath, ext: "")
-            let fileURL = URL(fileURLWithPath: filePath)
-            do {
-                try Data().write(to: fileURL)
-                logger.info("created editable file: \(fileURL.path)")
-                revealInFinderAndRename(fileURL)
-            } catch {
-                logger.error("create editable file error: \(error.localizedDescription)")
-            }
-            return
+            ext = ""
+            template = nil
+        } else {
+            guard let item = state.getFileType(rid: rid) else { return }
+            ext = item.ext
+            template = item.template ?? Bundle.main.url(forResource: "template", withExtension: ext.trimmingCharacters(in: CharacterSet(charactersIn: ".")))
         }
-
-        guard let rcitem = state.getFileType(rid: rid) else {
-            logger.warning("when createFile, but not have fileType \(rid) ")
-            return
-        }
-
-        let ext = rcitem.ext
-        logger.info("create file dir:\(dirPath) -- ext \(ext)")
-        let filePath = getUniqueFilePath(dir: dirPath, ext: ext)
-        let fileURL = URL(fileURLWithPath: filePath)
-
+        let activity = FileActionActivity()
         do {
-            let fileManager = FileManager.default
-
-            if let templateUrl = rcitem.template {
-                try fileManager.copyItem(at: templateUrl, to: fileURL)
-                logger.info("已成功复制模板到目标路径：\(fileURL.path)")
-            } else {
-                if let defaultTemplateURL = Bundle.main.url(forResource: "template", withExtension: ext.replacingOccurrences(of: ".", with: "")) {
-                    logger.info("使用模板创建文件，模板路径：\(defaultTemplateURL.path)")
-                    try fileManager.copyItem(at: defaultTemplateURL, to: fileURL)
-                    logger.info("已成功复制模板到目标路径：\(fileURL.path)")
-                } else {
-                    logger.warning("模板文件不存在：\(ext)")
-                    try Data().write(to: fileURL)
-                }
-            }
+            let fileURL = try await FileActionWorker.create(in: dirURL, extension: ext, template: template,
+                                                          baseName: AppLocalization.localized("Untitled"))
+            activity.finish()
             revealInFinderAndRename(fileURL)
-        } catch let error as NSError {
-            switch error.domain {
-            case NSCocoaErrorDomain:
-                switch error.code {
-                case NSFileNoSuchFileError:
-                    logger.error("文件不存在：\(filePath)")
-                case NSFileWriteOutOfSpaceError:
-                    logger.error("磁盘空间不足")
-                case NSFileWriteNoPermissionError:
-                    logger.error("没有写入权限：\(filePath)")
-                default:
-                    logger.error("创建文件错误：\(error.localizedDescription) (错误码：\(error.code))")
-                }
-            default:
-                logger.error("未处理的错误：\(error.localizedDescription) (错误码：\(error.code))")
-            }
+        } catch {
+            activity.finish()
+            showFileFailures([FileActionWorker.Failure(url: dirURL, message: error.localizedDescription)])
         }
+    }
+
+    private func showFileFailures(_ failures: [FileActionWorker.Failure]) {
+        guard !failures.isEmpty else { return }
+        for failure in failures { logger.error("File operation failed: \(failure.url.path) — \(failure.message)") }
+        let alert = NSAlert()
+        alert.messageText = AppLocalization.localized("Some files could not be processed")
+        alert.informativeText = failures.prefix(5).map { "\($0.url.lastPathComponent): \($0.message)" }.joined(separator: "\n")
+        alert.addButton(withTitle: AppLocalization.localized("OK"))
+        NSApp.activate(ignoringOtherApps: true)
+        alert.runModal()
     }
 
     // MARK: - 辅助
 
-    /// 生成目录内唯一的文件名（避免重名冲突）
-    func getUniqueFilePath(dir: String, ext: String) -> String {
-        let fileManager = FileManager.default
-        let dirURL = URL(fileURLWithPath: dir.hasSuffix("/") ? String(dir.dropLast()) : dir)
-        let baseFileName = AppLocalization.localized("Untitled")
-        var filePath = dirURL.appendingPathComponent("\(baseFileName)\(ext)").path
-        var counter = 1
-
-        while fileManager.fileExists(atPath: filePath) {
-            let newFileName = "\(baseFileName)\(counter)"
-            filePath = dirURL.appendingPathComponent("\(newFileName)\(ext)").path
-            counter += 1
-        }
-
-        return filePath
-    }
-
-    /// 解析新建文件的目标目录（目录直接用；文件取父目录）
-    func targetDirectoryForNewFile(_ target: [String]) -> String? {
-        guard let rawPath = target.first else { return nil }
-        let path = rawPath
-        var isDirectory: ObjCBool = false
-
-        if FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory) {
-            if isDirectory.boolValue {
-                return path
-            }
-            return URL(fileURLWithPath: path).deletingLastPathComponent().path
-        }
-
-        return path
+    /// Resolve directory metadata away from the UI thread, including network volumes.
+    func targetDirectoryForNewFile(_ target: [String]) async -> String? {
+        await FileActionWorker.targetDirectory(target)
     }
 
     /// 在 Finder 中选中新文件并触发重命名（需要辅助功能权限）
     private func revealInFinderAndRename(_ fileURL: URL) {
         NSWorkspace.shared.activateFileViewerSelecting([fileURL])
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [logger] in
-            let options = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
-            guard AXIsProcessTrustedWithOptions(options) else {
-                logger.warning("Accessibility permission is required to trigger Finder rename for \(fileURL.path)")
-                return
-            }
-
-            NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.finder").first?.activate()
-
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-                let keyCodeReturn: CGKeyCode = 36
-                let source = CGEventSource(stateID: .hidSystemState)
-                let keyDown = CGEvent(keyboardEventSource: source, virtualKey: keyCodeReturn, keyDown: true)
-                let keyUp = CGEvent(keyboardEventSource: source, virtualKey: keyCodeReturn, keyDown: false)
-                keyDown?.post(tap: .cghidEventTap)
-                keyUp?.post(tap: .cghidEventTap)
-            }
-        }
+        FinderRenameService.shared.renameWhenReady(fileURL)
     }
 }

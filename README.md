@@ -19,7 +19,7 @@ An everyday Mac toolkit for Finder right-click actions, archive browsing and inp
 
 ## 🚀 Features
 
-- [x] **Toolbox Home** — A shared home for right-click tools, archive tools and input method switching, with quick actions and grouped navigation.
+- [x] **Toolbox Home** — A shared settings home for right-click tools, archive tools and input method switching, with grouped navigation.
 - [x] **Automatic Input Method Switching** — Choose an input source per app, set a default or remember each app's choice. Based on [LockIME](https://github.com/oomol-lab/LockIME); see [input method switching](docs/input-methods.md).
 - [x] **Archive Browser & Preview** — Navigate and search archives, preview text and images, or use Quick Look. Associate selected archive formats from the archive settings.
 

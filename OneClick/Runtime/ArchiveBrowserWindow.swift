@@ -299,10 +299,17 @@ private struct ArchiveBrowserView: View {
                     }
                 }
                 .padding(.vertical, 5).contentShape(Rectangle()).tag(entry.id)
-                .onTapGesture(count: 2) {
-                    if entry.isDirectory { model.navigate(to: entry.normalizedPath) }
-                    else { model.selection = entry.id }
-                }
+            }
+        }
+        // Let the list handle double-clicks without delaying single-click selection
+        // while a row-level double-tap recognizer waits for a second click.
+        .contextMenu(forSelectionType: String.self) { _ in
+            EmptyView()
+        } primaryAction: { selection in
+            guard let id = selection.first else { return }
+            model.selection = id
+            if let entry = model.selectedEntry, entry.isDirectory {
+                model.navigate(to: entry.normalizedPath)
             }
         }
         .overlay {
