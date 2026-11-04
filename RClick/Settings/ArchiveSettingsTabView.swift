@@ -11,6 +11,16 @@ struct ArchiveSettingsTabView: View {
     var body: some View {
         Form {
             Section {
+                ArchiveLaunchControls()
+            } header: {
+                Text(appLocalized: "Archive Tools")
+            }
+            Section {
+                ArchiveAssociationView()
+            } header: {
+                Text(appLocalized: "File Associations")
+            }
+            Section {
                 Toggle(AppLocalization.localized("Collapse compression and extraction menu"), isOn: $appState.foldArchivesMenu)
                     .onChange(of: appState.foldArchivesMenu) {
                         NotificationCenter.default.post(name: .menuConfigShouldUpdate, object: nil)

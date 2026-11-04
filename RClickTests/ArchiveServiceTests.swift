@@ -264,7 +264,9 @@ struct ArchiveServiceTests {
         #expect(try FileManager.default.contentsOfDirectory(atPath: root.path) == ["broken.zip"])
     }
 
-    @Test(arguments: [ArchiveOperation.zip, .encryptedZip], [false, true])
+    // These cases must observe a live helper. Concurrent fixture generation can
+    // starve their polling long enough for another case's helper to finish.
+    @Test(.serialized, arguments: [ArchiveOperation.zip, .encryptedZip], [false, true])
     func cancelledWorkDoesNotPublishOrLeaveStaging(operation: ArchiveOperation, split: Bool) async throws {
         let root = try temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: root) }

@@ -198,7 +198,7 @@ nonisolated final class ArchiveProgress: @unchecked Sendable {
         lock.withLock { process?.isRunning == true }
     }
 
-    fileprivate var passwordFailure: Bool {
+    var passwordFailure: Bool {
         lock.withLock { askedForPassword || reportedWrongPassword }
     }
 
@@ -209,7 +209,7 @@ nonisolated final class ArchiveProgress: @unchecked Sendable {
         }
     }
 
-    fileprivate func launch(_ process: Process) throws {
+    func launch(_ process: Process) throws {
         try lock.withLock {
             if cancelled { throw CancellationError() }
             try process.run()
@@ -217,14 +217,14 @@ nonisolated final class ArchiveProgress: @unchecked Sendable {
         }
     }
 
-    fileprivate func finish() throws {
+    func finish() throws {
         try lock.withLock {
             process = nil
             if cancelled { throw CancellationError() }
         }
     }
 
-    fileprivate func append(_ data: Data) {
+    func append(_ data: Data) {
         lock.withLock {
             output.append(data)
             let text = String(decoding: output, as: UTF8.self)

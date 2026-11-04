@@ -49,8 +49,8 @@ struct MenuBarView: View {
     var body: some View {
         VStack {
             Button(action: actionSettings) {
-                Image(systemName: "gearshape")
-                Text(appLocalized: "Settings")
+                Image(systemName: "square.grid.2x2")
+                Text(appLocalized: "Open Toolbox")
             }
             .keyboardShortcut(",", modifiers: [.command])
 

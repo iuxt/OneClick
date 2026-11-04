@@ -76,6 +76,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     let messager = Messager.shared
     var showMenuBarExtra = UserDefaults.group.bool(forKey: Key.showMenuBarExtra)
     var settingsWindow: NSWindow!
+    private var openedArchiveDuringLaunch = false
 
     override init() {
         super.init()
@@ -96,6 +97,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ aNotification: Notification) {
         logger.info("applicationDidFinishLaunching called")
+        InputMethodService.shared.start()
 
         // 设置窗口打开策略。注意 RClick 是 LSUIElement 应用，启动时系统不会
         // 激活它（NSApp.isActive 恒为 false），无法用激活状态区分启动来源，
@@ -116,7 +118,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         logger.info("launch decision: hintClick=\(isHintClickLaunch, privacy: .public) bootLaunch=\(isBootLaunch, privacy: .public) uptime=\(Int(processInfo.systemUptime), privacy: .public)s openSettings=\(willOpenSettings, privacy: .public)")
         if willOpenSettings {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                NotificationCenter.default.post(name: .openSettingsRequested, object: nil)
+                if !self.openedArchiveDuringLaunch {
+                    NotificationCenter.default.post(name: .openSettingsRequested, object: nil)
+                }
             }
         }
 
@@ -219,8 +223,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        InputMethodService.shared.stop()
         messager.sendQuitNotification()
         logger.info("applicationWillTerminate")
+    }
+
+    func application(_ application: NSApplication, open urls: [URL]) {
+        openedArchiveDuringLaunch = true
+        for url in urls { ArchiveBrowserPresenter.shared.open(url) }
     }
 
     /// 迁移旧的"开机登录"设置。

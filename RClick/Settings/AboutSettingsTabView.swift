@@ -39,7 +39,7 @@ struct AboutSettingsTabView: View {
                         .foregroundStyle(.secondary)
                 }
 
-                Text(appLocalized: "RClick is a right-click menu extension that allows you to add applications for opening folders and includes some common actions.")
+                Text(appLocalized: "A home for the tools that make everyday work on your Mac easier.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)

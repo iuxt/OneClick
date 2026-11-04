@@ -11,9 +11,13 @@
 [![GitHub release](https://img.shields.io/github/v/release/wflixu/RClick)](https://github.com/wflixu/RClick/releases)
 [![GitHub downloads](https://img.shields.io/github/downloads/wflixu/RClick/total)](https://github.com/wflixu/RClick/releases)
 
-Enhance your macOS Finder context menu with custom actions. Built with Swift 6.2 and SwiftUI for macOS 15.6+. Full dark mode support with adaptive icons.
+An everyday Mac toolkit for Finder right-click actions, archive browsing and input method switching. Built with Swift 6.2 and SwiftUI for macOS 15.6+. Full dark mode support with adaptive icons.
 
 ## 🚀 Features
+
+- [x] **Toolbox Home** — A shared home for right-click tools, archive tools and input method switching, with quick actions and grouped navigation.
+- [x] **Automatic Input Method Switching** — Choose an input source per app, set a default or remember each app's choice. Based on [LockIME](https://github.com/oomol-lab/LockIME); see [input method switching](docs/input-methods.md).
+- [x] **Archive Browser & Preview** — Navigate and search archives, preview text and images, or use Quick Look. Associate selected archive formats from the archive settings.
 
 - [x] **Open with External App** — Open files or directories with any installed application, with support for custom arguments and environment variables. Ships with presets for popular editors, terminals and IDEs, per-app visibility for the toolbar and context menus, and none/simple/original icon styles.
 - [x] **Copy Path** — Copy the full path of selected files or folders to clipboard.

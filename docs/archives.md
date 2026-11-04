@@ -83,6 +83,39 @@ files share content, but extracting an individual file may take longer. These
 options apply to the current custom compression job; direct shortcuts retain
 their existing behavior.
 
+## Archive browser and file associations
+
+**Toolbox → Compression & Extraction → Open Archive…** opens a dedicated browser.
+Navigate folders, search paths across the archive, and select a file to preview.
+Text up to 2 MiB is shown in a selectable text pane, images display inline, and
+**Quick Look** opens the system preview for PDF and other supported formats.
+Preview content is limited to 64 MiB, including incorrectly declared sizes.
+**Extract All…** uses the existing extraction workflow with destination
+authorization and collision protection.
+
+Under **File Associations**, select ZIP, 7Z, RAR, TAR or TGZ and click
+**Associate Selected Formats**. macOS may request consent. Launching RClick
+does not change default handlers. Double-clicking an associated file opens its
+browser, including when RClick was not running. Current associations and errors
+are shown in settings. To change back, use Finder's Get Info → Open with →
+Change All. macOS may classify `.tar.gz` as GZIP rather than TGZ; use
+**Open Archive…** or Finder's Open With for these files.
+
+7Z/RAR and split-volume listings use bundled 7-Zip. ZIP, TAR filters and other
+libarchive formats use the macOS libarchive directory reader, preserving Unicode
+and embedded newlines in names. ZIP/7Z/RAR previews use 7-Zip; other previews use
+libarchive. Listings are bounded to 100,000 entries and 32 MiB
+of names/listing output. Missing folder records are synthesized. Encrypted
+headers prompt before listing; encrypted contents prompt when previewing.
+Passwords stay in window memory and clear when the window closes.
+
+Only the selected entry is read for preview. Archive paths never become
+filesystem destinations. Preview bytes go to a generated file in a private
+mode-0700 temporary directory, removed when replaced or the window closes.
+Links, duplicate paths and traversal paths cannot be previewed. 7-Zip wildcard
+matching is disabled for exact-name selection. Closing a browser or selecting
+another file cancels pending work. Browsing does not write beside the archive.
+
 ## Implementation
 
 Keka's [current repository](https://github.com/aonez/Keka) provides documentation,
