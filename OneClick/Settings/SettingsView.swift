@@ -55,8 +55,7 @@ struct SettingsView: View {
 
     private var tabSelection: Binding<Tabs> {
         Binding(get: { selectedTab }, set: { tab in
-            // Replacing two large Forms in an animated navigation transaction
-            // forces both layouts through the transition on every sidebar click.
+            // Selection feedback and page visibility change in the same transaction.
             var transaction = Transaction(animation: nil)
             transaction.disablesAnimations = true
             withTransaction(transaction) { selectedTab = tab }
@@ -99,41 +98,37 @@ struct SettingsView: View {
             .tag(tab)
     }
 
-    @ViewBuilder var detailView: some View {
-        // 右侧内容
-        Group {
-            switch self.selectedTab {
-            case .home:
-                ToolboxHomeView { tabSelection.wrappedValue = $0 }
-            case .inputMethods:
-                InputMethodSettingsView()
-            case .general:
-                GeneralSettingsTabView()
-            case .apps:
-                AppsSettingsTabView()
-            case .actions:
-                ActionSettingsTabView()
-            case .archives:
-                ArchiveSettingsTabView()
-            case .newFile:
-                NewFileSettingsTabView()
-            case .cdirs:
-                CommonDirsSettingTabView()
-            case .iconStyle:
-                IconStyleSettingsView()
-            case .about:
-                AboutSettingsTabView()
-            }
+    @ViewBuilder private func page(for tab: Tabs) -> some View {
+        switch tab {
+        case .home:
+            ToolboxHomeView { tabSelection.wrappedValue = $0 }
+        case .inputMethods:
+            InputMethodSettingsView()
+        case .general:
+            GeneralSettingsTabView()
+        case .apps:
+            AppsSettingsTabView()
+        case .actions:
+            ActionSettingsTabView()
+        case .archives:
+            ArchiveSettingsTabView()
+        case .newFile:
+            NewFileSettingsTabView()
+        case .cdirs:
+            CommonDirsSettingTabView()
+        case .iconStyle:
+            IconStyleSettingsView()
+        case .about:
+            AboutSettingsTabView()
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .frame(minWidth: 450)
     }
 
     var body: some View {
         NavigationSplitView {
             self.sidebar
         } detail: {
-            self.detailView
+            SettingsPageStack(selection: selectedTab) { page(for: $0) }
+                .frame(minWidth: 450)
                 .navigationTitle(AppLocalization.localized(selectedTab.titleKey))
         }
         .navigationSplitViewStyle(.balanced)

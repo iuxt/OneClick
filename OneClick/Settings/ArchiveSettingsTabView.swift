@@ -2,6 +2,7 @@ import SwiftUI
 
 @available(macOS 27, *)
 struct ArchiveSettingsTabView: View {
+    @Environment(\.isSettingsPageActive) private var isActive
     @EnvironmentObject var appState: AppState
     @AppStorage("archiveCompressionFormat", store: .group) private var format: ArchiveCompressionFormat = .zip
     @AppStorage("archiveCompressionLevel", store: .group) private var level: ArchiveCompressionLevel = .normal
@@ -87,7 +88,8 @@ struct ArchiveSettingsTabView: View {
             }
         }
         .formStyle(.grouped)
-        .onAppear {
+        .onChange(of: isActive, initial: true) {
+            guard isActive else { return }
             threadCount = min(max(0, threadCount), ArchiveCompressionSettings.maximumThreadCount)
         }
     }

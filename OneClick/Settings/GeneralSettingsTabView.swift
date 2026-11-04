@@ -16,6 +16,7 @@ import UniformTypeIdentifiers
 
 @available(macOS 27, *)
 struct GeneralSettingsTabView: View {
+    @Environment(\.isSettingsPageActive) private var isActive
     @AppLog(category: "settings-general")
     private var logger
 
@@ -153,22 +154,24 @@ struct GeneralSettingsTabView: View {
             }
         }
         .formStyle(.grouped)
-        .onAppear {
-            updatePermissionStatus()
-        }
         .onForeground {
-            updatePermissionStatus()
+            if isActive { updatePermissionStatus() }
         }
         // 权限状态挂在定时器上：授权发生在系统设置里（本应用在后台），
         // macOS 的 scenePhase 对窗口级焦点切换不可靠，回到本应用时 onForeground
-        // 不保证触发。两个权限检测都是廉价系统调用，2 秒轮询无性能顾虑。
-        .onReceive(Timer.publish(every: 2, on: .main, in: .common).autoconnect()) { _ in
-            updatePermissionStatus()
+        // 不保证触发。仅在当前页面可见时每 2 秒检测，切走后取消轮询。
+        .task(id: isActive) {
+            guard isActive else { return }
+            while !Task.isCancelled {
+                updatePermissionStatus()
+                do { try await Task.sleep(for: .seconds(2)) }
+                catch { return }
+            }
         }
         // 从系统设置切回时立即刷新（窗口重新成为 key window 的那一刻），
         // 不等下一个 2 秒轮询
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in
-            updatePermissionStatus()
+            if isActive { updatePermissionStatus() }
         }
         .alert(
             Text(appLocalized: "Invalid Folder"),

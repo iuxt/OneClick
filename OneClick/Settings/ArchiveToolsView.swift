@@ -25,6 +25,7 @@ nonisolated struct ArchiveAssociationFormat: Identifiable, Sendable {
 
 @available(macOS 27, *)
 struct ArchiveAssociationView: View {
+    @Environment(\.isSettingsPageActive) private var isActive
     @State private var selected: Set<String> = ["ZIP", "7Z", "RAR"]
     @State private var associated: Set<String> = []
     @State private var associating = false
@@ -55,7 +56,9 @@ struct ArchiveAssociationView: View {
             }
             if let result { Text(result).font(.caption).textSelection(.enabled) }
         }
-        .task { await refresh() }
+        .task(id: isActive) {
+            if isActive { await refresh() }
+        }
     }
 
     private func refresh() async {

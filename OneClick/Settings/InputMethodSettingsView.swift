@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 
 @available(macOS 27, *)
 struct InputMethodSettingsView: View {
+    @Environment(\.isSettingsPageActive) private var isActive
     @ObservedObject private var service = InputMethodService.shared
     @State private var addingApp = false
     @State private var selectedSource = ""
@@ -85,8 +86,10 @@ struct InputMethodSettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .onAppear {
-            service.refresh()
+        .onChange(of: isActive, initial: true) {
+            guard isActive else { return }
+            // The running service already tracks input-source changes. Avoid a
+            // synchronous TIS enumeration in the sidebar selection transaction.
             selectedSource = service.currentSourceID ?? service.sources.first?.id ?? ""
         }
         .fileImporter(isPresented: $addingApp, allowedContentTypes: [.application]) { result in
