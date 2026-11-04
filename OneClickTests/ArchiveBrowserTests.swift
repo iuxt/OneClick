@@ -151,6 +151,42 @@ struct ArchiveBrowserTests {
         }
     }
 
+    @Test @MainActor func extractAllClosesBrowserAndKeepsPasswordForBackgroundWork() async throws {
+        let root = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let file = root.appendingPathComponent("notes.txt")
+        let contents = Data("encrypted contents".utf8)
+        try contents.write(to: file)
+        let password = "test-password"
+        let archive = try await ArchiveService.perform(ArchiveRequest(operation: .encryptedSevenZip, urls: [file]), password: password)
+        var closed = false
+        var extractionCount = 0
+        var output: URL?
+        var extractionError: Error?
+        let model = ArchiveBrowserModel(url: archive) { url, capturedPassword in
+            #expect(closed)
+            #expect(url == archive)
+            #expect(capturedPassword == password)
+            extractionCount += 1
+            do {
+                output = try await ArchiveService.perform(ArchiveRequest(operation: .extract, urls: [url]), password: capturedPassword)
+            } catch { extractionError = error }
+        }
+        defer { model.close() }
+        model.load(password: password)
+        try await waitUntil { !model.loading }
+        #expect(model.error == nil)
+        model.extract { closed = true }
+        #expect(closed)
+        model.close()
+        model.extract { Issue.record("A closed browser must not extract twice") }
+        try await waitUntil { output != nil || extractionError != nil }
+        #expect(extractionError == nil)
+        #expect(extractionCount == 1)
+        let extracted = try #require(output)
+        #expect(try Data(contentsOf: extracted.appendingPathComponent(file.lastPathComponent)) == contents)
+    }
+
     @Test(arguments: [ArchiveOperation.zip, .tarGzip])
     func nativeDirectoryReaderPreservesNewlinesAndRejectsLinks(operation: ArchiveOperation) async throws {
         let root = try temporaryDirectory()

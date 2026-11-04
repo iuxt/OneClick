@@ -59,6 +59,13 @@ final class ConfigService {
             modelContext.delete(entity)
             changedActions = true
         }
+        // Early extract-and-delete configurations used a nonexistent SF Symbol.
+        // Repair the persisted value so settings and Finder both receive the icon.
+        for entity in savedActions where entity.id == RCAction.extractAndDelete.id
+            && entity.icon == "archivebox.badge.arrow.trianglehead.2.clockwise" {
+            entity.icon = RCAction.extractAndDelete.icon
+            changedActions = true
+        }
         data.actions = savedActions.filter { !retiredActionIDs.contains($0.id) }.map { entity in
             RCAction(
                 id: entity.id,

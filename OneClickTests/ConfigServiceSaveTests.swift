@@ -115,4 +115,26 @@ struct ConfigServiceSaveTests {
             #expect(Set(stored.map(\.id)) == Set(expected.map(\.id)))
         }
     }
+
+    @Test func loadingRepairsLegacyExtractAndDeleteIconAndPersistsIt() throws {
+        let (service, context) = try makeService()
+        var saved = payload
+        var action = RCAction.extractAndDelete
+        action.icon = "archivebox.badge.arrow.trianglehead.2.clockwise"
+        action.enabled = false
+        action.idx = 42
+        saved.actions.append(action)
+        try service.save(saved)
+
+        let loaded = try #require(service.load().actions.first { $0.id == action.id })
+        #expect(loaded.icon == RCAction.extractAndDelete.icon)
+        #expect(!loaded.enabled)
+        #expect(loaded.idx == 42)
+
+        let freshContext = ModelContext(context.container)
+        let persisted = try #require(freshContext.fetch(FetchDescriptor<ActionEntity>()).first { $0.id == action.id })
+        #expect(persisted.icon == RCAction.extractAndDelete.icon)
+        #expect(!persisted.isEnabled)
+        #expect(persisted.sortOrder == 42)
+    }
 }

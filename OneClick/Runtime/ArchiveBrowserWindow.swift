@@ -31,7 +31,9 @@ private final class ArchiveBrowserWindowController: NSWindowController, NSWindow
         model = ArchiveBrowserModel(url: url)
         self.onClose = onClose
         let window = NSWindow()
-        window.contentViewController = NSHostingController(rootView: ArchiveBrowserView(model: model))
+        window.contentViewController = NSHostingController(rootView: ArchiveBrowserView(model: model) { [weak window] in
+            window?.performClose(nil)
+        })
         window.title = url.lastPathComponent
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
         window.setContentSize(NSSize(width: 980, height: 640))
@@ -68,9 +70,13 @@ final class ArchiveBrowserModel: ObservableObject {
     private var previewDirectory: URL?
     private var scoped = false
     private var closed = false
+    private let extractArchive: @MainActor (URL, String?) async -> Void
 
-    init(url: URL) {
+    init(url: URL, extractArchive: @escaping @MainActor (URL, String?) async -> Void = { url, password in
+        await RCRuntime.shared.actionService.extractArchiveSilently(url, password: password)
+    }) {
         self.url = url
+        self.extractArchive = extractArchive
         scoped = url.startAccessingSecurityScopedResource()
     }
 
@@ -194,8 +200,16 @@ final class ArchiveBrowserModel: ObservableObject {
 
     func navigate(to path: String) { selection = nil; folder = path; search = ""; showPreview() }
 
-    func extract() {
-        Task { await RCRuntime.shared.actionService.showArchives([url.path], operation: .extract) }
+    func extract(closeWindow: () -> Void) {
+        guard !closed else { return }
+        // Keep the extraction independent of browser teardown, which cancels
+        // listing/preview tasks and clears the browser's password.
+        let url = self.url
+        let password = self.password
+        let extractArchive = self.extractArchive
+        close()
+        closeWindow()
+        Task { await extractArchive(url, password) }
     }
 
     func close() {
@@ -210,6 +224,7 @@ final class ArchiveBrowserModel: ObservableObject {
 
 private struct ArchiveBrowserView: View {
     @ObservedObject var model: ArchiveBrowserModel
+    let close: () -> Void
     @State private var password = ""
     @State private var quickLookURL: URL?
 
@@ -223,7 +238,7 @@ private struct ArchiveBrowserView: View {
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
-                Button(AppLocalization.localized("Extract All…"), systemImage: "arrow.down.doc") { model.extract() }
+                Button(AppLocalization.localized("Extract All…"), systemImage: "arrow.down.doc") { model.extract(closeWindow: close) }
                     .buttonStyle(.borderedProminent)
                     .disabled(model.loading)
             }.padding(20)

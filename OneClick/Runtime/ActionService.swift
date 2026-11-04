@@ -182,6 +182,22 @@ final class ActionService {
         }
     }
 
+    /// The archive browser's Extract All action must never present another window.
+    @discardableResult
+    func extractArchiveSilently(_ url: URL, password: String? = nil) async -> URL? {
+        let parent = url.deletingLastPathComponent().resolvingSymlinksInPath()
+        guard permission.hasAccess(to: parent) else {
+            logger.error("Background extraction skipped: folder access was not granted for \(parent.path)")
+            return nil
+        }
+        do {
+            return try await ArchiveService.perform(ArchiveRequest(operation: .extract, urls: [url]), password: password)
+        } catch {
+            logger.error("Background extraction failed for \(url.path): \(error.localizedDescription)")
+            return nil
+        }
+    }
+
     func showChecksums(_ target: [String]) async {
         var inputs: [ChecksumInput] = []
         var deniedDirectories: Set<URL> = []
