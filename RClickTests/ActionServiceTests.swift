@@ -82,6 +82,51 @@ final class ActionServiceTests {
         func show(requests: [ArchiveRequest]) { self.requests = requests }
     }
 
+    @Test(arguments: ["report%20.txt", "literal%2F.txt", "100%25.txt", "中文%20.txt"])
+    func deletionPreservesLiteralPercentNames(name: String) async throws {
+        let fm = FileManager.default
+        let root = fm.temporaryDirectory.appendingPathComponent("rclick-literal-delete-\(UUID())")
+        try fm.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: root) }
+        let selected = root.appendingPathComponent(name)
+        let other = root.appendingPathComponent(try #require(name.removingPercentEncoding))
+        try fm.createDirectory(at: other.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("selected".utf8).write(to: selected)
+        let otherContents = Data("unselected".utf8)
+        try otherContents.write(to: other)
+        let permission = MockPermission()
+        permission.hasAccessResult = true
+        let confirmation = MockConfirmation()
+        let service = ActionService(state: MockState(), permission: permission, confirmation: confirmation)
+        await service.deleteFoldorFile([selected.path], "ctx-items")
+        #expect(!fm.fileExists(atPath: selected.path))
+        #expect(try Data(contentsOf: other) == otherContents)
+        #expect(confirmation.confirmCalls == [[selected.path]])
+    }
+
+    @Test func hidingAndNewFileTargetsPreserveLiteralNames() async throws {
+        let fm = FileManager.default
+        let root = fm.temporaryDirectory.appendingPathComponent("rclick-literal-target-\(UUID())")
+        try fm.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: root) }
+        let literal = root.appendingPathComponent("literal%20.txt")
+        let other = root.appendingPathComponent("literal .txt")
+        try Data().write(to: literal)
+        try Data().write(to: other)
+        let permission = MockPermission()
+        permission.hasAccessResult = true
+        let service = ActionService(state: MockState(), permission: permission, confirmation: MockConfirmation())
+        await service.hideFilesAndDirs([literal.path], "ctx-items")
+        #expect(try URL(fileURLWithPath: literal.path).resourceValues(forKeys: [.isHiddenKey]).isHidden == true)
+        #expect(try URL(fileURLWithPath: other.path).resourceValues(forKeys: [.isHiddenKey]).isHidden == false)
+        await service.unhideFilesAndDirs([literal.path], "ctx-items")
+        #expect(try URL(fileURLWithPath: literal.path).resourceValues(forKeys: [.isHiddenKey]).isHidden == false)
+        let literalDirectory = root.appendingPathComponent("folder%2Fname")
+        try fm.createDirectory(at: literalDirectory, withIntermediateDirectories: false)
+        #expect(service.targetDirectoryForNewFile([literalDirectory.path]) == literalDirectory.path)
+        #expect(service.targetDirectoryForNewFile([literal.path]) == root.path)
+    }
+
     @Test func archiveDispatchKeepsLiteralNamesAndRejectsEmptySpaceMenus() async {
         let permission = MockPermission()
         permission.hasAccessResult = true
@@ -136,7 +181,7 @@ final class ActionServiceTests {
         }
         defer { model.cancel() }
         #expect(!model.isRunning)
-        #expect(model.rows.count == 3)
+        try #require(model.rows.count == 3)
         #expect(model.rows[0].error != nil)
         let fileZIP = try #require(model.rows[1].output)
         let folderZIP = try #require(model.rows[2].output)
@@ -150,7 +195,7 @@ final class ActionServiceTests {
         }
     }
 
-    @Test func separateZIPAuthorizationFailureAffectsOnlyItsDirectory() async {
+    @Test func separateZIPAuthorizationFailureAffectsOnlyItsDirectory() async throws {
         let permission = MockPermission()
         let allowed = URL(fileURLWithPath: "/tmp/allowed")
         permission.authorizedDirs = [allowed.resolvingSymlinksInPath().path]
@@ -162,7 +207,7 @@ final class ActionServiceTests {
                                     target: ["/tmp/denied/a.txt", "/tmp/denied/b.txt", allowed.appendingPathComponent("c.txt").path],
                                     trigger: "ctx-items")
         #expect(permission.promptCalls.count == 1)
-        #expect(archives.requests.count == 3)
+        try #require(archives.requests.count == 3)
         #expect(archives.requests[0].error != nil)
         #expect(archives.requests[1].error != nil)
         #expect(archives.requests[2].error == nil)
@@ -397,20 +442,22 @@ final class ActionServiceTests {
         #expect(confirmation.confirmCalls == [[fileA.path]]) // 确认框只拿到已授权子集
     }
 
-    @Test func appEntityPersistsOpensNewInstance() throws {
+    @Test(arguments: ["/Applications/Safari.app", "/Applications/literal%20%2F.app"])
+    func appEntityPersistsOpensNewInstanceAndLiteralPaths(path: String) throws {
         let container = try ModelContainer(
             for: AppEntity.self,
             configurations: ModelConfiguration(isStoredInMemoryOnly: true)
         )
         let context = container.mainContext
 
-        var app = OpenWithApp(appURL: URL(fileURLWithPath: "/Applications/Safari.app"))
+        var app = OpenWithApp(appURL: URL(fileURLWithPath: path))
         app.opensNewInstance = true
         context.insert(AppEntity(from: app, sortOrder: 0))
         try context.save()
 
         let fetched = try context.fetch(FetchDescriptor<AppEntity>())
         #expect(fetched.first?.opensNewInstance == true)
+        #expect(fetched.first?.url.path == path)
     }
 
     @Test func fileTemplateSurvivesSaveAndReload() throws {

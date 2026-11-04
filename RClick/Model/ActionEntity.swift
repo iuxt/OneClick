@@ -59,6 +59,7 @@ final class ActionEntity {
             ActionEntity(id: "compress-zip-encrypted", name: "Compress to Encrypted ZIP…", icon: "lock.doc", isEnabled: true, sortOrder: 9),
             ActionEntity(id: "compress-7z-encrypted", name: "Compress to Encrypted 7Z…", icon: "lock.doc", isEnabled: true, sortOrder: 10),
             ActionEntity(id: "compress", name: "Compress…", icon: "archivebox", isEnabled: true, sortOrder: 11),
+            ActionEntity(id: "compress-zip-separately", name: "Compress to Separate ZIPs", icon: "archivebox", isEnabled: true, sortOrder: 12),
         ]
     }
 }

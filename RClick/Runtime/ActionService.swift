@@ -40,7 +40,7 @@ final class ActionService {
         if let dirPath = target.first {
             let pasteboard = NSPasteboard.general
             pasteboard.clearContents()
-            pasteboard.setString(dirPath.removingPercentEncoding ?? dirPath, forType: .string)
+            pasteboard.setString(dirPath, forType: .string)
         }
     }
 
@@ -114,7 +114,7 @@ final class ActionService {
         logger.debug("开始打开常用目录，目标路径：\(target)")
 
         for dirPath in target {
-            let path = dirPath.removingPercentEncoding ?? dirPath
+            let path = dirPath
             let url = URL(fileURLWithPath: path, isDirectory: true)
 
             if !permission.hasAccess(to: url) {
@@ -229,7 +229,7 @@ final class ActionService {
         }
 
         for item in target {
-            let decodedPath = item.removingPercentEncoding ?? item
+            let decodedPath = item
             logger.info("airdrop path \(decodedPath)")
 
             if Utils.isProtectedFolder(decodedPath) {
@@ -283,7 +283,7 @@ final class ActionService {
         logger.info("开始取消隐藏文件和目录，目标路径：\(target)")
         if let dirPath = target.first {
             let fileManager = FileManager.default
-            let path = dirPath.removingPercentEncoding ?? dirPath
+            let path = dirPath
             logger.info("处理主目录：\(path)")
             let url = URL(fileURLWithPath: path)
 
@@ -329,7 +329,7 @@ final class ActionService {
         let fileManager = FileManager.default
 
         if trigger == "ctx-container", let dirPath = target.first {
-            let path = dirPath.removingPercentEncoding ?? dirPath
+            let path = dirPath
             logger.info("处理主目录：\(path)")
             let url = URL(fileURLWithPath: path)
 
@@ -362,7 +362,7 @@ final class ActionService {
             }
         } else if trigger == "ctx-items" {
             for dirPath in target {
-                let path = dirPath.removingPercentEncoding ?? dirPath
+                let path = dirPath
                 logger.info("处理路径：\(path)")
                 let url = URL(fileURLWithPath: path)
 
@@ -410,7 +410,7 @@ final class ActionService {
 
         var pathsToDelete: [String] = []
         for item in target {
-            let decodedPath = item.removingPercentEncoding ?? item
+            let decodedPath = item
 
             if Utils.isProtectedFolder(decodedPath) {
                 let alert = NSAlert()
@@ -560,9 +560,9 @@ final class ActionService {
     }
 
     /// 解析新建文件的目标目录（目录直接用；文件取父目录）
-    private func targetDirectoryForNewFile(_ target: [String]) -> String? {
+    func targetDirectoryForNewFile(_ target: [String]) -> String? {
         guard let rawPath = target.first else { return nil }
-        let path = rawPath.removingPercentEncoding ?? rawPath
+        let path = rawPath
         var isDirectory: ObjCBool = false
 
         if FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory) {

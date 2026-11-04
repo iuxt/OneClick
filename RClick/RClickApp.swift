@@ -159,7 +159,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             logger.info("Registering message handlers")
             messager.onExtensionMessage(.click) { [weak self] data in
                 guard let self = self else { return }
-                if let event: ClickEventPayload = messager.decodeSignedData(data) {
+                if let event: ClickEventPayload = messager.decode(data) {
                     // 确认收到，供扩展判断主程序可通信性（操作成败另议）
                     messager.sendActionAck()
                     Task { @MainActor in

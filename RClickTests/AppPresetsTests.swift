@@ -32,10 +32,12 @@ struct AppPresetsTests {
         #expect(AppPresets.resolveOpenTargets(appPath: nil, explicit: true, targetPaths: targets).map(\.url) == [root, root, missing])
         #expect(AppPresets.resolveOpenTargets(appPath: nil, explicit: nil, targetPaths: targets).map(\.url) == [file, root, missing])
         #expect(AppPresets.resolveOpenTargets(appPath: nil, explicit: true, targetPaths: []).isEmpty)
-        let encodedFile = file.path.replacingOccurrences(of: " ", with: "%20")
-        let resolved = AppPresets.resolveOpenTargets(appPath: nil, explicit: true, targetPaths: [encodedFile])
-        #expect(resolved.first?.path == file.path)
-        #expect(resolved.first?.url == root)
+        let literal = root.appendingPathComponent("literal%20%2F.txt")
+        try Data().write(to: literal)
+        let resolved = AppPresets.resolveOpenTargets(appPath: nil, explicit: false, targetPaths: [literal.path])
+        #expect(resolved.first?.path == literal.path)
+        #expect(resolved.first?.url == literal)
+        #expect(AppPresets.resolveOpenTargets(appPath: nil, explicit: true, targetPaths: [literal.path]).first?.url == root)
     }
 
     @Test func symbolsReuseImagesWithinEachAppearance() throws {

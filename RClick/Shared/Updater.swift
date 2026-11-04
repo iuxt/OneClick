@@ -346,7 +346,7 @@ class UpdateManager: ObservableObject {
             let downloadedURL = try await downloadAsset(asset: appZipAsset)
             
             // 2. 解压到临时目录
-            let appURL = try await extractAppZip(zipURL: downloadedURL)
+            let appURL = try await UpdateArchiveExtractor.extract(zipURL: downloadedURL)
             
             // 3. 安装应用到应用程序目录
             try await installApplication(appURL: appURL)
@@ -410,48 +410,6 @@ class UpdateManager: ObservableObject {
 
             task.resume()
         }
-    }
-
-    // 关联对象键
-    private var DownloadDelegateKey: UInt8 = 0
-
-    // MARK: - 解压 APP Zip 文件
-
-    private func extractAppZip(zipURL: URL) async throws -> URL {
-        let tempDir = FileManager.default.temporaryDirectory
-        let extractionDir = tempDir.appendingPathComponent("app_extraction")
-        
-        // 创建解压目录
-        try FileManager.default.createDirectory(at: extractionDir, withIntermediateDirectories: true)
-        
-        // 使用系统命令解压
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/unzip")
-        process.arguments = ["-o", zipURL.path, "-d", extractionDir.path]
-        
-        let outputPipe = Pipe()
-        let errorPipe = Pipe()
-        process.standardOutput = outputPipe
-        process.standardError = errorPipe
-        
-        try process.run()
-        process.waitUntilExit()
-        
-        guard process.terminationStatus == 0 else {
-            let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
-            let errorString = String(data: errorData, encoding: .utf8) ?? AppLocalization.localized("Unknown error")
-            throw InstallationError.zipExtractionFailed(String(format: AppLocalization.localized("Extraction failed: %@"), errorString))
-        }
-        
-        // 查找解压后的 .app 文件
-        let fileManager = FileManager.default
-        let contents = try fileManager.contentsOfDirectory(at: extractionDir, includingPropertiesForKeys: nil)
-        
-        guard let appURL = contents.first(where: { $0.pathExtension == "app" }) else {
-            throw InstallationError.noAppFound(AppLocalization.localized("No .app application was found in the ZIP file."))
-        }
-        
-        return appURL
     }
 
     // MARK: - 请求文件夹权限
@@ -596,7 +554,7 @@ class UpdateManager: ObservableObject {
         }
     }
 
-    enum InstallationError: LocalizedError {
+    nonisolated enum InstallationError: LocalizedError {
         case zipExtractionFailed(String)
         case noAppFound(String)
         case invalidAppBundle(String)

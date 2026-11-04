@@ -126,8 +126,8 @@ class FinderSyncExt: FIFinderSync, @unchecked Sendable {
         // 处理主程序发送的菜单配置
         messager.onMainMessage(.menuConfig) { [weak self] data in
             guard let self = self else { return }
-            // 使用 decodeSignedData 解码签名数据
-            if let config = self.messager.decodeSignedData(data, as: MenuConfigPayload.self) {
+            // Messager authenticates the envelope before dispatching its payload.
+            if let config = self.messager.decode(data, as: MenuConfigPayload.self) {
                 DispatchQueue.main.async { [weak self] in
                     guard let self else { return }
                     _ = self.mainActivity.receive()
@@ -141,7 +141,7 @@ class FinderSyncExt: FIFinderSync, @unchecked Sendable {
         // 处理主程序发送的 running 通知
         messager.onMainMessage(.running) { [weak self] data in
             guard let self = self else { return }
-            if let payload = self.messager.decodeSignedData(data, as: RunningPayload.self) {
+            if let payload = self.messager.decode(data, as: RunningPayload.self) {
                 self.markMainActivity()
                 logger.debug("Received running notification: \(payload.directories)")
                 // 可以根据 payload 更新监听目录
@@ -738,7 +738,7 @@ class FinderSyncExt: FIFinderSync, @unchecked Sendable {
         guard let first = itemPaths.first else { return }
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
-        pasteboard.setString(first.removingPercentEncoding ?? first, forType: .string)
+        pasteboard.setString(first, forType: .string)
     }
 
     @objc private func handleAppClick(_ sender: NSMenuItem) {

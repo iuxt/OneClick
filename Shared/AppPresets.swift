@@ -117,15 +117,14 @@ enum AppPresets {
         let bundleID = appPath.flatMap { Bundle(url: URL(fileURLWithPath: $0))?.bundleIdentifier }
         let opensContainingDir = explicit ?? bundleID.map { terminalBundleIDs.contains($0) } ?? false
         return targetPaths.map { raw in
-            let decoded = raw.removingPercentEncoding ?? raw
-            var url = URL(fileURLWithPath: decoded)
+            var url = URL(fileURLWithPath: raw)
             if opensContainingDir {
                 var isDir: ObjCBool = false
                 if FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir), !isDir.boolValue {
                     url = url.deletingLastPathComponent()
                 }
             }
-            return (decoded, url)
+            return (raw, url)
         }
     }
 

@@ -1,129 +1,92 @@
-//
-//  MessageSecurity.swift
-//  RClick
-//
-//  IPC 消息安全模块 - 防止消息伪造
-//  基于：HMAC-SHA256 签名算法
-//
-
-import Foundation
 import CryptoKit
-import OSLog
+import Foundation
 
-// MARK: - Logger
+/// The wire format contains one authenticated byte sequence, never a second
+/// independently decoded execution payload. Legacy fixed-key messages fail closed.
+public nonisolated struct SignedPayload: Codable, Sendable {
+    let signature: String
+    let jsonData: String
+}
 
-private let logger = Logger(
-    subsystem: Bundle.main.bundleIdentifier ?? "RClick",
-    category: "MessageSecurity"
-)
+nonisolated enum MessageAuthenticationError: Error {
+    case invalidKey, invalidSignature, invalidEnvelope, expired, replayed, capacityExceeded
+}
 
-// MARK: - 消息签名管理器
-
-/// 为 IPC 消息提供 HMAC-SHA256 签名验证
-public class MessageSecurity {
-
-    // 共享密钥 - 应存储在 Keychain 中，这里使用常量简化实现
-    private static let sharedKey = "RClick_IPC_SharedKey_2026_v1"
-
-    /// 为消息载荷添加 HMAC 签名
-    /// - Parameter payload: 需要签名的消息载荷
-    /// - Returns: 带签名的消息结构
-    /// - Throws: 如果编码失败则抛出错误
-    public static func sign<T: Codable>(_ payload: T) throws -> SignedPayload<T> {
-        let data = try JSONEncoder().encode(payload)
-        let key = SymmetricKey(data: sharedKey.data(using: .utf8)!)
-        let hmac = HMAC<SHA256>.authenticationCode(for: data, using: key)
-
-        return SignedPayload(
-            payload: payload,
-            signature: Data(hmac).base64EncodedString(),
-            data: data
-        )
+/// Each receiver has its own bounded replay cache. The key provider is injectable
+/// so regression tests never read or alter the user's Keychain.
+nonisolated final class MessageAuthenticator: @unchecked Sendable {
+    private struct Envelope: Codable {
+        let version: Int
+        let id: UUID
+        let context: String
+        let issuedAt: TimeInterval
+        let payload: Data?
     }
 
-    /// 验证消息签名
-    /// - Parameter signed: 带签名的消息结构
-    /// - Returns: 签名是否有效
-    public static func verify<T: Codable>(_ signed: SignedPayload<T>) -> Bool {
-        guard let signatureData = Data(base64Encoded: signed.signature) else {
-            logger.error("Failed to decode signature from base64")
-            return false
+    static let lifetime: TimeInterval = 60
+    private let keyProvider: @Sendable () throws -> Data
+    private let lock = NSLock()
+    private var received: [UUID: TimeInterval] = [:]
+
+    init(keyProvider: @escaping @Sendable () throws -> Data) {
+        self.keyProvider = keyProvider
+    }
+
+    func seal(_ payload: Data?, context: String, id: UUID, now: Date = Date()) throws -> SignedPayload {
+        let envelope = Envelope(version: 2, id: id, context: context,
+                                issuedAt: now.timeIntervalSince1970, payload: payload)
+        let data = try JSONEncoder().encode(envelope)
+        let signature = HMAC<SHA256>.authenticationCode(for: data, using: try key())
+        return SignedPayload(signature: Data(signature).base64EncodedString(), jsonData: data.base64EncodedString())
+    }
+
+    func open(_ signed: SignedPayload, context: String, id: UUID, now: Date = Date()) throws -> Data? {
+        guard let data = Data(base64Encoded: signed.jsonData),
+              let signature = Data(base64Encoded: signed.signature),
+              HMAC<SHA256>.isValidAuthenticationCode(signature, authenticating: data, using: try key()) else {
+            throw MessageAuthenticationError.invalidSignature
         }
-
-        // 从保存的 jsonData 恢复原始数据
-        guard let payloadData = Data(base64Encoded: signed.jsonData) else {
-            logger.error("Failed to decode jsonData from base64")
-            return false
+        let envelope = try JSONDecoder().decode(Envelope.self, from: data)
+        guard envelope.version == 2, envelope.context == context, envelope.id == id else {
+            throw MessageAuthenticationError.invalidEnvelope
         }
+        let timestamp = now.timeIntervalSince1970
+        guard envelope.issuedAt.isFinite, envelope.issuedAt <= timestamp + 5,
+              timestamp - envelope.issuedAt < Self.lifetime else {
+            throw MessageAuthenticationError.expired
+        }
+        try lock.withLock {
+            received = received.filter { $0.value > timestamp }
+            guard received[id] == nil else { throw MessageAuthenticationError.replayed }
+            guard received.count < 4_096 else { throw MessageAuthenticationError.capacityExceeded }
+            received[id] = envelope.issuedAt + Self.lifetime
+        }
+        return envelope.payload
+    }
 
-        let key = SymmetricKey(data: sharedKey.data(using: .utf8)!)
-
-        // 计算预期的 HMAC（使用保存的原始数据）
-        let expectedHMAC = HMAC<SHA256>.authenticationCode(for: payloadData, using: key)
-
-        // 比较签名（常数时间比较，防止时序攻击）
-        let isValid = signatureData.elementsEqual(Data(expectedHMAC))
-
-        // 添加详细日志
-        logger.debug("Signature verification: \(isValid ? "PASSED" : "FAILED")")
-        logger.debug("Signature prefix: \(signed.signature.prefix(20))...")
-        logger.debug("Payload data hash: \(MessageSecurity.hash(payloadData).prefix(16))...")
-
-        return isValid
+    private func key() throws -> SymmetricKey {
+        let data = try keyProvider()
+        guard data.count == 32 else { throw MessageAuthenticationError.invalidKey }
+        return SymmetricKey(data: data)
     }
 }
 
-// MARK: - 带签名的消息载荷
+public nonisolated enum MessageSecurity {
+    private static let authenticator = MessageAuthenticator { try IPCKeyStore.shared.key() }
 
-/// 包装原始载荷并添加 HMAC 签名
-public struct SignedPayload<T: Codable>: Codable {
-    /// 原始消息载荷
-    public let payload: T
-
-    /// Base64 编码的 HMAC-SHA256 签名
-    public let signature: String
-
-    /// Base64 编码的原始 JSON 数据（用于验证）
-    public let jsonData: String
-
-    /// 初始化器
-    /// - Parameters:
-    ///   - payload: 原始消息载荷
-    ///   - signature: Base64 编码的签名
-    ///   - jsonData: Base64 编码的原始 JSON 数据
-    public init(payload: T, signature: String, jsonData: String) {
-        self.payload = payload
-        self.signature = signature
-        self.jsonData = jsonData
+    static func sign<T: Encodable>(_ payload: T?, context: String, id: UUID) throws -> SignedPayload {
+        try authenticator.seal(try payload.map { try JSONEncoder().encode($0) }, context: context, id: id)
     }
 
-    /// 内部初始化器 - 从签名操作创建
-    init(payload: T, signature: String, data: Data) {
-        self.payload = payload
-        self.signature = signature
-        self.jsonData = data.base64EncodedString()
+    static func open(_ signed: SignedPayload, context: String, id: UUID) throws -> Data? {
+        try authenticator.open(signed, context: context, id: id)
     }
-}
 
-// MARK: - 消息完整性检查
-
-extension MessageSecurity {
-
-    /// 计算消息的 SHA256 哈希（用于日志脱敏和去重）
-    /// - Parameter data: 消息数据
-    /// - Returns: SHA256 哈希的十六进制字符串
     public static func hash(_ data: Data) -> String {
-        let hash = SHA256.hash(data: data)
-        return hash.compactMap { String(format: "%02x", $0) }.joined()
+        SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
     }
 
-    /// 计算消息的 SHA256 哈希（用于日志脱敏和去重）
-    /// - Parameter string: 消息字符串
-    /// - Returns: SHA256 哈希的十六进制字符串
     public static func hash(_ string: String) -> String {
-        guard let data = string.data(using: .utf8) else {
-            return ""
-        }
-        return hash(data)
+        hash(Data(string.utf8))
     }
 }

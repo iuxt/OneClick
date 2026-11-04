@@ -2,11 +2,13 @@ import Foundation
 
 public class Utils {
     public static func isProtectedFolder(_ path: String) -> Bool {
-        print("isProtectedFolder: \(path)")
-        
+        let target = URL(fileURLWithPath: path).standardizedFileURL.resolvingSymlinksInPath().pathComponents
+        if target == ["/"] { return true }
         return Constants.protectedDirs.contains { protectedPath in
-            print("Comparing with protected path: \(protectedPath)")
-            return path == protectedPath
+            let protected = URL(fileURLWithPath: protectedPath).standardizedFileURL.resolvingSymlinksInPath().pathComponents
+            // Protect the directory itself. Its descendants remain available
+            // for explicitly authorized file operations (e.g. on Desktop).
+            return target == protected
         }
     }
     // MARK: 

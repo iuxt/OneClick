@@ -117,7 +117,7 @@ struct ClickEventPayload: Codable {
     let itemId: String
     /// 菜单项类型
     let itemType: MenuItemType
-    /// 目标文件/目录路径列表
+    /// Native file/directory paths from URL.path, never URL-encoded strings.
     let target: [String]
     /// 触发来源
     let trigger: MenuTrigger
@@ -197,17 +197,11 @@ struct MainToExtensionMessage: Codable {
         self.id = id
         self.action = action
 
-        // 对 payload 进行签名
-        if let data = data {
-            do {
-                let signedPayload = try MessageSecurity.sign(data)
-                self.signedData = try? JSONEncoder().encode(signedPayload)
-            } catch {
-                self.signedData = nil
-            }
-        } else {
-            self.signedData = nil
-        }
+        // Authenticate control messages too, including their direction, action
+        // and outer ID. A missing credential never produces an unsigned fallback.
+        self.signedData = try? JSONEncoder().encode(
+            MessageSecurity.sign(data, context: "main-to-extension:\(action.rawValue)", id: id)
+        )
     }
 }
 
@@ -228,17 +222,11 @@ struct ExtensionToMainMessage: Codable {
         self.id = id
         self.action = action
 
-        // 对 payload 进行签名
-        if let data = data {
-            do {
-                let signedPayload = try MessageSecurity.sign(data)
-                self.signedData = try? JSONEncoder().encode(signedPayload)
-            } catch {
-                self.signedData = nil
-            }
-        } else {
-            self.signedData = nil
-        }
+        // Authenticate control messages too, including their direction, action
+        // and outer ID. A missing credential never produces an unsigned fallback.
+        self.signedData = try? JSONEncoder().encode(
+            MessageSecurity.sign(data, context: "extension-to-main:\(action.rawValue)", id: id)
+        )
     }
 }
 
@@ -268,8 +256,10 @@ class Messager: @unchecked Sendable {
     static let extensionToMainNotification = "RClick.ExtensionToMain"
 
     private let isExtension: Bool
+    private let authenticator: MessageAuthenticator?
 
     private init() {
+        self.authenticator = nil
         // 判断当前是否为 Extension 进程
         let bundleId = Bundle.main.bundleIdentifier ?? ""
         self.isExtension = bundleId.hasSuffix(".FinderSyncExt")
@@ -293,11 +283,22 @@ class Messager: @unchecked Sendable {
         }
     }
 
+    /// In-memory transport for authentication tests; never observes or posts a
+    /// distributed notification and never accesses the production Keychain.
+    init(authenticator: MessageAuthenticator) {
+        self.authenticator = authenticator
+        self.isExtension = false
+    }
+
     // MARK: - 发送消息（nonisolated，不访问 @MainActor 状态）
 
     /// 主程序发送消息给 Extension
     func sendToExtension<T: Codable>(_ action: MainToExtensionAction, data: T? = nil) {
         let message = MainToExtensionMessage(action: action, data: data)
+        guard message.signedData != nil else {
+            logger.error("Cannot authenticate message to Finder extension; check Keychain access")
+            return
+        }
         sendMessage(message, via: Self.mainToExtensionNotification)
         logger.debug("Sent to extension: \(action.rawValue)")
     }
@@ -305,6 +306,10 @@ class Messager: @unchecked Sendable {
     /// Extension 发送消息给主程序
     func sendToMain<T: Codable>(_ action: ExtensionToMainAction, data: T? = nil) {
         let message = ExtensionToMainMessage(action: action, data: data)
+        guard message.signedData != nil else {
+            logger.error("Cannot authenticate message to main app; check Keychain access")
+            return
+        }
         sendMessage(message, via: Self.extensionToMainNotification)
         logger.debug("Sent to main: \(action.rawValue)")
     }
@@ -348,7 +353,7 @@ class Messager: @unchecked Sendable {
 
     // MARK: - 处理消息
 
-    @objc private func handleMainToExtensionMessage(_ notification: NSNotification) {
+    @objc func handleMainToExtensionMessage(_ notification: NSNotification) {
         guard let jsonString = notification.object as? String,
               let jsonData = jsonString.data(using: .utf8) else {
             logger.error("Invalid message format")
@@ -357,6 +362,7 @@ class Messager: @unchecked Sendable {
 
         do {
             let message = try JSONDecoder().decode(MainToExtensionMessage.self, from: jsonData)
+            let payload = try authenticatedPayload(message.signedData, context: "main-to-extension:\(message.action.rawValue)", id: message.id)
             logger.debug("Received main-to-extension message: \(message.action.rawValue)")
 
             handlersLock.lock()
@@ -364,7 +370,7 @@ class Messager: @unchecked Sendable {
             handlersLock.unlock()
 
             if let handler {
-                handler(message.signedData)
+                handler(payload)
             } else {
                 logger.warning("No handler registered for action: \(message.action.rawValue)")
             }
@@ -373,7 +379,7 @@ class Messager: @unchecked Sendable {
         }
     }
 
-    @objc private func handleExtensionToMainMessage(_ notification: NSNotification) {
+    @objc func handleExtensionToMainMessage(_ notification: NSNotification) {
         guard let jsonString = notification.object as? String,
               let jsonData = jsonString.data(using: .utf8) else {
             logger.error("Invalid message format")
@@ -382,6 +388,7 @@ class Messager: @unchecked Sendable {
 
         do {
             let message = try JSONDecoder().decode(ExtensionToMainMessage.self, from: jsonData)
+            let payload = try authenticatedPayload(message.signedData, context: "extension-to-main:\(message.action.rawValue)", id: message.id)
             logger.debug("Received extension-to-main message: \(message.action.rawValue)")
 
             handlersLock.lock()
@@ -389,7 +396,7 @@ class Messager: @unchecked Sendable {
             handlersLock.unlock()
 
             if let handler {
-                handler(message.signedData)
+                handler(payload)
             } else {
                 logger.warning("No handler registered for action: \(message.action.rawValue)")
             }
@@ -399,6 +406,13 @@ class Messager: @unchecked Sendable {
     }
 
     // MARK: - 便捷方法
+
+    private func authenticatedPayload(_ data: Data?, context: String, id: UUID) throws -> Data? {
+        guard let data else { throw MessageAuthenticationError.invalidEnvelope }
+        let signed = try JSONDecoder().decode(SignedPayload.self, from: data)
+        if let authenticator { return try authenticator.open(signed, context: context, id: id) }
+        return try MessageSecurity.open(signed, context: context, id: id)
+    }
 
     /// 主程序发送菜单配置给 Extension
     func sendMenuConfig(_ config: MenuConfigPayload) {
@@ -438,28 +452,10 @@ class Messager: @unchecked Sendable {
 
     // MARK: - 解码辅助
 
-    /// 解码数据为指定类型
-    func decode<T: Codable>(_ data: Data?) -> T? {
+    /// Decode only the payload already authenticated by the transport handler.
+    func decode<T: Codable>(_ data: Data?, as type: T.Type = T.self) -> T? {
         guard let data = data else { return nil }
         return try? JSONDecoder().decode(T.self, from: data)
     }
 
-    /// 解码并验证签名的数据为指定类型
-    func decodeSignedData<T: Codable>(_ signedData: Data?, as type: T.Type = T.self) -> T? {
-        guard let signedData = signedData else { return nil }
-
-        do {
-            let signedPayload = try JSONDecoder().decode(SignedPayload<T>.self, from: signedData)
-
-            if MessageSecurity.verify(signedPayload) {
-                return signedPayload.payload
-            } else {
-                logger.warning("Message signature verification failed, dropping message")
-                return nil
-            }
-        } catch {
-            logger.error("Failed to decode signed data: \(error)")
-            return nil
-        }
-    }
 }
