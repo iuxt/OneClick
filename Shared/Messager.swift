@@ -1,6 +1,6 @@
 //
 //  Messager.swift
-//  RClick
+//  OneClick
 //
 //  进程间通信（IPC）管理器
 //  Authenticated local stream + Codable protocol
@@ -181,7 +181,7 @@ enum ItemType: String, Codable {
 
 /// Logger for Messager operations
 private let logger = Logger(
-    subsystem: Bundle.main.bundleIdentifier ?? "RClick",
+    subsystem: Bundle.main.bundleIdentifier ?? "OneClick",
     category: "Messager"
 )
 

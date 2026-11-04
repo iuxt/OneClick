@@ -1,5 +1,5 @@
 #!/bin/bash
-# 本地构建、安装并启动 RClick。直接运行 ./build.sh 即可。
+# 本地构建、安装并启动 OneClick。直接运行 ./build.sh 即可。
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -8,9 +8,11 @@ BUILD_MODE="${BUILD_MODE:-local}"
 SIGNING_IDENTITY="${SIGNING_IDENTITY:-}"
 INSTALL_DIR="${INSTALL_DIR:-/Applications}"
 BUILD_DIR="$ROOT_DIR/.build"
-APP_PATH="$BUILD_DIR/DerivedData-$BUILD_MODE/Build/Products/$CONFIGURATION/RClick.app"
-TARGET_APP="$INSTALL_DIR/RClick.app"
-EXTENSION_PATTERN='/RClick[.]app/Contents/PlugIns/FinderSyncExt[.]appex/Contents/MacOS/FinderSyncExt([[:space:]]|$)'
+APP_PATH="$BUILD_DIR/DerivedData-$BUILD_MODE/Build/Products/$CONFIGURATION/OneClick.app"
+TARGET_APP="$INSTALL_DIR/OneClick.app"
+PREVIOUS_APP="$TARGET_APP"
+APP_PROCESS_PATTERN='^(OneClick|RClick)$'
+EXTENSION_PATTERN='/(OneClick|RClick)[.]app/Contents/PlugIns/FinderSyncExt[.]appex/Contents/MacOS/FinderSyncExt([[:space:]]|$)'
 USER_ID="$(id -u)"
 NEEDS_SUDO=false
 WAS_RUNNING=false
@@ -30,7 +32,7 @@ cleanup() {
     if [[ -n "$STAGING_DIR" ]]; then
         # 替换中途失败时恢复旧版本，不删除唯一的备份。
         if [[ -d "$STAGING_DIR/previous.app" && ! -e "$TARGET_APP" ]]; then
-            if ! as_installer mv "$STAGING_DIR/previous.app" "$TARGET_APP"; then
+            if ! as_installer mv "$STAGING_DIR/previous.app" "$PREVIOUS_APP"; then
                 printf '恢复失败，旧版本保存在：%s/previous.app\n' "$STAGING_DIR" >&2
                 exit 1
             fi
@@ -38,7 +40,7 @@ cleanup() {
         as_installer rm -rf "$STAGING_DIR" || true
     fi
     if [[ "$status" -ne 0 ]] && "$WAS_RUNNING" && "$APP_STOPPED"; then
-        open "$TARGET_APP" || true
+        open "$PREVIOUS_APP" || true
     fi
     exit "$status"
 }
@@ -51,6 +53,10 @@ trap 'exit 143' TERM
 [[ "$CONFIGURATION" == Release || "$CONFIGURATION" == Debug ]] || fail 'CONFIGURATION 只能为 Release 或 Debug。'
 [[ "$INSTALL_DIR" == /* ]] || fail 'INSTALL_DIR 必须是绝对路径。'
 xcodebuild -version >/dev/null 2>&1 || fail '请先安装完整的 Xcode，并通过 xcode-select 选择它。'
+SDK_VERSION="$(xcrun --sdk macosx --show-sdk-version)"
+[[ "${SDK_VERSION%%.*}" -ge 27 ]] || fail '需要 Xcode 27 或更新版本及 macOS 27 SDK。'
+SYSTEM_VERSION="$(sw_vers -productVersion)"
+[[ "${SYSTEM_VERSION%%.*}" -ge 27 ]] || fail 'OneClick 的最低运行版本为 macOS 27 Golden Gate。'
 [[ "$BUILD_MODE" == local || "$BUILD_MODE" == developer ]] || fail 'BUILD_MODE 只能为 local 或 developer。'
 if [[ "$BUILD_MODE" == developer ]]; then
     [[ "$SIGNING_IDENTITY" != '-' ]] || fail '开发者模式不能使用 ad-hoc 签名。'
@@ -59,12 +65,12 @@ if [[ "$BUILD_MODE" == developer ]]; then
 fi
 command -v python3 >/dev/null || fail '签名检查需要 python3（可由 Xcode 命令行工具提供）。'
 
-log "构建 RClick（${CONFIGURATION}，${BUILD_MODE}）"
+log "构建 OneClick（${CONFIGURATION}，${BUILD_MODE}）"
 mkdir -p "$BUILD_DIR"
 BUILD_ARGS=(
     build
-    -project "$ROOT_DIR/RClick.xcodeproj"
-    -scheme RClick
+    -project "$ROOT_DIR/OneClick.xcodeproj"
+    -scheme OneClick
     -configuration "$CONFIGURATION"
     -destination 'platform=macOS'
     -derivedDataPath "$BUILD_DIR/DerivedData-$BUILD_MODE"
@@ -82,7 +88,7 @@ else
 fi
 xcodebuild "${BUILD_ARGS[@]}" 2>&1 | tee "$BUILD_DIR/build.log"
 
-[[ -x "$APP_PATH/Contents/MacOS/RClick" ]] || fail "未找到构建产物：$APP_PATH"
+[[ -x "$APP_PATH/Contents/MacOS/OneClick" ]] || fail "未找到构建产物：$APP_PATH"
 EXTENSION_PATH="$APP_PATH/Contents/PlugIns/FinderSyncExt.appex"
 [[ -d "$EXTENSION_PATH" ]] || fail '构建产物缺少 FinderSync 扩展。'
 
@@ -98,7 +104,7 @@ import sys
 
 root, output = map(pathlib.Path, sys.argv[1:])
 output.mkdir(parents=True, exist_ok=True)
-for name in ("RClick", "FinderSyncExt"):
+for name in ("OneClick", "FinderSyncExt"):
     entitlements = plistlib.loads((root / name / f"{name}.entitlements").read_bytes())
     entitlements.pop("com.apple.security.application-groups", None)
     entitlements["com.apple.security.temporary-exception.files.home-relative-path.read-write"] = [
@@ -107,7 +113,7 @@ for name in ("RClick", "FinderSyncExt"):
     # Ad-hoc builds lack a provisioned App Group. Limit the local development
     # IPC exception to this installation's single socket; retain the sandbox.
     ipc_path = pathlib.Path(pwd.getpwuid(os.getuid()).pw_dir) / "Library/Application Support/RClickLocal/ipc.sock"
-    operations = "network-bind network-outbound" if name == "RClick" else "network-outbound"
+    operations = "network-bind network-outbound" if name == "OneClick" else "network-outbound"
     entitlements["com.apple.security.temporary-exception.sbpl"] = [
         f"(allow {operations} (literal {json.dumps(str(ipc_path.resolve()), ensure_ascii=False)}))"
     ]
@@ -119,11 +125,11 @@ PY
     codesign --force --options runtime --timestamp=none --sign - \
         --entitlements "$BUILD_DIR/Signing/FinderSyncExt.entitlements" "$EXTENSION_PATH"
     codesign --force --options runtime --timestamp=none --sign - \
-        --entitlements "$BUILD_DIR/Signing/RClick.entitlements" "$APP_PATH"
+        --entitlements "$BUILD_DIR/Signing/OneClick.entitlements" "$APP_PATH"
 else
     # 签名完整性通过不代表 App Group 已获授权，必须同时检查两份 profile。
     log '验证 App Group 授权'
-python3 - "$ROOT_DIR/RClick/RClick.entitlements" "$APP_PATH" "$EXTENSION_PATH" <<'PY'
+python3 - "$ROOT_DIR/OneClick/OneClick.entitlements" "$APP_PATH" "$EXTENSION_PATH" <<'PY'
 import datetime
 import pathlib
 import plistlib
@@ -177,12 +183,18 @@ if [[ ! -d "$INSTALL_DIR" || ! -w "$INSTALL_DIR" ]]; then
     sudo -v
 fi
 as_installer mkdir -p "$INSTALL_DIR"
-STAGING_DIR="$(as_installer mktemp -d "$INSTALL_DIR/.RClick-install.XXXXXX")"
-as_installer ditto "$APP_PATH" "$STAGING_DIR/RClick.app"
+STAGING_DIR="$(as_installer mktemp -d "$INSTALL_DIR/.OneClick-install.XXXXXX")"
+as_installer ditto "$APP_PATH" "$STAGING_DIR/OneClick.app"
 
-if pgrep -u "$USER_ID" -x RClick >/dev/null; then
+# 旧版应用保留相同 bundle ID；首次安装更名版本时替换旧路径。
+if [[ ! -e "$TARGET_APP" && -d "$INSTALL_DIR/RClick.app" ]] &&
+    [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$INSTALL_DIR/RClick.app/Contents/Info.plist" 2>/dev/null)" == cn.wflixu.RClick ]]; then
+    PREVIOUS_APP="$INSTALL_DIR/RClick.app"
+fi
+
+if pgrep -u "$USER_ID" -x "$APP_PROCESS_PATTERN" >/dev/null; then
     WAS_RUNNING=true
-    log '退出正在运行的 RClick'
+    log '退出正在运行的 OneClick'
     osascript <<'APPLESCRIPT' || true
 with timeout of 10 seconds
     if application id "cn.wflixu.RClick" is running then
@@ -191,23 +203,23 @@ with timeout of 10 seconds
 end timeout
 APPLESCRIPT
     for ((i = 0; i < 10; i++)); do
-        pgrep -u "$USER_ID" -x RClick >/dev/null || break
+        pgrep -u "$USER_ID" -x "$APP_PROCESS_PATTERN" >/dev/null || break
         sleep 1
     done
-    if pgrep -u "$USER_ID" -x RClick >/dev/null; then
-        pkill -TERM -u "$USER_ID" -x RClick || true
+    if pgrep -u "$USER_ID" -x "$APP_PROCESS_PATTERN" >/dev/null; then
+        pkill -TERM -u "$USER_ID" -x "$APP_PROCESS_PATTERN" || true
         for ((i = 0; i < 5; i++)); do
-            pgrep -u "$USER_ID" -x RClick >/dev/null || break
+            pgrep -u "$USER_ID" -x "$APP_PROCESS_PATTERN" >/dev/null || break
             sleep 1
         done
     fi
-    if pgrep -u "$USER_ID" -x RClick >/dev/null; then
-        fail 'RClick 未能退出，已取消更新。'
+    if pgrep -u "$USER_ID" -x "$APP_PROCESS_PATTERN" >/dev/null; then
+        fail 'OneClick 未能退出，已取消更新。'
     fi
     APP_STOPPED=true
 fi
 
-# Finder 扩展是独立进程，也需要结束才能加载新版；只匹配 RClick 内的扩展。
+# Finder 扩展是独立进程，也需要结束才能加载新版；匹配新旧应用内的扩展。
 if pgrep -u "$USER_ID" -f "$EXTENSION_PATTERN" >/dev/null; then
     log '停止旧版 Finder 扩展'
     pkill -TERM -u "$USER_ID" -f "$EXTENSION_PATTERN" || true
@@ -221,15 +233,15 @@ if pgrep -u "$USER_ID" -f "$EXTENSION_PATTERN" >/dev/null; then
 fi
 
 log "安装到 $TARGET_APP"
-if [[ -e "$TARGET_APP" || -L "$TARGET_APP" ]]; then
-    as_installer mv "$TARGET_APP" "$STAGING_DIR/previous.app"
+if [[ -e "$PREVIOUS_APP" || -L "$PREVIOUS_APP" ]]; then
+    as_installer mv "$PREVIOUS_APP" "$STAGING_DIR/previous.app"
 fi
-as_installer mv "$STAGING_DIR/RClick.app" "$TARGET_APP"
+as_installer mv "$STAGING_DIR/OneClick.app" "$TARGET_APP"
 
 # 注册新路径，保留用户在系统设置中选择的扩展开关状态。
 if ! pluginkit -a "$TARGET_APP/Contents/PlugIns/FinderSyncExt.appex"; then
     printf '提示：Finder 扩展注册失败，可在系统设置中检查扩展状态。\n' >&2
 fi
-log '启动 RClick'
+log '启动 OneClick'
 open "$TARGET_APP"
 log '完成'

@@ -1,6 +1,6 @@
 //
 //  AppPresets.swift
-//  RClick
+//  OneClick
 //
 //  常用应用预设：预设清单（设置页快速添加用）+ 「简单图标」的 bundleID → SF Symbol 映射。
 //  预设清单参考 OpenInTerminal 的支持列表（终端 / 编辑器 / Git 客户端）。

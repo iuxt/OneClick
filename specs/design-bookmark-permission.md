@@ -4,7 +4,7 @@
 
 ### 现状
 
-RClick 当前依赖 **Full Disk Access (FDA)** 获取文件系统权限：
+OneClick 当前依赖 **Full Disk Access (FDA)** 获取文件系统权限：
 
 | 机制 | 说明 |
 |------|------|
@@ -78,7 +78,7 @@ let container = try ModelContainer(
 
 ### 3.1 职责
 
-新建 `RClick/Shared/BookmarkManager.swift`，`@MainActor` + `ObservableObject`：
+新建 `OneClick/Shared/BookmarkManager.swift`，`@MainActor` + `ObservableObject`：
 
 ```
 BookmarkManager
@@ -122,7 +122,7 @@ final class BookmarkManager: ObservableObject {
 ### 3.3 关键设计决策
 
 **NSOpenPanel 呈现方式：**
-- RClick 是菜单栏应用（`activationPolicy: .accessory`），无主窗口
+- OneClick 是菜单栏应用（`activationPolicy: .accessory`），无主窗口
 - 使用 `.runModal()` 而非 `.beginSheetModal()`（与 iMonet 不同）
 - 弹出前调用 `NSApp.activate(ignoringOtherApps: true)` 确保面板在前台
 
@@ -144,7 +144,7 @@ final class BookmarkManager: ObservableObject {
 
 ### 4.1 改动范围
 
-`RClickApp.swift` 中的文件操作需要增加权限检查：
+`OneClickApp.swift` 中的文件操作需要增加权限检查：
 
 | 操作 | 是否需要 ensureAccess | 原因 |
 |------|---------------------|------|
@@ -208,7 +208,7 @@ case .newFile:
 
 ## 五、移除 FDA 相关代码
 
-### 5.1 RClickApp.swift
+### 5.1 OneClickApp.swift
 
 - **删除** `checkFDAAndGuideIfNeeded()` 方法（lines 274-304）
 - **删除** `applicationDidFinishLaunching` 中对其的调用（line 167）
@@ -284,7 +284,7 @@ LabeledContent {
 | `Add Folder…` | 添加目录按钮 |
 | `No folders authorized` | 空状态 |
 | `Grant Access` | NSOpenPanel 的 prompt 文案 |
-| `RClick needs permission to access this folder to perform file operations.` | NSOpenPanel 的 message |
+| `OneClick needs permission to access this folder to perform file operations.` | NSOpenPanel 的 message |
 
 ---
 
@@ -292,13 +292,13 @@ LabeledContent {
 
 | 文件 | 改动类型 |
 |------|---------|
-| `RClick/Model/BookmarkEntity.swift` | **新增** |
-| `RClick/Shared/BookmarkManager.swift` | **新增** |
-| `RClick/Model/ModelContainer.swift` | 注册 BookmarkEntity |
-| `RClick/AppState.swift` | 删 FDA、加 BookmarkManager |
-| `RClick/RClickApp.swift` | 删 FDA 引导、文件操作加 ensureAccess、异步化 |
-| `RClick/Settings/GeneralSettingsTabView.swift` | 替换 FDA 行为 Folder Permissions |
-| `RClick/Shared/PermissionChecker.swift` | 删 hasFullDiskAccess |
-| `RClick/Shared/StringExtension.swift` | 删 hasSeenFDAGuide key |
+| `OneClick/Model/BookmarkEntity.swift` | **新增** |
+| `OneClick/Shared/BookmarkManager.swift` | **新增** |
+| `OneClick/Model/ModelContainer.swift` | 注册 BookmarkEntity |
+| `OneClick/AppState.swift` | 删 FDA、加 BookmarkManager |
+| `OneClick/OneClickApp.swift` | 删 FDA 引导、文件操作加 ensureAccess、异步化 |
+| `OneClick/Settings/GeneralSettingsTabView.swift` | 替换 FDA 行为 Folder Permissions |
+| `OneClick/Shared/PermissionChecker.swift` | 删 hasFullDiskAccess |
+| `OneClick/Shared/StringExtension.swift` | 删 hasSeenFDAGuide key |
 | `README.md` | FDA → Folder Access |
 | `SECURITY.md` | 更新 bookmark 描述的准确性 |

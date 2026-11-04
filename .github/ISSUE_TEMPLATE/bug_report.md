@@ -1,6 +1,6 @@
 ---
 name: Bug Report
-about: Report a bug to help us improve RClick
+about: Report a bug to help us improve OneClick
 title: '[BUG] '
 labels: bug
 assignees: ''
@@ -28,7 +28,7 @@ If applicable, add screenshots to help explain the problem.
 
 | Detail | Value |
 |--------|-------|
-| **RClick Version** | [e.g. 2.0.4] |
+| **OneClick Version** | [e.g. 2.0.4] |
 | **macOS Version** | [e.g. 15.6] |
 | **Mac Model** | [e.g. MacBook Pro M3] |
 | **Installation Method** | [DMG / Built from Source] |

@@ -191,7 +191,7 @@ nonisolated final class LocalIPCTransport: @unchecked Sendable {
         private let fd: Int32
         private let lock = NSLock()
         private var stopped = false
-        private let writer = DispatchQueue(label: "RClick.IPC.write")
+        private let writer = DispatchQueue(label: "OneClick.IPC.write")
 
         init(fd: Int32) {
             self.fd = fd

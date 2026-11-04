@@ -35,6 +35,8 @@ enum HintClickLaunch {
 
 /// Shared by both targets so launch markers and the host settings use one ID.
 nonisolated enum SharedAppGroup {
+    // Keep the pre-OneClick identifier and storage path so existing settings and
+    // folder permissions remain available after the product rename.
     static let identifier = "group.cn.wflixu.RClick"
 
     /// 本地签名无法获得 App Group 授权，改用双方明确获准访问的普通目录。

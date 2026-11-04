@@ -1,6 +1,6 @@
 //
 //  FileTypeIconProvider.swift
-//  RClick
+//  OneClick
 //
 //  Created by Claude on 2026/06/27.
 //
@@ -96,7 +96,7 @@ final class FileTypeIconProvider: @unchecked Sendable {
 
     // MARK: - Private
 
-    private let logger = Logger(subsystem: "RClick.Shared", category: "FileTypeIconProvider")
+    private let logger = Logger(subsystem: "OneClick.Shared", category: "FileTypeIconProvider")
 
     /// 旧版 PNG 图标名 → SF Symbol 映射（兼容升级用户数据库中的旧数据）
     private let iconFallbackMap: [String: String] = [

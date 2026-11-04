@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to RClick are documented in this file.
+All notable changes to OneClick are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Changed
+- Rename the application, Xcode project and release artifacts to OneClick; keep existing bundle and storage identifiers for compatibility
 - Keep Finder workspace icon caches warm with background preloading and main-thread image resizing
 - Use lightweight heartbeat replies and reconnect from the last peer activity
 - Direct Delete now always asks for confirmation before permanently removing files. Hold Option while choosing it to skip the prompt
@@ -28,7 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [2.3.1] - 2026-10-14
 
 ### Fixed
-- RClick no longer shows up in the Dock. The app declared no `LSUIElement` and left the Dock by switching its activation policy from inside `applicationDidFinishLaunching`, so any launch that failed before reaching that call — a startup failure, or a bad first launch after installation — stayed a foreground app with a Dock icon until the Dock was restarted. It is declared as an agent now, so it never appears there at all
+- OneClick no longer shows up in the Dock. The app declared no `LSUIElement` and left the Dock by switching its activation policy from inside `applicationDidFinishLaunching`, so any launch that failed before reaching that call — a startup failure, or a bad first launch after installation — stayed a foreground app with a Dock icon until the Dock was restarted. It is declared as an agent now, so it never appears there at all
 
 ## [2.3.0] - 2026-09-16
 
@@ -36,7 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Builds clean against the macOS 27 SDK with Xcode 27, with no compiler warnings
 
 ### Fixed
-- RClick quit instantly and silently whenever it could not open its configuration database. It now reports the cause and exits cleanly instead of trapping. The case seen in the wild is a build that is not properly code-signed, which cannot reach the shared App Group container
+- OneClick quit instantly and silently whenever it could not open its configuration database. It now reports the cause and exits cleanly instead of trapping. The case seen in the wild is a build that is not properly code-signed, which cannot reach the shared App Group container
 
 ## [2.2.1] - 2026-09-13
 

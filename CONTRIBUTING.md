@@ -1,8 +1,8 @@
-# Contributing to RClick
+# Contributing to OneClick
 
-Thank you for your interest in contributing to RClick! 🎉
+Thank you for your interest in contributing to OneClick! 🎉
 
-RClick is a macOS Finder enhancement tool built with Swift 6.2 and SwiftUI. This guide will help you get set up and make your first contribution.
+OneClick is a macOS Finder enhancement tool built with Swift 6.2 and SwiftUI. This guide will help you get set up and make your first contribution.
 
 ## Table of Contents
 
@@ -40,14 +40,14 @@ This project follows the [Contributor Covenant Code of Conduct](CODE_OF_CONDUCT.
 
 ```bash
 # Clone the repository
-git clone https://github.com/wflixu/RClick.git
-cd RClick
+git clone https://github.com/iuxt/OneClick.git
+cd OneClick
 
 # Open in Xcode
-open RClick.xcodeproj
+open OneClick.xcodeproj
 
 # Or build from CLI
-xcodebuild -project RClick.xcodeproj -scheme RClick -destination 'platform=macOS'
+xcodebuild -project OneClick.xcodeproj -scheme OneClick -destination 'platform=macOS'
 ```
 
 > **Note:** The FinderSync Extension requires code signing. When building for development, Xcode will automatically use your development team. You may need to adjust the signing settings in **Signing & Capabilities**.
@@ -55,9 +55,9 @@ xcodebuild -project RClick.xcodeproj -scheme RClick -destination 'platform=macOS
 ### Project Structure
 
 ```
-RClick/
-├── RClick/                    # Main application target
-│   ├── RClickApp.swift        # App entry point
+OneClick/
+├── OneClick/                    # Main application target
+│   ├── OneClickApp.swift        # App entry point
 │   ├── AppState.swift         # Global state management
 │   ├── Model/                 # SwiftData models
 │   ├── Settings/              # Settings UI (SwiftUI)
@@ -163,7 +163,7 @@ These are **hard constraints** from the project constitution:
 
 **Dual-Process Communication:**
 - Main app and FinderSync Extension communicate via `DistributedNotificationCenter`.
-- Message protocol is defined in `RClick/Shared/Messager.swift`.
+- Message protocol is defined in `OneClick/Shared/Messager.swift`.
 - Always handle `isHostAppOpen` state — don't block if the main app isn't running.
 
 ## Testing
@@ -172,13 +172,13 @@ Before submitting a PR, please verify:
 
 ```bash
 # Build the main app
-xcodebuild -project RClick.xcodeproj -scheme RClick -destination 'platform=macOS'
+xcodebuild -project OneClick.xcodeproj -scheme OneClick -destination 'platform=macOS'
 
 # Build the extension
-xcodebuild -project RClick.xcodeproj -scheme FinderSyncExt -destination 'platform=macOS'
+xcodebuild -project OneClick.xcodeproj -scheme FinderSyncExt -destination 'platform=macOS'
 
 # Run tests (if applicable)
-xcodebuild test -project RClick.xcodeproj -scheme RClick -destination 'platform=macOS'
+xcodebuild test -project OneClick.xcodeproj -scheme OneClick -destination 'platform=macOS'
 ```
 
 **Manual testing checklist:**
@@ -191,8 +191,8 @@ xcodebuild test -project RClick.xcodeproj -scheme RClick -destination 'platform=
 
 ## Finding Issues to Work On
 
-- Browse [open issues](https://github.com/wflixu/RClick/issues) — look for **`good first issue`** or **`help wanted`** labels.
-- If you have an idea, [open a discussion](https://github.com/wflixu/RClick/issues) first to get feedback before writing code.
+- Browse [open issues](https://github.com/iuxt/OneClick/issues) — look for **`good first issue`** or **`help wanted`** labels.
+- If you have an idea, [open a discussion](https://github.com/iuxt/OneClick/issues) first to get feedback before writing code.
 
 ---
 

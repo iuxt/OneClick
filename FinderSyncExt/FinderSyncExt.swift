@@ -13,7 +13,7 @@ import AppKit
 // MARK: - Logger
 
 private let logger = Logger(
-    subsystem: "RClick.FinderSyncExt",
+    subsystem: "OneClick.FinderSyncExt",
     category: "FinderSyncExt"
 )
 
@@ -104,7 +104,7 @@ class FinderSyncExt: FIFinderSync, @unchecked Sendable {
     /// a reliable observation boundary for Finder Sync across mount points.
     ///
     /// This is also what makes Finder redraw those volumes' sidebar icons with
-    /// RClick's app icon (#158) — a trade-off, not an oversight: a sandboxed
+    /// OneClick's app icon (#158) — a trade-off, not an oversight: a sandboxed
     /// extension cannot read a volume root (`/Volumes` is readable, `/Volumes/<a
     /// volume>` is not), so it cannot discover the volume's contents to observe
     /// anything narrower. See specs/external-volumes-observation.md.
@@ -183,8 +183,8 @@ class FinderSyncExt: FIFinderSync, @unchecked Sendable {
         guard isHostAppRunning else {
             Task { @MainActor in
                 self.showAlert(
-                    title: AppLocalization.localized("RClick is not running"),
-                    message: AppLocalization.localized("This action requires RClick to be running. Please launch RClick and try again.")
+                    title: AppLocalization.localized("OneClick is not running"),
+                    message: AppLocalization.localized("This action requires OneClick to be running. Please launch OneClick and try again.")
                 )
             }
             return
@@ -199,8 +199,8 @@ class FinderSyncExt: FIFinderSync, @unchecked Sendable {
         let work = DispatchWorkItem { [weak self] in
             Task { @MainActor in
                 self?.showAlert(
-                    title: AppLocalization.localized("RClick did not respond"),
-                    message: AppLocalization.localized("The operation may not have been executed. Please check that RClick is running.")
+                    title: AppLocalization.localized("OneClick did not respond"),
+                    message: AppLocalization.localized("The operation may not have been executed. Please check that OneClick is running.")
                 )
             }
         }
@@ -309,10 +309,10 @@ class FinderSyncExt: FIFinderSync, @unchecked Sendable {
 
     /// Finder 会为观察范围内的每个项目回调这里，问它该显示什么徽章。
     ///
-    /// RClick 不使用徽章，所以留空：扩展包里没有任何 badge 图（FinderSync 只认
+    /// OneClick 不使用徽章，所以留空：扩展包里没有任何 badge 图（FinderSync 只认
     /// Resources 下的 `<id>.png` 散文件，不认 asset catalog），没有可设的标识。
     ///
-    /// ⚠️ 这两行**不是**"外置盘图标变成 RClick 图标"的修复。#155 那个现象在这里
+    /// ⚠️ 这两行**不是**"外置盘图标变成 OneClick 图标"的修复。#155 那个现象在这里
     /// 被误判过两次：25b69e8 把随机标识改成空串，b697cc3 改成干脆不调用 —— 两次
     /// 都没有解决，第二次还实测过"不调用时图标照旧"。真正的原因在观察根：Finder
     /// 会把扩展的图标画到每个**被当作根观察**的文件夹上，扩展则把每个卷根放进了
@@ -326,11 +326,11 @@ class FinderSyncExt: FIFinderSync, @unchecked Sendable {
     // MARK: - Menu and toolbar item support
 
     override var toolbarItemName: String {
-        return "RClick"
+        return "OneClick"
     }
 
     override var toolbarItemToolTip: String {
-        return AppLocalization.localized("RClick: Click for menu options")
+        return AppLocalization.localized("OneClick: Click for menu options")
     }
 
     override var toolbarItemImage: NSImage {
@@ -431,7 +431,7 @@ class FinderSyncExt: FIFinderSync, @unchecked Sendable {
         }()
         logger.info("构建菜单，触发方式: \(menuKindLabel)")
 
-        let menu = NSMenu(title: "RClick")
+        let menu = NSMenu(title: "OneClick")
         // 关闭自动校验：FIFinderSync 的菜单跨进程交给 Finder 显示，跟踪循环在 Finder
         // 进程里执行，扩展侧的 validateMenuItem 不会被回调——启用状态必须在构建时
         // （menu(for:) 调用时刻）通过显式 isEnabled 定死。
@@ -447,7 +447,7 @@ class FinderSyncExt: FIFinderSync, @unchecked Sendable {
                 appendOfflineHint(menu, offline: true)
             } else {
                 requestMenuConfig()
-                menu.addItem(withTitle: AppLocalization.localized("RClick (loading...)"), action: nil, keyEquivalent: "")
+                menu.addItem(withTitle: AppLocalization.localized("OneClick (loading...)"), action: nil, keyEquivalent: "")
             }
             return menu
         }
@@ -573,8 +573,8 @@ class FinderSyncExt: FIFinderSync, @unchecked Sendable {
         menu.addItem(NSMenuItem.separator())
         let gray = [NSAttributedString.Key.foregroundColor: NSColor.secondaryLabelColor]
         let titles = [
-            AppLocalization.localized("RClick is not running"),
-            AppLocalization.localized("Restart RClick to restore the menu"),
+            AppLocalization.localized("OneClick is not running"),
+            AppLocalization.localized("Restart OneClick to restore the menu"),
         ]
         for title in titles {
             let item = menu.addItem(withTitle: "", action: #selector(handleLaunchHostClick(_:)), keyEquivalent: "")
@@ -590,7 +590,7 @@ class FinderSyncExt: FIFinderSync, @unchecked Sendable {
         let hostURL = Bundle.main.bundleURL
             .deletingLastPathComponent()   // PlugIns/
             .deletingLastPathComponent()   // Contents/
-            .deletingLastPathComponent()   // RClick.app
+            .deletingLastPathComponent()   // OneClick.app
         let config = NSWorkspace.OpenConfiguration()
         config.activates = false
         // RC_QUIET_LAUNCH=1 只在「本次真的拉起新进程」时送达主程序；App 已在运行

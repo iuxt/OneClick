@@ -23,18 +23,23 @@ jobs:
           XCODE_PATH=$(ls -d /Applications/Xcode*.app | sort -V | tail -1)
           sudo xcode-select -s "$XCODE_PATH/Contents/Developer"
           xcodebuild -version
+          SDK_VERSION=$(xcrun --sdk macosx --show-sdk-version)
+          if [[ "${SDK_VERSION%%.*}" -lt 27 ]]; then
+            echo "::error::Xcode 27 with the macOS 27 SDK is required."
+            exit 1
+          fi
           swift --version
 
-      - name: Build RClick
+      - name: Build OneClick
         run: |
           set -euo pipefail
           xcodebuild build \
-            -project RClick.xcodeproj \
-            -scheme RClick \
+            -project OneClick.xcodeproj \
+            -scheme OneClick \
             -configuration Debug \
             -destination "generic/platform=macOS" \
             ARCHS=arm64 \
-            MACOSX_DEPLOYMENT_TARGET=15.6 \
+            MACOSX_DEPLOYMENT_TARGET=27.0 \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
@@ -44,13 +49,13 @@ jobs:
         run: |
           set -euo pipefail
           xcodebuild test \
-            -project RClick.xcodeproj \
-            -scheme RClick \
+            -project OneClick.xcodeproj \
+            -scheme OneClick \
             -configuration Debug \
             -destination "platform=macOS" \
-            -only-testing:RClickTests \
+            -only-testing:OneClickTests \
             ARCHS=arm64 \
-            MACOSX_DEPLOYMENT_TARGET=15.6 \
+            MACOSX_DEPLOYMENT_TARGET=27.0 \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \

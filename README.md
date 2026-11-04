@@ -1,17 +1,21 @@
 
-[![](./RClick/Assets.xcassets/AppIcon.appiconset/AppIcon@1x.png)](https://github.com/wflixu/RClick/releases)
+[![](./OneClick/Assets.xcassets/AppIcon.appiconset/AppIcon@1x.png)](https://github.com/iuxt/OneClick/releases)
 
-# RClick
+# OneClick
+
+Previously named RClick. Bundle IDs, App Group IDs, database names and template
+storage paths retain their original identifiers to preserve existing settings
+and folder permissions.
 
 [![Swift 6.2](https://img.shields.io/badge/Swift-6.2-ED523F.svg?style=flat)](https://swift.org/)
 [![SwiftUI](https://img.shields.io/badge/SwiftUI-✓-orange)](https://developer.apple.com/xcode/swiftui/)
-[![macOS 15.6+](https://img.shields.io/badge/macOS_15.6+-Compatible-green)](https://www.apple.com/macos/macos-sequoia/)
-[![Xcode 26+](https://img.shields.io/badge/Xcode-26%2B-blue)](https://developer.apple.com/xcode/)
+[![macOS 27+](https://img.shields.io/badge/macOS_27+-Compatible-green)](https://www.apple.com/macos/macos-golden-gate/)
+[![Xcode 27+](https://img.shields.io/badge/Xcode-27%2B-blue)](https://developer.apple.com/xcode/)
 [![License](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
-[![GitHub release](https://img.shields.io/github/v/release/wflixu/RClick)](https://github.com/wflixu/RClick/releases)
-[![GitHub downloads](https://img.shields.io/github/downloads/wflixu/RClick/total)](https://github.com/wflixu/RClick/releases)
+[![GitHub release](https://img.shields.io/github/v/release/iuxt/OneClick)](https://github.com/iuxt/OneClick/releases)
+[![GitHub downloads](https://img.shields.io/github/downloads/iuxt/OneClick/total)](https://github.com/iuxt/OneClick/releases)
 
-An everyday Mac toolkit for Finder right-click actions, archive browsing and input method switching. Built with Swift 6.2 and SwiftUI for macOS 15.6+. Full dark mode support with adaptive icons.
+An everyday Mac toolkit for Finder right-click actions, archive browsing and input method switching. Built with Swift 6.2 and SwiftUI for macOS 27+. Full dark mode support with adaptive icons.
 
 ## 🚀 Features
 
@@ -23,7 +27,7 @@ An everyday Mac toolkit for Finder right-click actions, archive browsing and inp
 - [x] **Copy Path** — Copy the full path of selected files or folders to clipboard.
 - [x] **File Checksums** — Right-click selected files to calculate MD5, SHA1, and SHA256 with bounded multi-core parallelism, streaming reads, progress, cancellation, and copyable results. Available by default; toggle it in Settings → Actions.
 - [x] **Compress / Extract** — Right-click files or folders to create ZIP, TAR.GZ, AES-256 encrypted ZIP, or encrypted 7Z archives. Extract ZIP, 7Z, RAR (including password-protected archives), TAR and other common formats into separate folders alongside the originals. Includes password prompts and retry, batch extraction, cancellation, automatic naming on collisions, and Show in Finder. Enable or disable each action in Settings → Actions; no Keka or Homebrew installation required. See [archive support](docs/archives.md) for format and password details.
-- [x] **Delete Direct** — Delete files or folders directly, bypassing Trash. RClick asks for confirmation first; hold **Option** while choosing the action to skip it.
+- [x] **Delete Direct** — Delete files or folders directly, bypassing Trash. OneClick asks for confirmation first; hold **Option** while choosing the action to skip it.
 - [x] **Hide / Unhide** — Toggle file visibility in Finder.
 - [x] **AirDrop** — Share files instantly via AirDrop.
 - [x] **Create New Files** — Generate new files from templates directly in Finder. Supports `.txt`, `.json`, `.md`, `.docx`, `.pptx`, `.xlsx`, as well as Apple iWork formats: `.pages`, `.key`, `.numbers`.
@@ -33,7 +37,7 @@ An everyday Mac toolkit for Finder right-click actions, archive browsing and inp
 
 ## 📱 More Apps
 
-If RClick is useful to you, here are two other apps I maintain:
+If OneClick is useful to you, here are two other apps I maintain:
 
 | App | What it does | Download |
 |-----|--------------|----------|
@@ -42,11 +46,11 @@ If RClick is useful to you, here are two other apps I maintain:
 
 ## 🏗 Architecture
 
-RClick uses a dual-process architecture:
+OneClick uses a dual-process architecture:
 
 | Component | Description |
 |-----------|-------------|
-| **Main App** (`RClick/`) | SwiftUI menu bar app — manages settings, state, and file operations |
+| **Main App** (`OneClick/`) | SwiftUI menu bar app — manages settings, state, and file operations |
 | **FinderSync Extension** (`FinderSyncExt/`) | Injected into Finder — renders custom context menu items |
 
 Communication between the two processes uses `DistributedNotificationCenter`. Settings are persisted via SwiftData with a shared App Group container.
@@ -54,7 +58,7 @@ Communication between the two processes uses `DistributedNotificationCenter`. Se
 ## 📸 Screenshots
 
 
-![](./images/rclick-v2.0.1-screenshot.png)
+![](./images/oneclick-v2.0.1-screenshot.png)
 
 
 
@@ -62,31 +66,31 @@ Communication between the two processes uses `DistributedNotificationCenter`. Se
 
 ### Download
 
-Get the latest release from the [Releases page](https://github.com/wflixu/RClick/releases).
+Get the latest release from the [Releases page](https://github.com/iuxt/OneClick/releases).
 
-Download the `.dmg`, open it, and drag **RClick** to your Applications folder.
+Download the `.dmg`, open it, and drag **OneClick** to your Applications folder.
 
 > **Note:** On first launch, you may need to enable the Finder extension in **System Settings → Privacy & Security → Extensions → Added Extensions**.
 
 ### Build from Source
 
 ```bash
-git clone https://github.com/wflixu/RClick.git
-cd RClick
-open RClick.xcodeproj
+git clone https://github.com/iuxt/OneClick.git
+cd OneClick
+open OneClick.xcodeproj
 ```
 
-- Requires **Xcode 26+** and **macOS 15.6+**
-- Select the **RClick** scheme, then **Product → Build** (⌘B)
+- Requires **Xcode 27+** and **macOS 27+**
+- Select the **OneClick** scheme, then **Product → Build** (⌘B)
 - The FinderSync extension will be automatically registered
 
-To build, install to `/Applications/RClick.app`, and launch in one step:
+To build, install to `/Applications/OneClick.app`, and launch in one step:
 
 ```bash
 ./build.sh
 ```
 
-The script builds Release by default, quits any running RClick and its Finder
+The script builds Release by default, quits any running OneClick and its Finder
 extension after a successful build, replaces the app, then launches the new
 version. The default `local` mode needs no Apple developer account. Both targets
 remain sandboxed and receive explicit access only to
@@ -120,10 +124,10 @@ Optional overrides: `CONFIGURATION=Debug ./build.sh`,
 
 ```bash
 # Build
-xcodebuild -project RClick.xcodeproj -scheme RClick -destination 'platform=macOS'
+xcodebuild -project OneClick.xcodeproj -scheme OneClick -destination 'platform=macOS'
 
 # Build for Release
-xcodebuild -project RClick.xcodeproj -scheme RClick -configuration Release
+xcodebuild -project OneClick.xcodeproj -scheme OneClick -configuration Release
 ```
 
 ### Key Technologies
@@ -147,7 +151,7 @@ See the [release guide](docs/releasing.md) for installation, tag commands, and r
 
 ### 🌐 Localization
 
-RClick supports five languages with the following priority:
+OneClick supports five languages with the following priority:
 
 | Language | Code | Notes |
 |----------|------|-------|
@@ -165,7 +169,7 @@ RClick supports five languages with the following priority:
 
 ## 👥 Contributors
 
-Thanks to all the people who have contributed to RClick!
+Thanks to all the people who have contributed to OneClick!
 
 <a href="https://github.com/wflixu/RClick/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=wflixu/RClick" />
@@ -194,8 +198,8 @@ Recent contributions:
 
 We welcome contributions! Here's how you can help:
 
-- **[Report a Bug](https://github.com/wflixu/RClick/issues/new?template=bug_report.md)** — Found something broken? Let us know.
-- **[Request a Feature](https://github.com/wflixu/RClick/issues/new?template=feature_request.md)** — Have an idea? We'd love to hear it.
+- **[Report a Bug](https://github.com/iuxt/OneClick/issues/new?template=bug_report.md)** — Found something broken? Let us know.
+- **[Request a Feature](https://github.com/iuxt/OneClick/issues/new?template=feature_request.md)** — Have an idea? We'd love to hear it.
 - **[Submit a PR](CONTRIBUTING.md)** — Read our contribution guide to get started.
 - **[Security Policy](SECURITY.md)** — How to responsibly report vulnerabilities.
 

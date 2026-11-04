@@ -42,17 +42,17 @@ tag 可以指向任意分支的提交，构建内容以 tag 指向的提交为�
 以 `v2.3.4` 为例，Release 包含：
 
 ```text
-RClick-v2.3.4.dmg
-RClick-v2.3.4.dmg.sha256
-RClick-v2.3.4.app.zip
-RClick-v2.3.4.app.zip.sha256
+OneClick-v2.3.4.dmg
+OneClick-v2.3.4.dmg.sha256
+OneClick-v2.3.4.app.zip
+OneClick-v2.3.4.app.zip.sha256
 ```
 
 构建、签名和打包成功后才执行发布步骤。构建及打包日志单独保存在 Actions 的 `release-logs-*` artifact 中，保留 14 天，整个 job 上限为 30 分钟。
 
 ## 首次安装
 
-此版本没有 Apple Developer ID 签名或 Apple 公证，首次打开可能被 Gatekeeper 拦截。下载 DMG 后将应用拖入 Applications，尝试启动一次，再根据 [Apple 官方说明](https://support.apple.com/en-gb/102445)，在 **系统设置 → 隐私与安全性 → 仍要打开** 中允许该应用。随后在系统设置中启用 RClick 的 Finder 扩展。
+此版本没有 Apple Developer ID 签名或 Apple 公证，首次打开可能被 Gatekeeper 拦截。下载 DMG 后将应用拖入 Applications，尝试启动一次，再根据 [Apple 官方说明](https://support.apple.com/en-gb/102445)，在 **系统设置 → 隐私与安全性 → 仍要打开** 中允许该应用。随后在系统设置中启用 OneClick 的 Finder 扩展。
 
 ## 失败与重试
 

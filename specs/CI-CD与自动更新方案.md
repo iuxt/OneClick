@@ -1,8 +1,8 @@
-# RClick CI/CD 与自动更新改进方案
+# OneClick CI/CD 与自动更新改进方案
 
 ## 背景
 
-RClick 决定放弃 App Store 发布，转为纯开源项目。需要两个关键基础设施：
+OneClick 决定放弃 App Store 发布，转为纯开源项目。需要两个关键基础设施：
 1. **GitHub CI/CD**：PR 时自动构建测试，推送 tag 时自动签名、公证、发布
 2. **自动更新改进**：现有更新器功能基础，参考 capcap 项目的成熟实现进行增强
 
@@ -20,10 +20,10 @@ RClick 决定放弃 App Store 发布，转为纯开源项目。需要两个关�
 
 - **触发**: PR 到 `main` 或 `dev`
 - **策略**: `CODE_SIGNING_ALLOWED=NO`，对 fork PR 友好
-- **步骤**: Checkout → Select Xcode → Build (Debug) → Run Unit Tests (RClickTests)
+- **步骤**: Checkout → Select Xcode → Build (Debug) → Run Unit Tests (OneClickTests)
 
 关键点：
-- RClick 是 `.xcodeproj` 项目，使用 `-project RClick.xcodeproj -scheme RClick`
+- OneClick 是 `.xcodeproj` 项目，使用 `-project OneClick.xcodeproj -scheme OneClick`
 - 主 App 嵌入 FinderSyncExt 扩展，构建时自动包含
 - **仅跑单元测试，不跑 UI 测试**：UI 测试是空壳（只启动+截屏），且菜单栏 App 无法被 XCTest UI 测试有效覆盖
 - 单元测试虽也是空壳，但框架已搭好（Swift Testing），后续可添加模型层/协议层测试
@@ -45,14 +45,14 @@ RClick 决定放弃 App Store 发布，转为纯开源项目。需要两个关�
 
 | 文件 | 命名 | 用途 |
 |------|------|------|
-| .app.zip | `RClick-v{version}.app.zip` | 自动更新器下载使用 |
-| .sha256 | `RClick-v{version}.app.zip.sha256` | 自动更新器校验完整性 |
-| .dmg | `RClick-v{version}.dmg` | 用户手动下载安装 |
+| .app.zip | `OneClick-v{version}.app.zip` | 自动更新器下载使用 |
+| .sha256 | `OneClick-v{version}.app.zip.sha256` | 自动更新器校验完整性 |
+| .dmg | `OneClick-v{version}.dmg` | 用户手动下载安装 |
 
 示例（tag `v2.0.2`）：
-- `RClick-v2.0.2.app.zip`
-- `RClick-v2.0.2.app.zip.sha256`
-- `RClick-v2.0.2.dmg`
+- `OneClick-v2.0.2.app.zip`
+- `OneClick-v2.0.2.app.zip.sha256`
+- `OneClick-v2.0.2.dmg`
 
 **完整流程（10步）**：
 
@@ -89,8 +89,8 @@ RClick 决定放弃 App Store 发布，转为纯开源项目。需要两个关�
 
 | 文件 | 对象 | 关键权限 |
 |------|------|---------|
-| `RClick/RClick.entitlements` | 主 App (Release) | app-groups, bookmarks, user-selected.read-write, **temporary-exception.apple-events**, **temporary-exception.files.home-relative-path.read-write(/)**；为兼容 Accessibility，主 App 不启用 App Sandbox |
-| `RClick/RClickDebug.entitlements` | 主 App (Debug) | app-groups, bookmarks, temporary-exception.files.home-relative-path.read-write(/) |
+| `OneClick/OneClick.entitlements` | 主 App (Release) | app-groups, bookmarks, user-selected.read-write, **temporary-exception.apple-events**, **temporary-exception.files.home-relative-path.read-write(/)**；为兼容 Accessibility，主 App 不启用 App Sandbox |
+| `OneClick/OneClickDebug.entitlements` | 主 App (Debug) | app-groups, bookmarks, temporary-exception.files.home-relative-path.read-write(/) |
 | `FinderSyncExt/FinderSyncExt.entitlements` | 扩展 | app-groups, bookmarks, app-sandbox(通过 build setting) |
 
 `group.` 前缀的 App Group 在 macOS 上必须由每个进程自己的 provisioning profile 授权。主 App 和 FinderSync 扩展使用不同 Bundle ID，因此需要各自的 Developer ID profile；二者都必须包含 `group.cn.wflixu.RClick`。
@@ -100,10 +100,10 @@ RClick 决定放弃 App Store 发布，转为纯开源项目。需要两个关�
 构建时 `CODE_SIGNING_ALLOWED=NO`，然后分层手动签名：
 1. **Frameworks**（如有）：`codesign --force --options runtime --timestamp --sign "$CERT_IDENTITY"`
 2. **FinderSyncExt.appex**：嵌入扩展 profile，使用补全身份声明后的 `FinderSyncExt.entitlements` 签名
-3. **RClick.app**：嵌入主 App profile，使用补全身份声明后的 `RClick.entitlements` + `--options runtime` 签名
+3. **OneClick.app**：嵌入主 App profile，使用补全身份声明后的 `OneClick.entitlements` + `--options runtime` 签名
 4. **验证**：检查两份 profile 存在、最终签名包含各自 application identifier 和 App Group，并执行 `codesign --verify --deep --strict`
 
-**公证注意事项**：`RClick.entitlements` 包含 `temporary-exception.files.home-relative-path.read-write` 设为 `/`（整个家目录），这是一个宽泛的临时例外。RClick 作为 Finder 右键扩展需要访问用户在 Finder 中选中的任意文件，功能上合理。公证时 Apple 可能会审查此项，若不通过则需要收紧权限范围。
+**公证注意事项**：`OneClick.entitlements` 包含 `temporary-exception.files.home-relative-path.read-write` 设为 `/`（整个家目录），这是一个宽泛的临时例外。OneClick 作为 Finder 右键扩展需要访问用户在 Finder 中选中的任意文件，功能上合理。公证时 Apple 可能会审查此项，若不通过则需要收紧权限范围。
 
 ### 1.5 构建参数汇总
 
@@ -114,7 +114,7 @@ RClick 决定放弃 App Store 发布，转为纯开源项目。需要两个关�
 | `ARCHS` | `arm64` | 仅 Apple Silicon，**不包含 x86_64** |
 | `MACOSX_DEPLOYMENT_TARGET` | `15.6` | 最低 macOS 15.6 |
 | `-destination` | `generic/platform=macOS` | 通用 macOS 目标 |
-| `-scheme` | `RClick` | 主 scheme（自动包含 FinderSyncExt） |
+| `-scheme` | `OneClick` | 主 scheme（自动包含 FinderSyncExt） |
 
 ---
 
@@ -128,22 +128,22 @@ RClick 决定放弃 App Store 发布，转为纯开源项目。需要两个关�
 1. **检查更新**：向 GitHub API 查询最新 release 版本号，与本地版本做语义化比较
 2. **下载**：下载 `.app.zip` + `.sha256` 校验文件到临时目录
 3. **校验与解压**：CryptoKit 验证 SHA-256 → `ditto -x -k` 解压 → 移除 quarantine 隔离属性
-4. **分离脚本交换**：启动独立 bash 子进程，然后 RClick 自己退出 → 脚本等待进程退出 → 替换 .app → 启动新版本
+4. **分离脚本交换**：启动独立 bash 子进程，然后 OneClick 自己退出 → 脚本等待进程退出 → 替换 .app → 启动新版本
 
 **关键——分离交换脚本（capcap 模式）**：
 
 ```
-RClick 启动 bash 子进程，传入：
-  - 新 .app 路径（/tmp/rclick-update-xxx/RClick.app）
-  - 旧 .app 路径（/Applications/RClick.app）
+OneClick 启动 bash 子进程，传入：
+  - 新 .app 路径（/tmp/oneclick-update-xxx/OneClick.app）
+  - 旧 .app 路径（/Applications/OneClick.app）
   - 当前进程 PID
 
-RClick 调用 NSApp.terminate() 退出
+OneClick 调用 NSApp.terminate() 退出
        │
        ▼
    bash 脚本接管:
    ├─ 等待 PID 进程退出（轮询 kill -0，最多15秒）
-   ├─ mv old.app → old.app.rclick-backup-<PID>
+   ├─ mv old.app → old.app.oneclick-backup-<PID>
    ├─ ditto new.app → old.app
    ├─ 成功: 删备份, 删临时目录
    ├─ 失败: 恢复备份
@@ -152,7 +152,7 @@ RClick 调用 NSApp.terminate() 退出
 
 ### 2.2 当前状态 vs 改进目标
 
-文件：`RClick/Shared/Updater.swift` (495行), `RClick/Shared/UpdaterView.swift` (123行)
+文件：`OneClick/Shared/Updater.swift` (495行), `OneClick/Shared/UpdaterView.swift` (123行)
 
 | 问题 | 当前实现 | 改进后 |
 |------|---------|--------|
@@ -162,7 +162,7 @@ RClick 调用 NSApp.terminate() 退出
 | SHA-256 | 无 | CryptoKit 校验，缺文件时安全降级 |
 | 备份回滚 | 无 | mv 备份，失败自动恢复 |
 | 隔离属性 | 无 | `xattr -dr com.apple.quarantine` |
-| 残留清理 | 无 | 每次更新前清理 `rclick-update-*` |
+| 残留清理 | 无 | 每次更新前清理 `oneclick-update-*` |
 | 安装方式 | NSOpenPanel 让用户选文件夹 | isWritableFile 检查 + 分离脚本 |
 | 进程交换 | 运行时直接复制（不可靠） | 分离 bash 脚本等待退出后交换 |
 | 安装阶段 | 无区分 | InstallPhase 枚举（verifying, unzipping, installing） |
@@ -192,7 +192,7 @@ enum InstallPhase: Equatable {
 
 ### 2.4 App Sandbox 适配
 
-RClick 启用了 App Sandbox，`Process()` 启动的子进程继承沙盒限制：
+OneClick 启用了 App Sandbox，`Process()` 启动的子进程继承沙盒限制：
 - 分离脚本尽力而为（`try? task.run()`）
 - 沙盒下 `/Applications` 写入可能失败，回退到手动安装提示
 - 开发版本通过 `temporary-exception` 可获得写入权限
@@ -205,7 +205,7 @@ RClick 启用了 App Sandbox，`Process()` 启动的子进程继承沙盒限制�
 
 | # | 任务 | 产出 |
 |---|------|------|
-| 1.0 | **删除 UI 测试**：删除 `RClickUITests/` 目录，从 Xcode project 中移除 target 引用 | 清理无用代码 |
+| 1.0 | **删除 UI 测试**：删除 `OneClickUITests/` 目录，从 Xcode project 中移除 target 引用 | 清理无用代码 |
 | 1.1 | 创建 `.github/workflows/pr-build.yml` | PR 构建测试 |
 | 1.2 | 创建 `.github/workflows/release.yml` | Tag 自动发布 |
 | 1.3 | 配置 GitHub Secrets（6个） | 仓库设置 |
@@ -265,9 +265,9 @@ git tag v2.0.2-test && git push origin v2.0.2-test
 |------|------|------|
 | `.github/workflows/pr-build.yml` | **新建** | PR 构建测试工作流 |
 | `.github/workflows/release.yml` | **新建** | Tag 自动发布工作流 |
-| `RClick/Shared/Updater.swift` | **修改** | 状态机、ditto、SHA-256、备份回滚、分离脚本 |
-| `RClick/Shared/UpdaterView.swift` | **修改** | 状态驱动 UI（下载进度、安装阶段） |
-| `RClick/Settings/AboutSettingsTabView.swift` | **小改** | 适配新 API |
+| `OneClick/Shared/Updater.swift` | **修改** | 状态机、ditto、SHA-256、备份回滚、分离脚本 |
+| `OneClick/Shared/UpdaterView.swift` | **修改** | 状态驱动 UI（下载进度、安装阶段） |
+| `OneClick/Settings/AboutSettingsTabView.swift` | **小改** | 适配新 API |
 
 参考代码位置：
 - iMonet CI: `/Users/lixu/code/iMonet/.github/workflows/release.yml`

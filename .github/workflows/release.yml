@@ -15,13 +15,13 @@ concurrency:
 jobs:
   build-and-release:
     name: Build and Release (no Apple certificate required)
-    runs-on: macos-15
+    runs-on: macos-latest
     timeout-minutes: 30
     defaults:
       run:
         shell: bash
     env:
-      APP_NAME: RClick
+      APP_NAME: OneClick
       EXTENSION_NAME: FinderSyncExt
       BUILD_DIR: .build/release
 
@@ -33,8 +33,14 @@ jobs:
 
       - name: Select Xcode
         run: |
-          sudo xcode-select -s /Applications/Xcode_26.3.app/Contents/Developer
+          XCODE_PATH=$(ls -d /Applications/Xcode*.app | sort -V | tail -1)
+          sudo xcode-select -s "$XCODE_PATH/Contents/Developer"
           xcodebuild -version
+          SDK_VERSION=$(xcrun --sdk macosx --show-sdk-version)
+          if [[ "${SDK_VERSION%%.*}" -lt 27 ]]; then
+            echo "::error::Xcode 27 with the macOS 27 SDK is required."
+            exit 1
+          fi
           swift --version
 
       - name: Get Version from Tag
@@ -58,13 +64,13 @@ jobs:
         run: |
           mkdir -p "$BUILD_DIR"
           xcodebuild build \
-            -project RClick.xcodeproj \
-            -scheme RClick \
+            -project OneClick.xcodeproj \
+            -scheme OneClick \
             -configuration Release \
             -derivedDataPath "$BUILD_DIR/DerivedData" \
             -destination 'generic/platform=macOS' \
             ARCHS=arm64 \
-            MACOSX_DEPLOYMENT_TARGET=15.6 \
+            MACOSX_DEPLOYMENT_TARGET=27.0 \
             CODE_SIGNING_ALLOWED=NO \
             'SWIFT_ACTIVE_COMPILATION_CONDITIONS=$(inherited) RC_LOCAL_BUILD' \
             CURRENT_PROJECT_VERSION="$(date -u +%Y%m%d%H%M)" \
@@ -87,7 +93,7 @@ jobs:
 
           output = pathlib.Path(sys.argv[1])
           output.mkdir(parents=True, exist_ok=True)
-          for name in ("RClick", "FinderSyncExt"):
+          for name in ("OneClick", "FinderSyncExt"):
               entitlements = plistlib.loads(pathlib.Path(name, f"{name}.entitlements").read_bytes())
               entitlements.pop("com.apple.security.application-groups", None)
               entitlements["com.apple.security.temporary-exception.files.home-relative-path.read-write"] = [
@@ -136,13 +142,13 @@ jobs:
       - name: Prepare Installation Notes
         run: |
           cat > "$BUILD_DIR/release-notes.md" <<'EOF'
-          Apple Silicon (arm64), macOS 15.6 or later.
+          Apple Silicon (arm64), macOS 27 or later.
 
           This build uses ad-hoc signing and is not notarized by Apple.
-          Download the DMG and drag RClick to Applications. If macOS blocks the
+          Download the DMG and drag OneClick to Applications. If macOS blocks the
           first launch, follow [Apple's instructions](https://support.apple.com/en-gb/102445)
           to allow it in System Settings → Privacy & Security → Open Anyway.
-          Then enable RClick's Finder extension in System Settings.
+          Then enable OneClick's Finder extension in System Settings.
 
           This edition stores settings separately from Developer ID builds.
           EOF
@@ -151,7 +157,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          name: RClick ${{ github.ref_name }}
+          name: OneClick ${{ github.ref_name }}
           body_path: ${{ env.BUILD_DIR }}/release-notes.md
           generate_release_notes: true
           prerelease: ${{ steps.version.outputs.prerelease == 'true' }}

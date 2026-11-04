@@ -1,6 +1,6 @@
 # IPC authentication
 
-RClick and its Finder extension communicate over a local UNIX-domain stream.
+OneClick and its Finder extension communicate over a local UNIX-domain stream.
 They do not store or read a communication key, and do not use the login Keychain.
 
 Each side obtains its peer's audit token from the connected socket using

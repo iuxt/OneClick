@@ -701,72 +701,72 @@
         }
       }
     },
-    "RClick (loading...)": {
+    "OneClick (loading...)": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "RClick (loading...)"
+            "value": "OneClick (loading...)"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "RClick (cargando...)"
+            "value": "OneClick (cargando...)"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "RClick (chargement…)"
+            "value": "OneClick (chargement…)"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "RClick（読み込み中...）"
+            "value": "OneClick（読み込み中...）"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "RClick（加载中...）"
+            "value": "OneClick（加载中...）"
           }
         }
       }
     },
-    "RClick: Click for menu options": {
+    "OneClick: Click for menu options": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "RClick: Click for menu options"
+            "value": "OneClick: Click for menu options"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "RClick: haz clic para ver las opciones del menú"
+            "value": "OneClick: haz clic para ver las opciones del menú"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "RClick : cliquez pour afficher les options du menu"
+            "value": "OneClick : cliquez pour afficher les options du menu"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "RClick: クリックしてメニューオプションを表示"
+            "value": "OneClick: クリックしてメニューオプションを表示"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "RClick：点按以显示菜单选项"
+            "value": "OneClick：点按以显示菜单选项"
           }
         }
       }
@@ -806,177 +806,177 @@
         }
       }
     },
-    "RClick is not running": {
+    "OneClick is not running": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "RClick is not running"
+            "value": "OneClick is not running"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "RClick no está en ejecución"
+            "value": "OneClick no está en ejecución"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "RClick n’est pas lancé"
+            "value": "OneClick n’est pas lancé"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "RClick が実行されていません"
+            "value": "OneClick が実行されていません"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "RClick 未运行"
+            "value": "OneClick 未运行"
           }
         }
       }
     },
-    "Restart RClick to restore the menu": {
+    "Restart OneClick to restore the menu": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Restart RClick to restore the menu"
+            "value": "Restart OneClick to restore the menu"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Reinicia RClick para restaurar el menú"
+            "value": "Reinicia OneClick para restaurar el menú"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Relancez RClick pour rétablir le menu"
+            "value": "Relancez OneClick pour rétablir le menu"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "RClick を再起動するとメニューが復元されます"
+            "value": "OneClick を再起動するとメニューが復元されます"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "重新启动 RClick 后菜单将恢复"
+            "value": "重新启动 OneClick 后菜单将恢复"
           }
         }
       }
     },
-    "This action requires RClick to be running. Please launch RClick and try again.": {
+    "This action requires OneClick to be running. Please launch OneClick and try again.": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "This action requires RClick to be running. Please launch RClick and try again."
+            "value": "This action requires OneClick to be running. Please launch OneClick and try again."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Esta acción requiere que RClick esté en ejecución. Inicia RClick e inténtalo de nuevo."
+            "value": "Esta acción requiere que OneClick esté en ejecución. Inicia OneClick e inténtalo de nuevo."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Cette action nécessite que RClick soit lancé. Veuillez lancer RClick et réessayer."
+            "value": "Cette action nécessite que OneClick soit lancé. Veuillez lancer OneClick et réessayer."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "この操作には RClick の実行が必要です。RClick を起動してもう一度お試しください。"
+            "value": "この操作には OneClick の実行が必要です。OneClick を起動してもう一度お試しください。"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "此操作需要 RClick 正在运行。请启动 RClick 后重试。"
+            "value": "此操作需要 OneClick 正在运行。请启动 OneClick 后重试。"
           }
         }
       }
     },
-    "RClick did not respond": {
+    "OneClick did not respond": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "RClick did not respond"
+            "value": "OneClick did not respond"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "RClick no respondió"
+            "value": "OneClick no respondió"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "RClick ne répond pas"
+            "value": "OneClick ne répond pas"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "RClick が応答しませんでした"
+            "value": "OneClick が応答しませんでした"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "RClick 无响应"
+            "value": "OneClick 无响应"
           }
         }
       }
     },
-    "The operation may not have been executed. Please check that RClick is running.": {
+    "The operation may not have been executed. Please check that OneClick is running.": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "The operation may not have been executed. Please check that RClick is running."
+            "value": "The operation may not have been executed. Please check that OneClick is running."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Es posible que la operación no se haya ejecutado. Comprueba que RClick esté en ejecución."
+            "value": "Es posible que la operación no se haya ejecutado. Comprueba que OneClick esté en ejecución."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "L’opération n’a peut-être pas été exécutée. Vérifiez que RClick est lancé."
+            "value": "L’opération n’a peut-être pas été exécutée. Vérifiez que OneClick est lancé."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "操作が実行されていない可能性があります。RClick が実行されているか確認してください。"
+            "value": "操作が実行されていない可能性があります。OneClick が実行されているか確認してください。"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "操作可能未执行。请确认 RClick 正在运行。"
+            "value": "操作可能未执行。请确认 OneClick 正在运行。"
           }
         }
       }

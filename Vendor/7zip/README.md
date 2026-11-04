@@ -11,7 +11,7 @@ ZIP/7Z/RAR extraction. It requires no external installation or network access.
 - Binary archive SHA-256: `12ef6830317743cfd3f0ab1724bde43fcc270d8b6d8564f8c12c2a2b7f993570`
 - Original universal executable SHA-256: `8e495531e1b2b8cb169ca583493922d4ab386007756418c15b95f07f642c35fb`
 
-The build copies `7zz` into `RClick.app/Contents/Helpers/` and signs the copy with
+The build copies `7zz` into `OneClick.app/Contents/Helpers/` and signs the copy with
 `7zz.entitlements` to inherit the parent's sandbox. Signing changes the hash of
 the app-bundled copy; the vendored file remains the upstream binary.
 
@@ -21,6 +21,6 @@ RAR-compatible compressor. The complete upstream source archive is distributed
 alongside the executable as `7zip-26.05-src.tar.xz` and copied into the app's
 `Resources/7zip/` directory. It is also available at the corresponding-source
 URL above. 7-Zip is a separate command line program,
-not linked into RClick. Replacement compatible executables can be built from
+not linked into OneClick. Replacement compatible executables can be built from
 that source; sign the replacement with the same inherited-sandbox entitlements
 and re-sign the app when replacing a bundled copy.

@@ -25,11 +25,11 @@ extension; UI-framework interaction and observer cleanup use the main actor.
 ## The volume's sidebar icon (#155, #158)
 
 Observing a volume root is what makes Finder redraw that volume's sidebar icon
-with the extension's own icon. RClick ships no sidebar iconset — the documented
+with the extension's own icon. OneClick ships no sidebar iconset — the documented
 way to supply one — so Finder falls back to the app icon: every external disk and
-mounted disk image appears in the sidebar wearing RClick's icon. Measured on this
+mounted disk image appears in the sidebar wearing OneClick's icon. Measured on this
 machine against the installed 2.3.0: mounting a DMG volume produced a sidebar
-entry carrying RClick's app icon, while `/` (`Macintosh HD`) and every favourite
+entry carrying OneClick's app icon, while `/` (`Macintosh HD`) and every favourite
 folder kept theirs. Badges were blamed twice for this symptom (#128, #155) and
 measured false both times; they are not involved.
 
@@ -66,7 +66,7 @@ before it is believed.
   observer. The DMG was ejected after the probe.
 - The subdirectory variant was measured on this machine with a real USB volume
   (mounted at `/Volumes/UPAN`, folders at its root): the volume kept its own
-  sidebar icon — the intended effect — and had no RClick menu anywhere, root or
+  sidebar icon — the intended effect — and had no OneClick menu anywhere, root or
   subfolder, which is why it was abandoned.
 - Normal signing remains blocked by missing upstream provisioning profiles. This
   verifies observation-root management, not a signed Finder installation or

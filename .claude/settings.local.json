@@ -27,7 +27,7 @@
       "Bash(rm:*)",
       "Bash(curl:*)",
       "Bash(/usr/bin/log show *)",
-      "Bash(xcodebuild -project RClick.xcodeproj -scheme RClick -destination 'platform=macOS' build)",
+      "Bash(xcodebuild -project OneClick.xcodeproj -scheme OneClick -destination 'platform=macOS' build)",
       "WebSearch",
       "WebFetch(domain:stackoverflow.com)",
       "Bash(pluginkit *)"

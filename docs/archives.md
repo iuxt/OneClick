@@ -22,7 +22,7 @@ They require selected items; Finder's empty-space and toolbar menus disable them
 
 The operation window shows current activity, errors, and a
 **Show in Finder** button for each completed result. **Cancel** closes the window.
-Closing the window cancels unfinished work. Folder authorization uses RClick's
+Closing the window cancels unfinished work. Folder authorization uses OneClick's
 existing bookmark service.
 Cancelling authorization never produces a partially selected compression archive.
 
@@ -94,9 +94,9 @@ Preview content is limited to 64 MiB, including incorrectly declared sizes.
 authorization and collision protection.
 
 Under **File Associations**, select ZIP, 7Z, RAR, TAR or TGZ and click
-**Associate Selected Formats**. macOS may request consent. Launching RClick
+**Associate Selected Formats**. macOS may request consent. Launching OneClick
 does not change default handlers. Double-clicking an associated file opens its
-browser, including when RClick was not running. Current associations and errors
+browser, including when OneClick was not running. Current associations and errors
 are shown in settings. To change back, use Finder's Get Info → Open with →
 Change All. macOS may classify `.tar.gz` as GZIP rather than TGZ; use
 **Open Archive…** or Finder's Open With for these files.
@@ -152,7 +152,7 @@ ownership, ACLs, extended attributes, file flags or privileged permissions.
   TAR.LZMA, TAR.Z, JAR, WAR, APK, IPA, XPI, CAB, ISO, CPIO and CPGZ.
 - TAR-family extraction codecs depend on the libarchive version shipped with
   macOS; ZIP/7Z/RAR use the bundled 7-Zip version. Damaged archives or unsupported
-  codecs fail with a visible diagnostic. ZIP/7Z split sets created by RClick can
+  codecs fail with a visible diagnostic. ZIP/7Z split sets created by OneClick can
   be extracted from their `.001` file. RAR creation and other split-volume naming
   conventions are not offered. TAR.GZ does not support passwords or split volumes.
 - Single-file GZIP/BZIP2/XZ streams without a TAR container are not offered by
