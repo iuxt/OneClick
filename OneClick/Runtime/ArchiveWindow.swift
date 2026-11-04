@@ -81,6 +81,12 @@ final class ArchiveViewModel: ObservableObject {
     private var hasStarted = false
     private let compressionSettings: ArchiveCompressionSettings
 
+    var shouldCloseAutomatically: Bool {
+        !isRunning && !rows.isEmpty && rows.allSatisfy {
+            $0.output != nil && $0.error == nil && !$0.isRunning && !$0.needsPassword && !$0.needsConfiguration
+        }
+    }
+
     init(requests: [ArchiveRequest], compressionSettings: ArchiveCompressionSettings = .load(from: .group)) {
         self.compressionSettings = compressionSettings
         rows = requests.enumerated().map {
@@ -346,6 +352,9 @@ private struct ArchiveView: View {
         }
         .frame(minWidth: 500, minHeight: 280)
         .onAppear { model.start() }
+        .onChange(of: model.shouldCloseAutomatically) {
+            if model.shouldCloseAutomatically { close() }
+        }
         .onChange(of: pendingRow?.id) { form.clearPassword() }
         .onChange(of: form.format) {
             if form.format == .tarGzip {

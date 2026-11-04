@@ -73,6 +73,7 @@ struct ArchiveViewModelTests {
         }
         try await waitUntilIdle(model)
         let archive = try #require(model.rows[0].output)
+        #expect(model.shouldCloseAutomatically)
         let output = try await ArchiveService.perform(ArchiveRequest(operation: .extract, urls: [archive]), password: password)
         #expect(try String(contentsOf: output.appendingPathComponent("project/keep.txt"), encoding: .utf8) == "keep")
         #expect(!FileManager.default.fileExists(atPath: output.appendingPathComponent("project/.DS_Store").path))
@@ -90,6 +91,7 @@ struct ArchiveViewModelTests {
         model.start()
         #expect(model.rows[0].needsConfiguration)
         #expect(!model.isRunning)
+        #expect(!model.shouldCloseAutomatically)
         #expect(try FileManager.default.contentsOfDirectory(atPath: root.path) == ["file.txt"])
 
         let password = encrypted ? "test-password" : nil
@@ -101,6 +103,7 @@ struct ArchiveViewModelTests {
         #expect(model.rows[0].request.verifyAfterCompression)
         #expect(model.rows[0].error == nil)
         #expect(!model.isVerifying)
+        #expect(model.shouldCloseAutomatically)
         if encrypted {
             await #expect(throws: ArchiveError.passwordRequired) {
                 try await ArchiveService.perform(ArchiveRequest(operation: .extract, urls: [archive]))
@@ -119,6 +122,7 @@ struct ArchiveViewModelTests {
         #expect(!model.isRunning)
         #expect(model.rows[0].output == nil)
         #expect(model.rows[0].error == AppLocalization.localized("Cancelled"))
+        #expect(!model.shouldCloseAutomatically)
     }
 
     private func waitUntilIdle(_ model: ArchiveViewModel) async throws {
@@ -140,6 +144,7 @@ struct ArchiveViewModelTests {
         model.start()
         #expect(model.rows[0].needsPassword)
         #expect(!model.isRunning)
+        #expect(!model.shouldCloseAutomatically)
         #expect(try FileManager.default.contentsOfDirectory(atPath: root.path) == ["file.txt"])
 
         model.submitPassword(for: 0, password: operation == .encryptedSevenZip ? "中文密码" : "test-password")
@@ -147,6 +152,7 @@ struct ArchiveViewModelTests {
         #expect(model.rows[0].output != nil)
         #expect(!model.rows[0].needsPassword)
         #expect(model.rows[0].error == nil)
+        #expect(model.shouldCloseAutomatically)
     }
 
     @Test(arguments: [ArchiveOperation.extract, .extractAndDelete])
@@ -166,6 +172,7 @@ struct ArchiveViewModelTests {
         #expect(model.rows[0].needsPassword)
         #expect(FileManager.default.fileExists(atPath: encrypted.path))
         let plainOutput = try #require(model.rows[1].output)
+        #expect(!model.shouldCloseAutomatically)
         #expect(FileManager.default.fileExists(atPath: regular.path) == (operation == .extract))
 
         model.submitPassword(for: 0, password: "wrong")
@@ -173,6 +180,7 @@ struct ArchiveViewModelTests {
         #expect(model.rows[0].needsPassword)
         #expect(model.rows[0].output == nil)
         #expect(model.rows[0].error == ArchiveError.incorrectPassword.localizedDescription)
+        #expect(!model.shouldCloseAutomatically)
         #expect(FileManager.default.fileExists(atPath: encrypted.path))
 
         model.submitPassword(for: 0, password: "password")
@@ -181,6 +189,7 @@ struct ArchiveViewModelTests {
         #expect(model.rows[0].error == nil)
         #expect(FileManager.default.fileExists(atPath: encrypted.path) == (operation == .extract))
         #expect(model.rows[1].output == plainOutput)
+        #expect(model.shouldCloseAutomatically)
         #expect(try String(contentsOf: plainOutput.appendingPathComponent("plain.txt"), encoding: .utf8) == "plain")
     }
 
@@ -202,5 +211,25 @@ struct ArchiveViewModelTests {
         #expect(fm.fileExists(atPath: archive.path))
         #expect(model.rows[0].error != nil)
         #expect(!model.rows[0].needsPassword)
+        #expect(!model.shouldCloseAutomatically)
+    }
+
+    @Test func batchWithFailureRemainsOpenAfterOtherRowsSucceed() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("oneclick-auto-close-\(UUID())")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = root.appendingPathComponent("file.txt")
+        try Data("contents".utf8).write(to: source)
+        let model = ArchiveViewModel(requests: [
+            ArchiveRequest(operation: .zip, urls: [source]),
+            ArchiveRequest(operation: .extract, urls: [source], error: "Invalid archive")
+        ])
+        #expect(!model.shouldCloseAutomatically)
+        model.start()
+        #expect(!model.shouldCloseAutomatically)
+        try await waitUntilIdle(model)
+        #expect(model.rows[0].output != nil)
+        #expect(model.rows[1].error == "Invalid archive")
+        #expect(!model.shouldCloseAutomatically)
     }
 }
