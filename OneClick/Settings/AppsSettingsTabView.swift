@@ -14,11 +14,13 @@ import UniformTypeIdentifiers
 @available(macOS 27, *)
 struct AppsSettingsTabView: View {
     @EnvironmentObject var appState: AppState
-    @State var showSelectApp = false
+    @State private var showSelectApp = false
     @State var showPresetSheet = false
     @State private var editingApp: OpenWithApp?
 
     let messager = Messager.shared
+    private let appRowHeight: CGFloat = 44
+    private let maximumVisibleApps = 8
 
     var body: some View {
         Form {
@@ -95,31 +97,25 @@ struct AppsSettingsTabView: View {
                                 }
                             }
                         }
+                        .frame(height: appRowHeight - 12)
+                        .listRowInsets(EdgeInsets(top: 6, leading: 2, bottom: 6, trailing: 2))
                     }
                     .onMove { source, destination in
                         appState.moveApps(from: source, to: destination)
                         messager.sendRunningNotification()
                     }
                 }
-                .frame(minHeight: 180)
+                .listStyle(.plain)
+                // A List has no intrinsic content height inside a Form. Reserve
+                // only its actual rows; long lists keep their own scrolling.
+                .frame(height: CGFloat(min(appState.apps.count, maximumVisibleApps)) * appRowHeight)
             } header: {
                 Text(AppLocalization.localized("Show In"))
             }
         }
         .formStyle(.grouped)
-        .fileImporter(
-            isPresented: $showSelectApp,
-            allowedContentTypes: [.application],
-            allowsMultipleSelection: false
-        ) { result in
-            switch result {
-            case .success(let files):
-                if let url = files.first {
-                    appState.addApp(item: OpenWithApp(appURL: url))
-                }
-            case .failure(let error):
-                print(error)
-            }
+        .sheet(isPresented: $showSelectApp) {
+            AddApplicationSheetView(appState: appState)
         }
         .sheet(item: $editingApp) { app in
             EditAppSheetView(app: app, appState: appState)
