@@ -49,7 +49,7 @@ struct ArchiveServiceTests {
         try contents.write(to: source)
         let password = operation.isEncryptedCompression ? "test-password" : nil
         let request = ArchiveRequest(operation: operation, urls: [source], compressionLevel: .fast,
-                                     volumeSize: 1_024)
+                                     volumeSize: 1_024, verifyAfterCompression: true)
         // Even an orphaned later volume must reserve the entire archive name.
         let orphan = root.appendingPathComponent("资料.txt." + operation.fileExtension + ".999")
         try Data("keep".utf8).write(to: orphan)
@@ -93,6 +93,51 @@ struct ArchiveServiceTests {
         for archive in archives {
             let output = try await ArchiveService.perform(ArchiveRequest(operation: .extract, urls: [archive]))
             #expect(try Data(contentsOf: output.appendingPathComponent("same")) == data)
+        }
+    }
+
+    @Test(arguments: [ArchiveOperation.zip, .sevenZip, .tarGzip, .encryptedZip, .encryptedSevenZip], [false, true])
+    func verificationDetectsDamagedArchives(operation: ArchiveOperation, truncated: Bool) async throws {
+        let root = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = root.appendingPathComponent("source.txt")
+        let contents = Data(String(repeating: "verify these contents\n", count: 100).utf8)
+        try contents.write(to: source)
+        let password = operation.isEncryptedCompression ? "verification-password" : nil
+        let archive = try await ArchiveService.perform(ArchiveRequest(operation: operation, urls: [source],
+                                                                     verifyAfterCompression: true), password: password)
+        let progress = ArchiveProgress()
+        var bytes = try Data(contentsOf: archive)
+        if truncated {
+            bytes = bytes.prefix(bytes.count / 2)
+        } else {
+            // Corrupt the compressed data while retaining archive headers/indexes.
+            if operation == .zip || operation == .encryptedZip {
+                let nameLength = Int(bytes[26]) | Int(bytes[27]) << 8
+                let extraLength = Int(bytes[28]) | Int(bytes[29]) << 8
+                bytes[30 + nameLength + extraLength] ^= 0xff
+            } else {
+                bytes[bytes.count / 2] ^= 0xff
+            }
+        }
+        try bytes.write(to: archive)
+        do {
+            try ArchiveService.verifyArchive(at: archive, operation: operation, password: password, progress: progress)
+            Issue.record("Verification accepted a damaged archive")
+        } catch let error as ArchiveError {
+            guard case .verificationFailed = error else { Issue.record("Unexpected error: \(error)"); return }
+        }
+        #expect(!progress.isVerifying)
+        #expect(!progress.detail.contains(password ?? "not-a-password"))
+        #expect(try Data(contentsOf: source) == contents)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: root.path).allSatisfy { !$0.hasPrefix(".oneclick-archive-") })
+    }
+
+    @Test func verificationHonorsCancellation() async throws {
+        let progress = ArchiveProgress()
+        progress.cancel()
+        #expect(throws: CancellationError.self) {
+            try ArchiveService.verifyArchive(at: URL(fileURLWithPath: "/nonexistent.zip"), operation: .zip, progress: progress)
         }
     }
 

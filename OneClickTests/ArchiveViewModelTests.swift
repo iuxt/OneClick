@@ -12,6 +12,7 @@ struct ArchiveViewModelTests {
         form.format = .sevenZip
         #expect(!form.splitVolumes)
         #expect(form.solid)
+        #expect(!form.verifyAfterCompression)
         form.splitVolumes = true
         #expect(form.volumeSize == ArchiveVolumePreset.cd.bytes)
         form.volumePreset = .custom
@@ -92,11 +93,14 @@ struct ArchiveViewModelTests {
         #expect(try FileManager.default.contentsOfDirectory(atPath: root.path) == ["file.txt"])
 
         let password = encrypted ? "test-password" : nil
-        model.submitCompression(for: 0, format: format, level: .fast, password: password)
+        model.submitCompression(for: 0, format: format, level: .fast, password: password, verifyAfterCompression: true)
         try await waitUntilIdle(model)
         let archive = try #require(model.rows[0].output)
         #expect(!model.rows[0].needsConfiguration)
         #expect(model.rows[0].request.compressionLevel == .fast)
+        #expect(model.rows[0].request.verifyAfterCompression)
+        #expect(model.rows[0].error == nil)
+        #expect(!model.isVerifying)
         if encrypted {
             await #expect(throws: ArchiveError.passwordRequired) {
                 try await ArchiveService.perform(ArchiveRequest(operation: .extract, urls: [archive]))

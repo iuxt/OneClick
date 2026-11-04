@@ -74,6 +74,7 @@ final class ArchiveViewModel: ObservableObject {
     @Published private(set) var rows: [Row]
     @Published private(set) var isRunning = false
     @Published private(set) var detail = ""
+    @Published private(set) var isVerifying = false
     private var task: Task<Void, Never>?
     private var polling: Task<Void, Never>?
     private var progress: ArchiveProgress?
@@ -97,7 +98,7 @@ final class ArchiveViewModel: ObservableObject {
 
     func submitCompression(for index: Int, format: ArchiveCompressionFormat,
                            level: ArchiveCompressionLevel, password: String?,
-                           volumeSize: UInt64? = nil, solid: Bool? = nil) {
+                           volumeSize: UInt64? = nil, solid: Bool? = nil, verifyAfterCompression: Bool = false) {
         guard !isRunning, rows.indices.contains(index), rows[index].needsConfiguration else { return }
         // Never silently discard a requested password for an unsupported format.
         guard format != .tarGzip || password == nil else {
@@ -118,7 +119,7 @@ final class ArchiveViewModel: ObservableObject {
         }
         rows[index].request = ArchiveRequest(operation: format.operation(encrypted: password != nil),
                                              urls: rows[index].request.urls, compressionLevel: level,
-                                             volumeSize: volumeSize, solid: solid)
+                                             volumeSize: volumeSize, solid: solid, verifyAfterCompression: verifyAfterCompression)
         rows[index].error = nil
         rows[index].needsConfiguration = false
         run(indices: [index], password: password)
@@ -146,9 +147,11 @@ final class ArchiveViewModel: ObservableObject {
                 self.progress = progress
                 self.rows[index].isRunning = true
                 self.detail = ""
+                self.isVerifying = false
                 self.polling = Task { [weak self] in
                     while !Task.isCancelled {
                         self?.detail = progress.detail
+                        self?.isVerifying = progress.isVerifying
                         do { try await Task.sleep(for: .milliseconds(150)) } catch { break }
                     }
                 }
@@ -173,6 +176,7 @@ final class ArchiveViewModel: ObservableObject {
                 self.polling?.cancel()
                 self.polling = nil
                 self.progress = nil
+                self.isVerifying = false
             }
             self.isRunning = false
             self.task = nil
@@ -204,6 +208,7 @@ struct ArchiveFormState {
     var customVolumeSize = "100"
     var volumeUnit = ArchiveVolumeUnit.mebibytes
     var solid = true
+    var verifyAfterCompression = false
 
     var volumeSize: UInt64? {
         guard splitVolumes, format != .tarGzip else { return nil }
@@ -295,7 +300,7 @@ private struct ArchiveView: View {
                         HStack(spacing: 12) {
                             ProgressView().controlSize(.small)
                             VStack(alignment: .leading, spacing: 4) {
-                                Text(appLocalized: "Processing archive…")
+                                Text(appLocalized: model.isVerifying ? "Verifying archive…" : "Processing archive…")
                                 if let detail = model.detail.components(separatedBy: .newlines).last(where: { !$0.isEmpty }) {
                                     Text(detail)
                                         .font(.caption).foregroundStyle(.secondary)
@@ -371,6 +376,10 @@ private struct ArchiveView: View {
                 Text(error).foregroundStyle(.secondary).textSelection(.enabled)
             }
             if let output = row.output {
+                if row.request.verifyAfterCompression && !row.request.operation.isExtraction {
+                    Label(AppLocalization.localized("Archive verification passed."), systemImage: "checkmark.shield")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
                 Text(output.path).font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
                 Button(AppLocalization.localized("Show in Finder")) {
                     NSWorkspace.shared.activateFileViewerSelecting([output])
@@ -402,7 +411,8 @@ private struct ArchiveView: View {
         if row.needsConfiguration {
             model.submitCompression(for: row.id, format: form.format, level: form.level,
                                     password: form.encrypted ? password : nil,
-                                    volumeSize: form.volumeSize, solid: form.format == .sevenZip ? form.solid : nil)
+                                    volumeSize: form.volumeSize, solid: form.format == .sevenZip ? form.solid : nil,
+                                    verifyAfterCompression: form.verifyAfterCompression)
         } else {
             model.submitPassword(for: row.id, password: password)
         }
@@ -484,6 +494,15 @@ private struct ArchiveCompressionForm: View {
                         .font(.caption).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+            }
+
+            Divider()
+
+            VStack(alignment: .leading, spacing: 8) {
+                Toggle(AppLocalization.localized("Verify After Compression"), isOn: $form.verifyAfterCompression)
+                Text(appLocalized: "Check the archive for errors after compression. This takes additional time.")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             Divider()

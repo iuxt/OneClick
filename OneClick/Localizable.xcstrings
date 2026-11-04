@@ -1,6 +1,181 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+  "Verify After Compression": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Verify After Compression"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "压缩后校验"
+        }
+      },
+      "ja": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "圧縮後に検証"
+        }
+      },
+      "es": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Verificar después de comprimir"
+        }
+      },
+      "fr": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Vérifier après la compression"
+        }
+      }
+    }
+  },
+  "Check the archive for errors after compression. This takes additional time.": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Check the archive for errors after compression. This takes additional time."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "压缩完成后检查压缩包是否存在错误，这会增加处理时间。"
+        }
+      },
+      "ja": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "圧縮後にアーカイブのエラーを確認します。追加の時間がかかります。"
+        }
+      },
+      "es": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Comprueba si el archivo tiene errores después de comprimirlo. Esto requiere tiempo adicional."
+        }
+      },
+      "fr": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Vérifie si l’archive contient des erreurs après la compression. Cela prend du temps supplémentaire."
+        }
+      }
+    }
+  },
+  "Verifying archive…": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Verifying archive…"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "正在校验压缩包…"
+        }
+      },
+      "ja": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "アーカイブを検証中…"
+        }
+      },
+      "es": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Verificando archivo…"
+        }
+      },
+      "fr": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Vérification de l’archive…"
+        }
+      }
+    }
+  },
+  "Archive verification passed.": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Archive verification passed."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "压缩包校验通过。"
+        }
+      },
+      "ja": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "アーカイブの検証に成功しました。"
+        }
+      },
+      "es": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "La verificación del archivo se completó correctamente."
+        }
+      },
+      "fr": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "La vérification de l’archive a réussi."
+        }
+      }
+    }
+  },
+  "Archive verification failed. No archive was saved.": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Archive verification failed. No archive was saved."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "压缩包校验失败，未保存压缩包。"
+        }
+      },
+      "ja": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "アーカイブの検証に失敗しました。アーカイブは保存されませんでした。"
+        }
+      },
+      "es": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "La verificación falló. No se guardó ningún archivo comprimido."
+        }
+      },
+      "fr": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "La vérification de l’archive a échoué. Aucune archive n’a été enregistrée."
+        }
+      }
+    }
+  },
   "Working on files…": {
     "extractionState": "manual",
     "localizations": {

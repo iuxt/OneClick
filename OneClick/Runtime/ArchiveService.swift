@@ -146,14 +146,18 @@ nonisolated struct ArchiveRequest: Sendable {
     var volumeSize: UInt64? = nil
     /// nil retains the tool's default for direct compression shortcuts.
     var solid: Bool? = nil
+    var verifyAfterCompression = false
 }
 
 nonisolated enum ArchiveError: LocalizedError, Equatable {
     case sourceDeletionFailed(output: URL, detail: String)
+    case verificationFailed(String)
     case invalidSelection, notArchive, configurationRequired, passwordRequired, incorrectPassword, invalidPassword, invalidZIPPassword, encryptionNotSupported, invalidVolumeSize, splittingNotSupported, solidNotSupported, toolUnavailable, failed(String)
 
     var errorDescription: String? {
         switch self {
+        case .verificationFailed(let detail):
+            AppLocalization.localized("Archive verification failed. No archive was saved.") + "\n" + detail
         case .sourceDeletionFailed(_, let detail):
             AppLocalization.localized("Extraction completed, but the archive could not be deleted.") + "\n" + detail
         case .configurationRequired:
@@ -195,6 +199,13 @@ nonisolated final class ArchiveProgress: @unchecked Sendable {
     private var output = Data()
     private var askedForPassword = false
     private var reportedWrongPassword = false
+    private var verifying = false
+
+    var isVerifying: Bool { lock.withLock { verifying } }
+
+    func setVerifying(_ value: Bool) {
+        lock.withLock { verifying = value }
+    }
 
     var detail: String {
         lock.withLock { String(decoding: output.suffix(2_048), as: UTF8.self) }
@@ -218,6 +229,9 @@ nonisolated final class ArchiveProgress: @unchecked Sendable {
     func launch(_ process: Process) throws {
         try lock.withLock {
             if cancelled { throw CancellationError() }
+            output = Data()
+            askedForPassword = false
+            reportedWrongPassword = false
             try process.run()
             self.process = process
         }
@@ -349,6 +363,11 @@ nonisolated enum ArchiveService {
             try run(executable: executable, arguments: arguments, directory: parent,
                     password: useSevenZip ? password : nil, progress: progress)
             try Task.checkCancellation()
+            if !request.operation.isExtraction && request.verifyAfterCompression {
+                let archive = request.volumeSize == nil ? result : result.appendingPathExtension("001")
+                try verifyArchive(at: archive, operation: request.operation, password: password, progress: progress)
+                try Task.checkCancellation()
+            }
             if request.volumeSize != nil {
                 return try publishVolumes(of: result, to: parent, name: name, extension: ext)
             }
@@ -387,6 +406,33 @@ nonisolated enum ArchiveService {
 
     static func usesSevenZip(for url: URL) -> Bool {
         ["zip", "zip.001", "zipx", "7z", "7z.001", "rar", "jar", "war", "apk", "ipa", "xpi"].contains(ArchiveFormat.suffix(for: url) ?? "")
+    }
+
+    /// Read and validate every compressed stream before publishing the staged archive.
+    /// Split ZIP/7Z archives are tested through their first volume; 7-Zip reads the rest.
+    static func verifyArchive(at archive: URL, operation: ArchiveOperation, password: String? = nil,
+                              progress: ArchiveProgress = ArchiveProgress()) throws {
+        progress.setVerifying(true)
+        defer { progress.setVerifying(false) }
+        let directory = archive.deletingLastPathComponent()
+        do {
+            try Task.checkCancellation()
+            if operation == .tarGzip {
+                // Validate gzip's payload CRC as well as the enclosed TAR structure.
+                try run(executable: URL(fileURLWithPath: "/usr/bin/gzip"), arguments: ["-t", "--", archive.path],
+                        directory: directory, password: nil, progress: progress)
+                try Task.checkCancellation()
+                try run(executable: URL(fileURLWithPath: "/usr/bin/tar"), arguments: ["-tf", archive.path],
+                        directory: directory, password: nil, progress: progress)
+            } else {
+                try run(executable: sevenZipURL(), arguments: ["t", "-y", "-bd", "-bb1", "--", archive.path],
+                        directory: directory, password: password, progress: progress)
+            }
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            throw ArchiveError.verificationFailed(error.localizedDescription)
+        }
     }
 
     private static func moveExclusively(from source: URL, to destination: URL) throws {
