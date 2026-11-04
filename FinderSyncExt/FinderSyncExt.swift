@@ -860,17 +860,26 @@ class FinderSyncExt: FIFinderSync, @unchecked Sendable {
     /// 还要查窗口服务器的修饰键状态；沙盒下这两条读取通道都可用。
     private func isOptionKeyPressed() -> Bool {
         if NSEvent.modifierFlags.contains(.option) { return true }
-        if let event = NSApp.currentEvent, event.modifierFlags.contains(.option) { return true }
+        if currentEventOptionState() == true { return true }
         if CGEventSource.flagsState(.combinedSessionState).contains(.maskAlternate) { return true }
         if CGEventSource.flagsState(.hidSystemState).contains(.maskAlternate) { return true }
         return false
+    }
+
+    private func currentEventOptionState() -> Bool? {
+        // Finder Sync callbacks are nonisolated. Only consult AppKit's current
+        // event on the main thread; other threads use the global key state.
+        guard Thread.isMainThread else { return nil }
+        return MainActor.assumeIsolated {
+            NSApp.currentEvent?.modifierFlags.contains(.option)
+        }
     }
 
     /// 供诊断日志使用：各来源分别看到什么。
     private func optionKeySnapshot() -> String {
         let combined = CGEventSource.flagsState(.combinedSessionState).contains(.maskAlternate)
         let hid = CGEventSource.flagsState(.hidSystemState).contains(.maskAlternate)
-        let current = NSApp.currentEvent?.modifierFlags.contains(.option)
+        let current = currentEventOptionState()
         return "NSEvent=\(NSEvent.modifierFlags.contains(.option)) current=\(current.map(String.init) ?? "nil") combined=\(combined) hid=\(hid)"
     }
 
