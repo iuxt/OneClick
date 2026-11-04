@@ -55,28 +55,17 @@ final class ActionService {
         let appUrl = rcitem.url
         logger.debug("openApp: rid=\(rid) app=\(appUrl.path) target=\(target) opensNewInstance=\(rcitem.opensNewInstance)")
 
-        // 通过共享目标解析处理「选中文件时打开所在目录」选项
-        for resolved in AppPresets.resolveOpenTargets(
-            appPath: appUrl.path, explicit: rcitem.opensContainingDir, targetPaths: target
-        ) {
-            await openWithApp(resolved.url, appUrl: appUrl, options: AppLaunchOptions(app: rcitem))
+        let options = AppLaunchOptions(app: rcitem)
+        let targets = await FileActionWorker.openTargets(appPath: appUrl.path, explicit: rcitem.opensContainingDir, paths: target)
+        var decisions: [URL: Bool] = [:]
+        for target in targets {
+            guard await authorize(target.directory, decisions: &decisions) else { continue }
+            openWithApp(target.url, appUrl: appUrl, accessURL: target.directory, options: options)
         }
     }
 
-    private func openWithApp(_ url: URL, appUrl: URL, options: AppLaunchOptions) async {
-        let logger = self.logger  // 捕获 Sendable logger，供完成回调使用
-        var isDir: ObjCBool = false
-        let exists = FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir)
-        let accessURL = (exists && isDir.boolValue) ? url : url.deletingLastPathComponent()
-
-        // 门控先行：未授权先弹窗，避免"只是打开一个文件"也要用户授权整个父目录的弹窗偏重
-        if !permission.hasAccess(to: accessURL) {
-            guard await permission.promptForPermission(for: accessURL) != nil else {
-                logger.warning("用户取消授权，跳过打开：\(url.path)")
-                return
-            }
-        }
-
+    private func openWithApp(_ url: URL, appUrl: URL, accessURL: URL, options: AppLaunchOptions) {
+        let logger = self.logger
         let config = options.configuration()
         NSWorkspace.shared.open([url], withApplicationAt: appUrl, configuration: config) { [weak self] runningApp, error in
             guard let self else { return }
@@ -157,23 +146,19 @@ final class ActionService {
     }
 
     func showArchives(_ target: [String], operation: ArchiveOperation, separately: Bool = false) async {
-        let urls = target.map { URL(fileURLWithPath: $0) }
+        let targets = await FileActionWorker.inspect(target)
+        let urls = targets.map(\.url)
         guard !urls.isEmpty else { return }
         var denied: Set<URL> = []
-        var checked: Set<URL> = []
-        for url in urls {
-            let parent = url.deletingLastPathComponent().resolvingSymlinksInPath()
-            guard checked.insert(parent).inserted else { continue }
-            if !permission.hasAccess(to: parent) {
-                let chosen = await permission.promptForPermission(for: parent)
-                if chosen == nil || !permission.hasAccess(to: parent) { denied.insert(parent) }
-            }
+        var decisions: [URL: Bool] = [:]
+        for target in targets {
+            if !(await authorize(target.directory, decisions: &decisions)) { denied.insert(target.directory) }
         }
         let accessError = AppLocalization.localized("File access was not granted.")
         if operation.isExtraction || separately {
-            archives.show(requests: urls.map { url in
-                ArchiveRequest(operation: operation, urls: [url],
-                               error: denied.contains(url.deletingLastPathComponent().resolvingSymlinksInPath()) ? accessError : nil)
+            archives.show(requests: targets.map { target in
+                ArchiveRequest(operation: operation, urls: [target.url],
+                               error: denied.contains(target.directory) ? accessError : nil)
             })
         } else {
             // A compression request is all-or-nothing: never silently omit a
@@ -199,35 +184,18 @@ final class ActionService {
     }
 
     func showChecksums(_ target: [String]) async {
+        let targets = await FileActionWorker.inspect(target, access: .resolvedParent)
         var inputs: [ChecksumInput] = []
-        var deniedDirectories: Set<URL> = []
-        for path in target {
-            // Finder sends native paths, so a literal "%20" in a filename must
-            // not be percent-decoded into a different file.
-            let url = URL(fileURLWithPath: path)
-            let directory = url.resolvingSymlinksInPath().deletingLastPathComponent()
-            if !permission.hasAccess(to: directory) {
-                let granted: Bool
-                if deniedDirectories.contains(directory) {
-                    granted = false
-                } else {
-                    let chosen = await permission.promptForPermission(for: directory)
-                    granted = chosen != nil && permission.hasAccess(to: directory)
-                }
-                if !granted {
-                    deniedDirectories.insert(directory)
-                    inputs.append(ChecksumInput(url: url, error: AppLocalization.localized("File access was not granted.")))
-                    continue
-                }
-            }
-            inputs.append(ChecksumInput(url: url))
+        var decisions: [URL: Bool] = [:]
+        for target in targets {
+            let allowed = await authorize(target.directory, decisions: &decisions)
+            inputs.append(ChecksumInput(url: target.url, error: allowed ? nil : AppLocalization.localized("File access was not granted.")))
         }
         checksums.show(inputs: inputs)
     }
 
     func showAirDrop(_ target: [String], _ trigger: String) async {
         logger.info("---- showAirDrop trigger:\(trigger)")
-        let fm = FileManager.default
         var fileURLs: [URL] = []
 
         if trigger == "ctx-container" {
@@ -240,11 +208,13 @@ final class ActionService {
             return
         }
 
-        for item in target {
-            let decodedPath = item
+        let targets = await FileActionWorker.inspect(target, checkProtection: true, readFileType: true)
+        var decisions: [URL: Bool] = [:]
+        for target in targets {
+            let decodedPath = target.url.path
             logger.info("airdrop path \(decodedPath)")
 
-            if Utils.isProtectedFolder(decodedPath) {
+            if target.isProtected {
                 let alert = NSAlert()
                 alert.messageText = AppLocalization.localized("Warning")
                 alert.informativeText = String(format: AppLocalization.localized("Protected system folders cannot be shared: %@"), decodedPath)
@@ -255,9 +225,8 @@ final class ActionService {
                 continue
             }
 
-            var isDir: ObjCBool = false
-            if fm.fileExists(atPath: decodedPath, isDirectory: &isDir) {
-                if isDir.boolValue {
+            if target.exists {
+                if target.isDirectory {
                     logger.warning("不能通过 AirDrop 分享文件夹：\(decodedPath)")
                     let alert = NSAlert()
                     alert.messageText = AppLocalization.localized("Notice")
@@ -268,15 +237,8 @@ final class ActionService {
                     continue
                 } else {
                     // 确保有文件所在目录的访问权限
-                    let fileURL = URL(fileURLWithPath: decodedPath)
-                    let dirURL = fileURL.deletingLastPathComponent()
-                    if !permission.hasAccess(to: dirURL) {
-                        guard await permission.promptForPermission(for: dirURL) != nil else {
-                            logger.warning("用户取消授权，跳过 AirDrop：\(decodedPath)")
-                            continue
-                        }
-                    }
-                    fileURLs.append(fileURL)
+                    guard await authorize(target.directory, decisions: &decisions) else { continue }
+                    fileURLs.append(target.url)
                 }
             }
         }
@@ -302,21 +264,13 @@ final class ActionService {
     private func setHidden(_ hidden: Bool, target: [String], trigger: String) async {
         guard trigger == "ctx-items" || trigger == "ctx-container" else { return }
         let container = trigger == "ctx-container"
+        let targets = await FileActionWorker.inspect(container ? Array(target.prefix(1)) : target,
+                                                     access: container ? .directory : .parent,
+                                                     checkProtection: !container)
         var authorized: [URL] = []
-        var denied: Set<URL> = []
-        for path in container ? Array(target.prefix(1)) : target {
-            let url = URL(fileURLWithPath: path)
-            if !container && Utils.isProtectedFolder(path) { continue }
-            let directory = container ? url : url.deletingLastPathComponent()
-            if !permission.hasAccess(to: directory) {
-                guard !denied.contains(directory),
-                      await permission.promptForPermission(for: directory) != nil,
-                      permission.hasAccess(to: directory) else {
-                    denied.insert(directory)
-                    continue
-                }
-            }
-            authorized.append(url)
+        var decisions: [URL: Bool] = [:]
+        for target in targets where !target.isProtected {
+            if await authorize(target.directory, decisions: &decisions) { authorized.append(target.url) }
         }
         guard !authorized.isEmpty else { return }
         let activity = FileActionActivity()
@@ -338,43 +292,21 @@ final class ActionService {
             return
         }
 
-        var pathsToDelete: [String] = []
-        for item in target {
-            let decodedPath = item
-
-            if Utils.isProtectedFolder(decodedPath) {
+        let targets = await FileActionWorker.inspect(target, checkProtection: true)
+        var authorized: [String] = []
+        var decisions: [URL: Bool] = [:]
+        for target in targets {
+            if target.isProtected {
                 let alert = NSAlert()
                 alert.messageText = AppLocalization.localized("Warning")
-                alert.informativeText = String(format: AppLocalization.localized("Protected system folders cannot be deleted: %@"), decodedPath)
+                alert.informativeText = String(format: AppLocalization.localized("Protected system folders cannot be deleted: %@"), target.url.path)
                 alert.alertStyle = .warning
                 alert.addButton(withTitle: AppLocalization.localized("OK"))
                 alert.runModal()
-                logger.warning("试图删除受保护的系统文件夹，操作已被阻止：\(decodedPath)")
                 continue
             }
-
-            pathsToDelete.append(decodedPath)
-        }
-
-        guard !pathsToDelete.isEmpty else { return }
-
-        // 先把授权问完，再让确认框当最后一道关卡：确认框里的条目数就是
-        // "确认后真的会被删掉的数量"，取消授权的项在确认之前就已经出局。
-        // 授权由 BookmarkManager 持有到进程结束，提前检查不会失效。
-        var authorized: [String] = []
-        for decodedPath in pathsToDelete {
-            let dirURL = URL(fileURLWithPath: decodedPath).deletingLastPathComponent()
-            if !permission.hasAccess(to: dirURL) {
-                guard await permission.promptForPermission(for: dirURL) != nil else {
-                    logger.warning("用户取消授权，跳过删除：\(decodedPath)")
-                    continue
-                }
-                guard permission.hasAccess(to: dirURL) else {
-                    logger.warning("授权未覆盖目标目录，跳过删除：\(decodedPath)")
-                    continue
-                }
-            }
-            authorized.append(decodedPath)
+            // Finish authorization before confirmation, and only include granted paths.
+            if await authorize(target.directory, decisions: &decisions) { authorized.append(target.url.path) }
         }
 
         guard !authorized.isEmpty else { return }
@@ -445,6 +377,27 @@ final class ActionService {
     }
 
     // MARK: - 辅助
+
+    /// Cache decisions only within one action; never persist authorization results.
+    private func authorize(_ directory: URL, decisions: inout [URL: Bool]) async -> Bool {
+        if let allowed = decisions[directory] { return allowed }
+        if permission.hasAccess(toResolvedURL: directory) {
+            decisions[directory] = true
+            return true
+        }
+        let chosen = await permission.promptForPermission(for: directory)
+        // A newly granted ancestor can cover previously denied siblings.
+        if chosen != nil { decisions.removeAll() }
+        let allowed: Bool
+        if chosen != nil {
+            let resolved = await FileActionWorker.resolveDirectory(directory)
+            allowed = permission.hasAccess(toResolvedURL: resolved)
+        } else {
+            allowed = false
+        }
+        decisions[directory] = allowed
+        return allowed
+    }
 
     /// Resolve directory metadata away from the UI thread, including network volumes.
     func targetDirectoryForNewFile(_ target: [String]) async -> String? {

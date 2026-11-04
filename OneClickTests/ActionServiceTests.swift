@@ -23,6 +23,7 @@ final class ActionServiceTests {
     @MainActor
     private final class MockPermission: PermissionProviding {
         var hasAccessResult = false
+        var accessChecks = 0
         /// 模拟授权面板已把目录写进 BookmarkManager 的那部分目录
         var authorizedDirs: Set<String> = []
         var promptResult: URL?
@@ -31,7 +32,8 @@ final class ActionServiceTests {
         var callLog: CallLog?
 
         func hasAccess(to url: URL) -> Bool {
-            hasAccessResult || authorizedDirs.contains(url.resolvingSymlinksInPath().path)
+            accessChecks += 1
+            return hasAccessResult || authorizedDirs.contains(url.resolvingSymlinksInPath().path)
         }
         func promptForPermission(for url: URL) async -> URL? {
             promptCalls.append(url)
@@ -80,6 +82,23 @@ final class ActionServiceTests {
     private final class MockArchives: ArchivePresenting {
         var requests: [ArchiveRequest] = []
         func show(requests: [ArchiveRequest]) { self.requests = requests }
+    }
+
+    @Test func batchAuthorizationChecksSharedDirectoryOnceAndDoesNotCacheAcrossActions() async {
+        let permission = MockPermission()
+        permission.hasAccessResult = true
+        let checksums = MockChecksums()
+        let service = ActionService(state: MockState(), permission: permission, confirmation: MockConfirmation(), checksums: checksums)
+        let paths = (0..<1000).map { "/tmp/oneclick-batch/file-\($0)" }
+        await service.showChecksums(paths)
+        #expect(permission.accessChecks == 1)
+        #expect(checksums.inputs.count == paths.count)
+        #expect(checksums.inputs.allSatisfy { $0.error == nil })
+        permission.hasAccessResult = false
+        await service.showChecksums(paths)
+        #expect(permission.accessChecks == 2)
+        #expect(permission.promptCalls.count == 1)
+        #expect(checksums.inputs.allSatisfy { $0.error != nil })
     }
 
     @Test(arguments: ["report%20.txt", "literal%2F.txt", "100%25.txt", "中文%20.txt"])

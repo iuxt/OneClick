@@ -112,13 +112,14 @@ class AppState: ObservableObject, ActionStateProviding {
     }
 
     @MainActor
-    func updateApp(id: String, itemName: String, arguments: [String], environment: [String: String], opensNewInstance: Bool = false) {
+    func updateApp(id: String, itemName: String, arguments: [String], environment: [String: String], opensNewInstance: Bool = false, opensContainingDir: Bool? = nil) {
         if let index = apps.firstIndex(where: { $0.id == id }) {
             var updatedApp = apps[index]
             updatedApp.itemName = itemName
             updatedApp.arguments = arguments
             updatedApp.environment = environment
             updatedApp.opensNewInstance = opensNewInstance
+            updatedApp.opensContainingDir = opensContainingDir
             apps[index] = updatedApp
             persist()
         }

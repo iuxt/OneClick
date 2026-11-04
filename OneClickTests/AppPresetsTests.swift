@@ -27,9 +27,9 @@ struct AppPresetsTests {
         try PropertyListSerialization.data(fromPropertyList: info, format: .xml, options: 0)
             .write(to: terminal.appendingPathComponent("Contents/Info.plist"))
         let targets = [file.path, root.path, missing.path]
-        #expect(AppPresets.resolveOpenTargets(appPath: terminal.path, explicit: nil, targetPaths: targets).map(\.url) == [root, root, missing])
+        #expect(AppPresets.resolveOpenTargets(appPath: terminal.path, explicit: nil, targetPaths: targets).map(\.url) == [root, missing])
         #expect(AppPresets.resolveOpenTargets(appPath: terminal.path, explicit: false, targetPaths: targets).map(\.url) == [file, root, missing])
-        #expect(AppPresets.resolveOpenTargets(appPath: nil, explicit: true, targetPaths: targets).map(\.url) == [root, root, missing])
+        #expect(AppPresets.resolveOpenTargets(appPath: nil, explicit: true, targetPaths: targets).map(\.url) == [root, missing])
         #expect(AppPresets.resolveOpenTargets(appPath: nil, explicit: nil, targetPaths: targets).map(\.url) == [file, root, missing])
         #expect(AppPresets.resolveOpenTargets(appPath: nil, explicit: true, targetPaths: []).isEmpty)
         let literal = root.appendingPathComponent("literal%20%2F.txt")
@@ -38,6 +38,18 @@ struct AppPresetsTests {
         #expect(resolved.first?.path == literal.path)
         #expect(resolved.first?.url == literal)
         #expect(AppPresets.resolveOpenTargets(appPath: nil, explicit: true, targetPaths: [literal.path]).first?.url == root)
+    }
+
+    @Test func containingFoldersAreDeduplicatedWithoutChangingFileMode() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("oneclick-open-targets-\(UUID())")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let files = (0..<30).map { root.appendingPathComponent("file-\($0).txt") }
+        for file in files { try Data().write(to: file) }
+        let folders = await FileActionWorker.openTargets(appPath: "/missing.app", explicit: true, paths: files.map(\.path))
+        #expect(folders.map { $0.url.path } == [root.path])
+        let unchanged = await FileActionWorker.openTargets(appPath: "/missing.app", explicit: false, paths: files.map(\.path))
+        #expect(unchanged.map(\.url) == files)
     }
 
     @Test func symbolsReuseImagesWithinEachAppearance() throws {

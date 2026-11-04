@@ -72,9 +72,22 @@ final class ArchiveViewModel: ObservableObject {
     }
 
     @Published private(set) var rows: [Row]
+    private var pendingRowIndex: Int?
+    var pendingRow: Row? { pendingRowIndex.map { rows[$0] } }
+
+    /// Progress invalidates only the activity view, not the entire batch list.
+    final class Activity: ObservableObject {
+        @Published private(set) var detail = ""
+        @Published private(set) var isVerifying = false
+
+        func update(detail: String, isVerifying: Bool) {
+            if self.detail != detail { self.detail = detail }
+            if self.isVerifying != isVerifying { self.isVerifying = isVerifying }
+        }
+    }
+    let activity = Activity()
+    var isVerifying: Bool { activity.isVerifying }
     @Published private(set) var isRunning = false
-    @Published private(set) var detail = ""
-    @Published private(set) var isVerifying = false
     private var task: Task<Void, Never>?
     private var polling: Task<Void, Never>?
     private var progress: ArchiveProgress?
@@ -94,6 +107,11 @@ final class ArchiveViewModel: ObservableObject {
                 needsPassword: $0.element.operation.isEncryptedCompression && $0.element.error == nil,
                 needsConfiguration: $0.element.operation == .compress && $0.element.error == nil)
         }
+        pendingRowIndex = rows.firstIndex { $0.needsConfiguration || $0.needsPassword }
+    }
+
+    private func refreshPendingRow() {
+        pendingRowIndex = rows.firstIndex { $0.needsConfiguration || $0.needsPassword }
     }
 
     func start() {
@@ -128,6 +146,7 @@ final class ArchiveViewModel: ObservableObject {
                                              volumeSize: volumeSize, solid: solid, verifyAfterCompression: verifyAfterCompression)
         rows[index].error = nil
         rows[index].needsConfiguration = false
+        refreshPendingRow()
         run(indices: [index], password: password)
     }
 
@@ -135,6 +154,7 @@ final class ArchiveViewModel: ObservableObject {
         guard !isRunning, rows.indices.contains(index), rows[index].needsPassword else { return }
         rows[index].error = nil
         rows[index].needsPassword = false
+        refreshPendingRow()
         run(indices: [index], password: password)
     }
 
@@ -152,12 +172,10 @@ final class ArchiveViewModel: ObservableObject {
                 let progress = ArchiveProgress()
                 self.progress = progress
                 self.rows[index].isRunning = true
-                self.detail = ""
-                self.isVerifying = false
+                self.activity.update(detail: "", isVerifying: false)
                 self.polling = Task { [weak self] in
                     while !Task.isCancelled {
-                        self?.detail = progress.detail
-                        self?.isVerifying = progress.isVerifying
+                        self?.activity.update(detail: progress.detail, isVerifying: progress.isVerifying)
                         do { try await Task.sleep(for: .milliseconds(150)) } catch { break }
                     }
                 }
@@ -179,10 +197,11 @@ final class ArchiveViewModel: ObservableObject {
                     self.rows[index].error = error.localizedDescription
                 }
                 self.rows[index].isRunning = false
+                self.refreshPendingRow()
                 self.polling?.cancel()
                 self.polling = nil
                 self.progress = nil
-                self.isVerifying = false
+                self.activity.update(detail: progress.detail, isVerifying: false)
             }
             self.isRunning = false
             self.task = nil
@@ -198,6 +217,7 @@ final class ArchiveViewModel: ObservableObject {
             rows[index].needsPassword = false
             rows[index].needsConfiguration = false
         }
+        refreshPendingRow()
         // Keep isRunning until the worker exits and cleans its staging folder.
     }
 }
@@ -262,7 +282,7 @@ private struct ArchiveView: View {
     // A batch can request different passwords. Resolve one pending prompt at a time,
     // while keeping completed results and the remaining queue visible.
     private var pendingRow: ArchiveViewModel.Row? {
-        model.rows.first { $0.needsConfiguration || $0.needsPassword }
+        model.pendingRow
     }
 
     private var canSubmit: Bool {
@@ -301,20 +321,9 @@ private struct ArchiveView: View {
             .padding(20)
 
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
+                LazyVStack(alignment: .leading, spacing: 16) {
                     if model.isRunning {
-                        HStack(spacing: 12) {
-                            ProgressView().controlSize(.small)
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(appLocalized: model.isVerifying ? "Verifying archive…" : "Processing archive…")
-                                if let detail = model.detail.components(separatedBy: .newlines).last(where: { !$0.isEmpty }) {
-                                    Text(detail)
-                                        .font(.caption).foregroundStyle(.secondary)
-                                        .lineLimit(1).truncationMode(.middle)
-                                }
-                            }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                        ArchiveActivityView(activity: model.activity)
                     }
                     ForEach(model.rows) { row in
                         archiveRow(row)
@@ -425,6 +434,25 @@ private struct ArchiveView: View {
         } else {
             model.submitPassword(for: row.id, password: password)
         }
+    }
+}
+
+private struct ArchiveActivityView: View {
+    @ObservedObject var activity: ArchiveViewModel.Activity
+
+    var body: some View {
+        HStack(spacing: 12) {
+            ProgressView().controlSize(.small)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(appLocalized: activity.isVerifying ? "Verifying archive…" : "Processing archive…")
+                if let detail = activity.detail.components(separatedBy: .newlines).last(where: { !$0.isEmpty }) {
+                    Text(detail)
+                        .font(.caption).foregroundStyle(.secondary)
+                        .lineLimit(1).truncationMode(.middle)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

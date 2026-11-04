@@ -17,7 +17,7 @@ enum RCAppIconStyle: Int {
 }
 
 /// 一个预设应用：名称键、bundleID（检测安装 + 简单图标映射）、简单图标用的 SF Symbol
-struct AppPreset {
+nonisolated struct AppPreset: Sendable {
     let nameKey: String
     let bundleID: String
     let symbol: String
@@ -29,7 +29,7 @@ struct AppPreset {
 enum AppPresets {
 
     /// 预设应用清单（分组无关，按用途排列）
-    static let all: [AppPreset] = [
+    nonisolated static let all: [AppPreset] = [
         // 终端
         AppPreset(nameKey: "Terminal", bundleID: "com.apple.Terminal", symbol: "terminal", isTerminal: true),
         AppPreset(nameKey: "iTerm2", bundleID: "com.googlecode.iterm2", symbol: "terminal", isTerminal: true),
@@ -67,7 +67,7 @@ enum AppPresets {
     }
 
     /// 终端类预设的 bundleID 集合：打开应用时判断是否做「文件 → 所在目录」转换
-    static let terminalBundleIDs: Set<String> = Set(all.filter { $0.isTerminal }.map { $0.bundleID })
+    nonisolated static let terminalBundleIDs: Set<String> = Set(all.filter { $0.isTerminal }.map { $0.bundleID })
 
     /// bundleID → SF Symbol 名（未收录的应用返回 nil，简单图标模式下回落到原始图标）
     private static let symbolByBundleID: [String: String] = {
@@ -111,12 +111,13 @@ enum AppPresets {
     /// 「选中文件时打开所在目录」——每应用显式开关优先，未手动设置时按预设终端分类兜底；
     /// 编辑器 / Git 客户端等保持原样（打开文件本身才是预期）。
     /// 返回 (原始路径（供日志）, 解析后的目标 URL)。
-    static func resolveOpenTargets(
+    nonisolated static func resolveOpenTargets(
         appPath: String?, explicit: Bool?, targetPaths: [String]
     ) -> [(path: String, url: URL)] {
         let bundleID = appPath.flatMap { Bundle(url: URL(fileURLWithPath: $0))?.bundleIdentifier }
         let opensContainingDir = explicit ?? bundleID.map { terminalBundleIDs.contains($0) } ?? false
-        return targetPaths.map { raw in
+        var seen = Set<URL>()
+        return targetPaths.compactMap { raw in
             var url = URL(fileURLWithPath: raw)
             if opensContainingDir {
                 var isDir: ObjCBool = false
@@ -124,6 +125,7 @@ enum AppPresets {
                     url = url.deletingLastPathComponent()
                 }
             }
+            if opensContainingDir && !seen.insert(url.standardizedFileURL).inserted { return nil }
             return (raw, url)
         }
     }

@@ -14,10 +14,16 @@ import Foundation
 protocol PermissionProviding: AnyObject {
     /// 检查某个文件/目录是否在已授权目录下
     func hasAccess(to url: URL) -> Bool
+    /// The caller resolves symlinks off main before using this batch check.
+    func hasAccess(toResolvedURL url: URL) -> Bool
     /// 弹出 NSOpenPanel 请求目录访问权限
     func promptForPermission(for url: URL) async -> URL?
     /// 保存目录的 security-scoped bookmark
     func saveBookmark(for url: URL)
+}
+
+extension PermissionProviding {
+    func hasAccess(toResolvedURL url: URL) -> Bool { hasAccess(to: url) }
 }
 
 /// 权限服务：内部委托 BookmarkManager
@@ -31,6 +37,10 @@ final class PermissionService: PermissionProviding {
 
     func hasAccess(to url: URL) -> Bool {
         bookmarkManager.hasAccess(to: url)
+    }
+
+    func hasAccess(toResolvedURL url: URL) -> Bool {
+        bookmarkManager.authorizedDirectories.contains { BookmarkManager.covers($0, url) }
     }
 
     func promptForPermission(for url: URL) async -> URL? {

@@ -24,6 +24,9 @@ final class ConfigService {
     private var logger
 
     let modelContext: ModelContext
+    // This service owns configuration writes. A reload or pending context changes
+    // invalidates the baseline; failed transactions never advance it.
+    private var lastSaved: AppConfigData?
 
     init(modelContext: ModelContext? = nil) {
         self.modelContext = modelContext ?? ModelContext(SharedDataManager.sharedModelContainer)
@@ -31,6 +34,7 @@ final class ConfigService {
 
     /// 从 SwiftData 读取全部配置
     func load() -> AppConfigData {
+        lastSaved = nil
         var data = AppConfigData()
 
         // Apps
@@ -137,41 +141,122 @@ final class ConfigService {
         return data
     }
 
-    /// 将配置数据写回 SwiftData（全量替换）
+    /// Reconcile stable IDs in place. Unchanged rows never become database writes.
     func save(_ data: AppConfigData) throws {
+        if modelContext.hasChanges { lastSaved = nil }
         do {
             try modelContext.transaction {
-                // Apps
-                try modelContext.delete(model: AppEntity.self)
-                for (index, app) in data.apps.enumerated() {
-                    modelContext.insert(AppEntity(from: app, sortOrder: index))
+                try reconcile(data.apps, previous: lastSaved?.apps, id: \.id, entityID: \AppEntity.id,
+                              same: Self.sameApp, create: { AppEntity(from: $0, sortOrder: $1) }) { entity, app, index in
+                    var changed = false
+                    self.assign(entity, \.urlString, app.url.path(percentEncoded: false), changed: &changed)
+                    self.assign(entity, \.itemName, app.name, changed: &changed)
+                    self.assign(entity, \.inheritFromGlobalArguments, app.inheritFromGlobalArguments, changed: &changed)
+                    self.assign(entity, \.inheritFromGlobalEnvironment, app.inheritFromGlobalEnvironment, changed: &changed)
+                    if entity.arguments != app.arguments {
+                        entity.argumentsData = try JSONEncoder().encode(app.arguments)
+                        changed = true
+                    }
+                    if entity.environment != app.environment {
+                        entity.environmentData = try JSONEncoder().encode(app.environment)
+                        changed = true
+                    }
+                    self.assign(entity, \.sortOrder, index, changed: &changed)
+                    self.assign(entity, \.opensNewInstance, app.opensNewInstance, changed: &changed)
+                    self.assign(entity, \.showInToolbar, app.showInToolbar, changed: &changed)
+                    self.assign(entity, \.showInContextMenu, app.showInContextMenu, changed: &changed)
+                    self.assign(entity, \.opensContainingDir, app.opensContainingDir, changed: &changed)
+                    if changed { entity.updatedAt = Date() }
                 }
-
-                // Actions
-                try modelContext.delete(model: ActionEntity.self)
-                for action in data.actions {
-                    modelContext.insert(ActionEntity(from: action))
+                try reconcile(data.actions, previous: lastSaved?.actions, id: \.id, entityID: \ActionEntity.id,
+                              same: { $0.name == $1.name && $0.icon == $1.icon && $0.enabled == $1.enabled && $0.idx == $1.idx },
+                              create: { action, _ in ActionEntity(from: action) }) { entity, action, _ in
+                    var changed = false
+                    self.assign(entity, \.name, action.name, changed: &changed)
+                    self.assign(entity, \.icon, action.icon, changed: &changed)
+                    self.assign(entity, \.isEnabled, action.enabled, changed: &changed)
+                    self.assign(entity, \.sortOrder, action.idx, changed: &changed)
+                    if changed { entity.updatedAt = Date() }
                 }
-
-                // NewFiles
-                try modelContext.delete(model: NewFileTypeEntity.self)
-                for newFile in data.newFiles {
-                    modelContext.insert(NewFileTypeEntity(from: newFile))
+                try reconcile(data.newFiles, previous: lastSaved?.newFiles, id: \.id, entityID: \NewFileTypeEntity.id,
+                              same: Self.sameFile, create: { file, _ in NewFileTypeEntity(from: file) }) { entity, file, _ in
+                    var changed = false
+                    self.assign(entity, \.fileExtension, file.ext, changed: &changed)
+                    self.assign(entity, \.name, file.name, changed: &changed)
+                    self.assign(entity, \.icon, file.icon, changed: &changed)
+                    self.assign(entity, \.isEnabled, file.enabled, changed: &changed)
+                    self.assign(entity, \.sortOrder, file.idx, changed: &changed)
+                    self.assign(entity, \.templatePath, file.template?.path, changed: &changed)
+                    self.assign(entity, \.openAppPath, file.openApp?.path, changed: &changed)
+                    if changed { entity.updatedAt = Date() }
                 }
-
-                // CommonDirs
-                try modelContext.delete(model: CommonDirEntity.self)
-                for (index, commonDir) in data.commonDirs.enumerated() {
-                    let entity = CommonDirEntity(from: commonDir)
+                try reconcile(data.commonDirs, previous: lastSaved?.commonDirs, id: \.id, entityID: \CommonDirEntity.id,
+                              same: { $0.name == $1.name && $0.url == $1.url && $0.icon == $1.icon },
+                              create: { directory, index in
+                    let entity = CommonDirEntity(from: directory)
                     entity.sortOrder = index
-                    modelContext.insert(entity)
+                    return entity
+                }) { entity, directory, index in
+                    var changed = false
+                    self.assign(entity, \.name, directory.name, changed: &changed)
+                    self.assign(entity, \.pathString, directory.url.path(), changed: &changed)
+                    self.assign(entity, \.icon, directory.icon, changed: &changed)
+                    self.assign(entity, \.sortOrder, index, changed: &changed)
+                    if changed { entity.updatedAt = Date() }
                 }
-
-                try modelContext.save()
+                if modelContext.hasChanges { try modelContext.save() }
             }
+            lastSaved = data
         } catch {
+            lastSaved = nil
             modelContext.rollback()
             throw error
+        }
+    }
+
+    private func reconcile<Value, Entity: PersistentModel>(
+        _ values: [Value], previous: [Value]?, id: KeyPath<Value, String>, entityID: KeyPath<Entity, String>,
+        same: (Value, Value) -> Bool, create: (Value, Int) -> Entity, update: (Entity, Value, Int) throws -> Void
+    ) throws {
+        if let previous, previous.count == values.count,
+           zip(previous, values).allSatisfy({ $0[keyPath: id] == $1[keyPath: id] && same($0, $1) }) { return }
+        let baseline = Dictionary(uniqueKeysWithValues: (previous ?? []).enumerated().map {
+            ($0.element[keyPath: id], (index: $0.offset, value: $0.element))
+        })
+        var remaining = Dictionary(uniqueKeysWithValues:
+            try modelContext.fetch(FetchDescriptor<Entity>()).map { ($0[keyPath: entityID], $0) })
+        for (index, value) in values.enumerated() {
+            if let entity = remaining.removeValue(forKey: value[keyPath: id]) {
+                if let old = baseline[value[keyPath: id]], old.index == index, same(old.value, value) { continue }
+                try update(entity, value, index)
+            } else {
+                modelContext.insert(create(value, index))
+            }
+        }
+        for entity in remaining.values { modelContext.delete(entity) }
+    }
+
+    // RCBase equality compares IDs only, so persistence must compare every stored field.
+    private static func sameApp(_ a: OpenWithApp, _ b: OpenWithApp) -> Bool {
+        a.url == b.url && a.itemName == b.itemName
+            && a.inheritFromGlobalArguments == b.inheritFromGlobalArguments
+            && a.inheritFromGlobalEnvironment == b.inheritFromGlobalEnvironment
+            && a.arguments == b.arguments && a.environment == b.environment
+            && a.opensNewInstance == b.opensNewInstance && a.showInToolbar == b.showInToolbar
+            && a.showInContextMenu == b.showInContextMenu && a.opensContainingDir == b.opensContainingDir
+    }
+
+    private static func sameFile(_ a: NewFile, _ b: NewFile) -> Bool {
+        a.ext == b.ext && a.name == b.name && a.icon == b.icon && a.enabled == b.enabled
+            && a.idx == b.idx && a.template == b.template && a.openApp == b.openApp
+    }
+
+    private func assign<Entity: AnyObject, Value: Equatable>(
+        _ entity: Entity, _ key: ReferenceWritableKeyPath<Entity, Value>, _ value: Value, changed: inout Bool
+    ) {
+        if entity[keyPath: key] != value {
+            entity[keyPath: key] = value
+            changed = true
         }
     }
 }

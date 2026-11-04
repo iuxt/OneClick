@@ -78,6 +78,31 @@ struct InteractionRegressionTests {
         }
     }
 
+    @Test func importingTemplatesPreservesPackagesAndSameNamedFiles() async throws {
+        let fm = FileManager.default
+        let root = fm.temporaryDirectory.appendingPathComponent("oneclick-import-template-\(UUID())")
+        try fm.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: root) }
+        let first = root.appendingPathComponent("a/Template.pages")
+        let second = root.appendingPathComponent("b/Template.pages")
+        for source in [first, second] { try fm.createDirectory(at: source, withIntermediateDirectories: true) }
+        try Data("first".utf8).write(to: first.appendingPathComponent("contents"))
+        try Data("second".utf8).write(to: second.appendingPathComponent("contents"))
+        let destination = root.appendingPathComponent("saved")
+        let savedFirst = try await FileActionWorker.importTemplate(from: first, into: destination)
+        let savedSecond = try await FileActionWorker.importTemplate(from: second, into: destination)
+        #expect(savedFirst != savedSecond)
+        #expect(try String(contentsOf: savedFirst.appendingPathComponent("contents"), encoding: .utf8) == "first")
+        #expect(try String(contentsOf: savedSecond.appendingPathComponent("contents"), encoding: .utf8) == "second")
+        let reused = try await FileActionWorker.importTemplate(from: savedFirst, into: destination, existing: savedFirst)
+        #expect(reused == savedFirst)
+        #expect(try fm.contentsOfDirectory(atPath: destination.path).count == 2)
+        await #expect(throws: CocoaError.self) {
+            try await FileActionWorker.importTemplate(from: root.appendingPathComponent("missing"), into: destination)
+        }
+        #expect(try fm.contentsOfDirectory(atPath: destination.path).count == 2)
+    }
+
     @Test func checksumGroupsKeepRowIdentityAndReflectResultsAndCancellation() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("oneclick-checksum-ui-\(UUID())")
         try Data("abc".utf8).write(to: root)

@@ -24,6 +24,9 @@ struct EditFileTypeSheetView: View {
     @State private var openApp: URL?
     @State private var template: URL?
 
+    @State private var isSaving = false
+    @State private var saveError: String?
+    @State private var saveTask: Task<Void, Never>?
     @State private var showSelectApp = false
     @State private var showSelectTemplate = false
 
@@ -180,6 +183,8 @@ struct EditFileTypeSheetView: View {
             }
             .formStyle(.grouped)
 
+            if isSaving { ProgressView().controlSize(.small).padding(.bottom, 8) }
+            if let saveError { Text(saveError).foregroundStyle(.red).padding(.horizontal) }
             HStack {
                 Button(AppLocalization.localized("Cancel")) {
                     dismiss()
@@ -187,8 +192,7 @@ struct EditFileTypeSheetView: View {
                 .keyboardShortcut(.escape)
 
                 Button(AppLocalization.localized(isAdding ? "Add" : "Save")) {
-                    saveChanges()
-                    dismiss()
+                    saveTask = Task { await saveChanges() }
                 }
                 .keyboardShortcut(.return)
                 .disabled(name.isEmpty || ext.isEmpty)
@@ -196,49 +200,50 @@ struct EditFileTypeSheetView: View {
             .padding(.bottom, 20)
         }
         .frame(width: 440, height: 580)
+        .disabled(isSaving)
+        .interactiveDismissDisabled(isSaving)
+        .onDisappear { saveTask?.cancel() }
     }
 
-    private func saveChanges() {
-        if isAdding {
-            var newFile = NewFile(
-                ext: ext,
-                name: name,
-                idx: appState.newFiles.count,
-                icon: icon
-            )
-            if let app = openApp {
-                newFile.openApp = app
+    private func saveChanges() async {
+        guard !isSaving else { return }
+        isSaving = true
+        saveError = nil
+        defer { isSaving = false }
+        do {
+            let savedTemplate: URL?
+            if let template {
+                guard let templatesDir else { throw CocoaError(.fileNoSuchFile) }
+                savedTemplate = try await FileActionWorker.importTemplate(from: template, into: templatesDir, existing: file.template)
+            } else {
+                savedTemplate = nil
             }
-            if let templateUrl = template {
-                if let templateDir = templatesDir {
-                    try? FileManager.default.createDirectory(at: templateDir, withIntermediateDirectories: true)
-                    let destUrl = templateDir.appendingPathComponent(templateUrl.lastPathComponent)
-                    try? FileManager.default.copyItem(at: templateUrl, to: destUrl)
-                    newFile.template = destUrl
+            if Task.isCancelled {
+                if let savedTemplate, savedTemplate != file.template {
+                    _ = await FileActionWorker.remove([savedTemplate.deletingLastPathComponent().path])
                 }
+                return
             }
-            appState.addNewFile(newFile)
-        } else {
-            if let index = appState.newFiles.firstIndex(where: { $0.id == file.id }) {
-                var updatedFile = file
-                updatedFile.name = name
-                updatedFile.ext = ext
-                updatedFile.icon = icon
-                updatedFile.openApp = openApp
-                if let templateUrl = template {
-                    if let templateDir = templatesDir {
-                        try? FileManager.default.createDirectory(at: templateDir, withIntermediateDirectories: true)
-                        let destUrl = templateDir.appendingPathComponent(templateUrl.lastPathComponent)
-                        try? FileManager.default.copyItem(at: templateUrl, to: destUrl)
-                        updatedFile.template = destUrl
-                    }
-                }
-                appState.newFiles[index] = updatedFile
+            var updated = isAdding
+                ? NewFile(ext: ext, name: name, idx: appState.newFiles.count, icon: icon)
+                : file
+            updated.name = name
+            updated.ext = ext
+            updated.icon = icon
+            updated.openApp = openApp
+            updated.template = savedTemplate
+            if isAdding {
+                appState.addNewFile(updated)
+            } else if let index = appState.newFiles.firstIndex(where: { $0.id == file.id }) {
+                appState.newFiles[index] = updated
+                appState.sync()
             }
+            if let error = appState.lastSaveError { saveError = error }
+            else { dismiss() }
+        } catch is CancellationError {
+            // Closing the sheet cancels publishing; the worker cleans partial copies.
+        } catch {
+            saveError = error.localizedDescription
         }
-        Task { @MainActor in
-            appState.sync()
-        }
-        messager.sendRunningNotification()
     }
 }

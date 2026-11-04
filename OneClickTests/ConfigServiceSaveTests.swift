@@ -4,13 +4,7 @@ import Testing
 
 @testable import OneClick
 
-/// `ConfigService.save` replaces the whole store: it deletes every row of each
-/// entity and inserts the in-memory arrays back.
-///
-/// Every entity carries `@Attribute(.unique)` on its `id`, and the ids survive the
-/// round trip (`OpenWithApp(id: entity.id, ...)`), so the second save re-inserts
-/// ids the context is still holding as pending deletions. These tests use an
-/// in-memory container - the real store in the App Group must not be touched.
+/// Use an isolated SQLite store to check identity, incremental changes and reloads.
 @MainActor
 struct ConfigServiceSaveTests {
     /// Backed by a real file, not `isStoredInMemoryOnly`: the failure this is
@@ -41,6 +35,74 @@ struct ConfigServiceSaveTests {
             commonDirs: [CommonDir(id: "desktop", name: "Desktop",
                                    url: URL(fileURLWithPath: "/Users/x/Desktop"), icon: "folder")]
         )
+    }
+
+    @Test func aSingleChangePreservesUnchangedRecordsAndNoOpSave() throws {
+        let (service, context) = try makeService()
+        var snapshot = payload
+        try service.save(snapshot)
+        let app = try #require(context.fetch(FetchDescriptor<AppEntity>()).first)
+        let action = try #require(context.fetch(FetchDescriptor<ActionEntity>()).first)
+        let file = try #require(context.fetch(FetchDescriptor<NewFileTypeEntity>()).first)
+        let directory = try #require(context.fetch(FetchDescriptor<CommonDirEntity>()).first)
+        let originalIDs = [app.persistentModelID, action.persistentModelID, file.persistentModelID, directory.persistentModelID]
+        let originalDates = [app.createdAt, action.updatedAt, file.updatedAt, directory.updatedAt]
+        snapshot.apps[0].showInToolbar = false
+        try service.save(snapshot)
+        #expect(!app.showInToolbar)
+        #expect([app.persistentModelID, action.persistentModelID, file.persistentModelID, directory.persistentModelID] == originalIDs)
+        #expect([app.createdAt, action.updatedAt, file.updatedAt, directory.updatedAt] == originalDates)
+        let updatedAt = app.updatedAt
+        try service.save(snapshot)
+        #expect(app.updatedAt == updatedAt)
+        #expect(!context.hasChanges)
+        let fresh = ModelContext(context.container)
+        #expect(try fresh.fetch(FetchDescriptor<AppEntity>()).first?.showInToolbar == false)
+    }
+
+    @Test func pendingContextEditsInvalidateTheSavedBaseline() throws {
+        let (service, context) = try makeService()
+        let snapshot = payload
+        try service.save(snapshot)
+        let app = try #require(context.fetch(FetchDescriptor<AppEntity>()).first)
+        app.showInToolbar = false
+        try service.save(snapshot)
+        #expect(app.showInToolbar)
+        #expect(!context.hasChanges)
+        _ = service.load()
+        var changed = snapshot
+        changed.apps[0].showInContextMenu = false
+        try service.save(changed)
+        #expect(!app.showInContextMenu)
+    }
+
+    @Test func incrementalSaveReordersAddsRemovesAndUpdatesAllCategories() throws {
+        let (service, context) = try makeService()
+        var snapshot = payload
+        snapshot.apps.append(OpenWithApp(id: "second", appURL: URL(fileURLWithPath: "/Applications/Second.app")))
+        try service.save(snapshot)
+        snapshot.apps.reverse()
+        snapshot.apps[0].arguments = ["--one", "two words"]
+        snapshot.apps[0].environment = ["KEY": "value"]
+        snapshot.apps[0].opensContainingDir = true
+        snapshot.actions[0].enabled = false
+        snapshot.newFiles[0].template = URL(fileURLWithPath: "/tmp/new-template.txt")
+        snapshot.commonDirs[0].name = "Changed"
+        try service.save(snapshot)
+        let fresh = ModelContext(context.container)
+        let apps = try fresh.fetch(FetchDescriptor<AppEntity>(sortBy: [SortDescriptor(\.sortOrder)]))
+        #expect(apps.map(\.id) == snapshot.apps.map(\.id))
+        #expect(apps[0].arguments == snapshot.apps[0].arguments)
+        #expect(apps[0].environment == snapshot.apps[0].environment)
+        #expect(apps[0].opensContainingDir == true)
+        #expect(try fresh.fetch(FetchDescriptor<ActionEntity>()).first?.isEnabled == false)
+        #expect(try fresh.fetch(FetchDescriptor<NewFileTypeEntity>()).first?.templatePath == "/tmp/new-template.txt")
+        #expect(try fresh.fetch(FetchDescriptor<CommonDirEntity>()).first?.name == "Changed")
+        try service.save(AppConfigData())
+        #expect(try context.fetchCount(FetchDescriptor<AppEntity>()) == 0)
+        #expect(try context.fetchCount(FetchDescriptor<ActionEntity>()) == 0)
+        #expect(try context.fetchCount(FetchDescriptor<NewFileTypeEntity>()) == 0)
+        #expect(try context.fetchCount(FetchDescriptor<CommonDirEntity>()) == 0)
     }
 
     @Test func theFirstSaveStoresEverything() throws {

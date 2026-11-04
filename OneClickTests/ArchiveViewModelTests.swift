@@ -1,9 +1,28 @@
 import Foundation
+import Combine
 import Testing
 @testable import OneClick
 
 @MainActor
 struct ArchiveViewModelTests {
+    @Test func progressDoesNotInvalidateBatchAndPendingPromptTracksCancellation() {
+        let model = ArchiveViewModel(requests: (0..<1000).map { _ in
+            ArchiveRequest(operation: .compress, urls: [URL(fileURLWithPath: "/tmp/file")])
+        })
+        #expect(model.pendingRow?.id == 0)
+        var batchChanges = 0
+        var progressChanges = 0
+        let batch = model.objectWillChange.sink { batchChanges += 1 }
+        let progress = model.activity.objectWillChange.sink { progressChanges += 1 }
+        for _ in 0..<20 { model.activity.update(detail: "processing", isVerifying: false) }
+        #expect(batchChanges == 0)
+        #expect(progressChanges == 1)
+        model.cancel()
+        #expect(model.pendingRow == nil)
+        #expect(model.rows.allSatisfy { !$0.needsConfiguration && $0.error != nil })
+        withExtendedLifetime((batch, progress)) {}
+    }
+
     @Test func volumePresetsAndCustomSizeValidation() {
         #expect(ArchiveVolumePreset.cd.bytes == 734_003_200)
         #expect(ArchiveVolumePreset.dvd.bytes == 4_700_000_000)

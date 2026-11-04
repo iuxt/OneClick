@@ -2,14 +2,14 @@ import Foundation
 
 public class Utils {
     nonisolated public static func isProtectedFolder(_ path: String) -> Bool {
-        let target = URL(fileURLWithPath: path).standardizedFileURL.resolvingSymlinksInPath().pathComponents
-        if target == ["/"] { return true }
-        return Constants.protectedDirs.contains { protectedPath in
-            let protected = URL(fileURLWithPath: protectedPath).standardizedFileURL.resolvingSymlinksInPath().pathComponents
-            // Protect the directory itself. Its descendants remain available
-            // for explicitly authorized file operations (e.g. on Desktop).
-            return target == protected
-        }
+        protectedPaths().contains(URL(fileURLWithPath: path).standardizedFileURL.resolvingSymlinksInPath().pathComponents)
+    }
+
+    /// Resolve once per batch, never indefinitely cache paths whose symlinks can change.
+    nonisolated static func protectedPaths() -> Set<[String]> {
+        Set([["/"]] + Constants.protectedDirs.map {
+            URL(fileURLWithPath: $0).standardizedFileURL.resolvingSymlinksInPath().pathComponents
+        })
     }
     // MARK: 
     nonisolated public static func getRealHomeDir() -> String {

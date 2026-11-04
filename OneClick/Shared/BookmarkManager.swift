@@ -38,7 +38,8 @@ final class BookmarkManager: ObservableObject {
         guard let entities = try? context.fetch(descriptor) else { return }
 
         for entity in entities {
-            // resolve 抛错 = bookmark 真失效（路径被删/移动导致无法解析）→ 删除脏数据
+            // 解析失败不代表用户撤销了授权：卷暂时不可用、系统服务异常或
+            // 签名变化都可能导致失败。保留原始书签，供后续启动重试。
             let url: URL
             var isStale = false
             do {
@@ -49,8 +50,7 @@ final class BookmarkManager: ObservableObject {
                     bookmarkDataIsStale: &isStale
                 )
             } catch {
-                logger.error("恢复 bookmark 失败，删除脏数据：\(entity.pathString) — \(error.localizedDescription)")
-                context.delete(entity)
+                logger.error("恢复 bookmark 失败，保留记录供下次重试：\(entity.pathString) — \(error.localizedDescription)")
                 continue
             }
 

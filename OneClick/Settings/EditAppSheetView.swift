@@ -118,9 +118,9 @@ struct EditAppSheetView: View {
             itemName: itemName,
             arguments: arguments.components(separatedBy: ";").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty },
             environment: parseEnvironmentVariables(environment),
-            opensNewInstance: opensNewInstance
+            opensNewInstance: opensNewInstance,
+            opensContainingDir: opensContainingDir
         )
-        appState.updateAppOpensContainingDir(id: app.id, value: opensContainingDir)
         messager.sendRunningNotification()
     }
 
