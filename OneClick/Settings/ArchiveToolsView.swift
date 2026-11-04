@@ -55,7 +55,7 @@ struct ArchiveLaunchControls: View {
     }
 }
 
-nonisolated struct ArchiveAssociationFormat: Identifiable {
+nonisolated struct ArchiveAssociationFormat: Identifiable, Sendable {
     let id: String
     let typeID: String
     static let all: [Self] = [
@@ -65,6 +65,14 @@ nonisolated struct ArchiveAssociationFormat: Identifiable {
         Self(id: "TAR", typeID: "public.tar-archive"),
         Self(id: "TGZ", typeID: "org.gnu.gnu-zip-tar-archive"),
     ]
+
+    @concurrent
+    static func associatedFormats(bundleID: String) async -> Set<String> {
+        Set(all.filter { format in
+            guard let handler = LSCopyDefaultRoleHandlerForContentType(format.typeID as CFString, .viewer)?.takeRetainedValue() else { return false }
+            return (handler as String).caseInsensitiveCompare(bundleID) == .orderedSame
+        }.map(\.id))
+    }
 }
 
 @available(macOS 27, *)
@@ -99,14 +107,13 @@ struct ArchiveAssociationView: View {
             }
             if let result { Text(result).font(.caption).textSelection(.enabled) }
         }
-        .task { refresh() }
+        .task { await refresh() }
     }
 
-    private func refresh() {
-        associated = Set(ArchiveAssociationFormat.all.filter { format in
-            guard let handler = LSCopyDefaultRoleHandlerForContentType(format.typeID as CFString, .viewer)?.takeRetainedValue() else { return false }
-            return (handler as String).caseInsensitiveCompare(Bundle.main.bundleIdentifier ?? "") == .orderedSame
-        }.map(\.id))
+    private func refresh() async {
+        let formats = await ArchiveAssociationFormat.associatedFormats(bundleID: Bundle.main.bundleIdentifier ?? "")
+        guard !Task.isCancelled else { return }
+        associated = formats
     }
 
     private func associate() {
@@ -119,7 +126,7 @@ struct ArchiveAssociationView: View {
                 do { try await NSWorkspace.shared.setDefaultApplication(at: Bundle.main.bundleURL, toOpen: type) }
                 catch { failures.append(format.id + ": " + error.localizedDescription) }
             }
-            refresh()
+            await refresh()
             associating = false
             result = failures.isEmpty ? AppLocalization.localized("File associations updated.")
                 : AppLocalization.localized("Some file associations could not be updated:") + "\n" + failures.joined(separator: "\n")

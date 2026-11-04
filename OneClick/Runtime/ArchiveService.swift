@@ -9,6 +9,7 @@ nonisolated enum ArchiveOperation: String, Sendable, CaseIterable {
     case encryptedZip = "compress-zip-encrypted"
     case encryptedSevenZip = "compress-7z-encrypted"
     case extract = "extract"
+    case extractAndDelete = "extract-and-delete"
 
     var title: String {
         let key = switch self {
@@ -19,6 +20,7 @@ nonisolated enum ArchiveOperation: String, Sendable, CaseIterable {
         case .encryptedZip: "Compress to Encrypted ZIP…"
         case .encryptedSevenZip: "Compress to Encrypted 7Z…"
         case .extract: "Extract Here"
+        case .extractAndDelete: "Extract and Delete Archive"
         }
         return AppLocalization.localized(key)
     }
@@ -32,6 +34,7 @@ nonisolated enum ArchiveOperation: String, Sendable, CaseIterable {
     }
 
     var isEncryptedCompression: Bool { self == .encryptedZip || self == .encryptedSevenZip }
+    var isExtraction: Bool { self == .extract || self == .extractAndDelete }
 }
 
 nonisolated enum ArchiveCompressionFormat: String, CaseIterable, Sendable {
@@ -146,10 +149,13 @@ nonisolated struct ArchiveRequest: Sendable {
 }
 
 nonisolated enum ArchiveError: LocalizedError, Equatable {
+    case sourceDeletionFailed(output: URL, detail: String)
     case invalidSelection, notArchive, configurationRequired, passwordRequired, incorrectPassword, invalidPassword, invalidZIPPassword, encryptionNotSupported, invalidVolumeSize, splittingNotSupported, solidNotSupported, toolUnavailable, failed(String)
 
     var errorDescription: String? {
         switch self {
+        case .sourceDeletionFailed(_, let detail):
+            AppLocalization.localized("Extraction completed, but the archive could not be deleted.") + "\n" + detail
         case .configurationRequired:
             AppLocalization.localized("Choose compression options before creating the archive.")
         case .invalidSelection:
@@ -264,7 +270,7 @@ nonisolated enum ArchiveService {
                     throw ArchiveError.invalidPassword
                 }
                 if request.operation == .encryptedZip && !isValidZIPPassword(password) { throw ArchiveError.invalidZIPPassword }
-                guard request.operation == .extract || request.operation.isEncryptedCompression else {
+                guard request.operation.isExtraction || request.operation.isEncryptedCompression else {
                     throw ArchiveError.encryptionNotSupported
                 }
             } else if request.operation.isEncryptedCompression {
@@ -276,7 +282,7 @@ nonisolated enum ArchiveService {
                 throw ArchiveError.invalidSelection
             }
             let parent = first.deletingLastPathComponent().standardizedFileURL
-            if request.operation == .extract {
+            if request.operation.isExtraction {
                 guard request.urls.count == 1, ArchiveFormat.suffix(for: first) != nil,
                       try first.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey]).isRegularFile == true,
                       try first.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink != true else {
@@ -296,7 +302,7 @@ nonisolated enum ArchiveService {
             let ext: String
             let arguments: [String]
             let useSevenZip: Bool
-            if request.operation == .extract {
+            if request.operation.isExtraction {
                 result = staging.appendingPathComponent("contents", isDirectory: true)
                 try fm.createDirectory(at: result, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
                 name = ArchiveFormat.extractionName(for: first)
@@ -348,18 +354,32 @@ nonisolated enum ArchiveService {
             }
             // moveItem refuses existing paths. Retry collisions, including races
             // with other jobs, without replacing the user's files or folders.
+            var published: URL?
             for index in 0...10_000 {
                 try Task.checkCancellation()
                 let suffix = index == 0 ? "" : " (\(index + 1))"
                 let destination = parent.appendingPathComponent(name + suffix + ext)
                 do {
                     try fm.moveItem(at: result, to: destination)
-                    return destination
+                    published = destination
+                    break
                 } catch let error as CocoaError where error.code == .fileWriteFileExists {
                     continue
                 }
             }
-            throw CocoaError(.fileWriteFileExists)
+            guard let published else { throw CocoaError(.fileWriteFileExists) }
+            if request.operation == .extractAndDelete {
+                do {
+                    try Task.checkCancellation()
+                    try fm.removeItem(at: first)
+                } catch is CancellationError {
+                    // Published contents remain available; cancellation preserves the archive.
+                    return published
+                } catch {
+                    throw ArchiveError.sourceDeletionFailed(output: published, detail: error.localizedDescription)
+                }
+            }
+            return published
         } onCancel: {
             progress.cancel()
         }

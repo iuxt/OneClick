@@ -12,11 +12,16 @@ has its own progress result, so a failed item does not stop the rest of the batc
 This shortcut uses the same compression exclusions and CPU thread setting.
 Select archives
 and choose **Extract Here** to extract each into its own folder beside the archive.
+Choose **Extract and Delete Archive** to delete each selected archive after its
+contents have been extracted successfully. Failed or cancelled extraction keeps
+the original archive. Password prompts and batch processing work the same way as
+**Extract Here**. If deletion fails, the extracted folder remains available and
+the window displays the deletion error.
 These actions can be toggled and reordered in Settings → Compression & Extraction,
 which also provides default format and compression level settings, a compression
 CPU thread limit, an exclusion list, and an independent menu-collapse switch.
-The existing direct ZIP/TAR.GZ and encrypted
-compression shortcuts remain available there. Existing enabled/disabled choices
+The direct ZIP/TAR.GZ compression shortcuts remain available there. Password
+protection is configured through **Compress…**. Existing enabled/disabled choices
 are preserved when the new Compress… action is added.
 They require selected items; Finder's empty-space and toolbar menus disable them.
 
@@ -45,7 +50,7 @@ Both settings apply to **Compress…** and the direct compression shortcuts.
 
 ## Password protection
 
-Choose **Compress to Encrypted ZIP…** or **Compress to Encrypted 7Z…**, enter a
+Choose **Compress…**, select ZIP or 7Z, enable **Password Protection**, enter a
 password twice and create the archive. Both use AES-256. ZIP encrypts file contents
 while leaving names visible; 7Z also encrypts file names. ZIP creation accepts
 1–99 printable ASCII characters because of the upstream 7-Zip ZIP writer's
@@ -108,6 +113,10 @@ libarchive. Listings are bounded to 100,000 entries and 32 MiB
 of names/listing output. Missing folder records are synthesized. Encrypted
 headers prompt before listing; encrypted contents prompt when previewing.
 Passwords stay in window memory and clear when the window closes.
+
+Directory indexing, sorting, search, preview file writes and image decoding run
+off the UI thread. Folder navigation uses a cached directory index, and text
+previews use a native text view that lays out visible content on demand.
 
 Only the selected entry is read for preview. Archive paths never become
 filesystem destinations. Preview bytes go to a generated file in a private

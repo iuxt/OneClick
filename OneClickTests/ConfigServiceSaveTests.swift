@@ -76,22 +76,43 @@ struct ConfigServiceSaveTests {
         let (service, context) = try makeService()
         try service.save(payload)
         let first = service.load()
-        #expect(first.actions.map(\.id) == ["copy-path", "checksum", "compress-zip", "compress-targz", "extract", "compress-zip-encrypted", "compress-7z-encrypted", "compress", "compress-zip-separately"])
+        #expect(first.actions.map(\.id) == ["copy-path", "checksum", "compress-zip", "compress-targz", "extract", "compress", "compress-zip-separately", "extract-and-delete"])
         #expect(first.actions.dropFirst().allSatisfy { $0.enabled })
-        #expect(first.actions.map(\.idx) == [0, 1, 2, 3, 4, 5, 6, 7, 8])
+        #expect(first.actions.map(\.idx) == [0, 1, 2, 3, 4, 5, 6, 7])
         _ = service.load()
-        #expect(try context.fetch(FetchDescriptor<ActionEntity>()).count == 9)
+        #expect(try context.fetch(FetchDescriptor<ActionEntity>()).count == 8)
 
         var disabled = first
-        disabled.actions[1].enabled = false
-        disabled.actions[2].enabled = false
-        disabled.actions[3].enabled = false
-        disabled.actions[4].enabled = false
-        disabled.actions[5].enabled = false
-        disabled.actions[6].enabled = false
-        disabled.actions[7].enabled = false
-        disabled.actions[8].enabled = false
+        for index in disabled.actions.indices.dropFirst() {
+            disabled.actions[index].enabled = false
+        }
         try service.save(disabled)
         #expect(service.load().actions.dropFirst().allSatisfy { !$0.enabled })
+    }
+
+    @Test func loadingRemovesEncryptedShortcutsAndPreservesOtherActions() throws {
+        let (service, context) = try makeService()
+        var saved = payload
+        saved.actions = RCAction.all.reversed().enumerated().map { index, action in
+            var action = action
+            action.idx = index
+            action.enabled = index.isMultiple(of: 2)
+            return action
+        }
+        let expected = saved.actions
+        saved.actions += [
+            RCAction(id: "compress-zip-encrypted", name: "Compress to Encrypted ZIP…", idx: -2, icon: "lock.doc"),
+            RCAction(id: "compress-7z-encrypted", name: "Compress to Encrypted 7Z…", enabled: false, idx: -1, icon: "lock.doc"),
+        ]
+        try service.save(saved)
+
+        for _ in 0..<2 {
+            let loaded = service.load()
+            #expect(loaded.actions.map(\.id) == expected.map(\.id))
+            #expect(loaded.actions.map(\.idx) == expected.map(\.idx))
+            #expect(loaded.actions.map(\.enabled) == expected.map(\.enabled))
+            let stored = try context.fetch(FetchDescriptor<ActionEntity>())
+            #expect(Set(stored.map(\.id)) == Set(expected.map(\.id)))
+        }
     }
 }

@@ -83,14 +83,10 @@ struct NewFileSettingsTabView: View {
                                     .foregroundColor(.secondary)
                                 // 图标
                                 if let appUrl = item.openApp {
-                                    Image(nsImage: IconCache.shared.icon(for: appUrl))
-                                        .resizable()
-                                        .aspectRatio(contentMode: .fit)
+                                    SettingsIcon(source: .application(appUrl))
                                         .frame(width: 24, height: 24)
-                                } else if let sysIcon = FileTypeIconProvider.shared.icon(for: item.ext, fallbackSymbol: item.icon) {
-                                    Image(nsImage: sysIcon)
-                                        .resizable()
-                                        .aspectRatio(contentMode: .fit)
+                                } else {
+                                    SettingsIcon(source: .fileType(item.ext, fallback: item.icon))
                                         .frame(width: 20, height: 20)
                                 }
 

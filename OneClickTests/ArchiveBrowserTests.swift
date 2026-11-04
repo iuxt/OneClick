@@ -26,6 +26,12 @@ struct ArchiveBrowserTests {
         #expect(entry.size == contents.count)
         let preview = try await ArchiveBrowserService.preview(archive, entry: entry, password: password)
         #expect(preview == contents)
+        let prepared = try await ArchivePreparedPreview.prepare(archive, entry: entry, password: password)
+        defer { try? FileManager.default.removeItem(at: prepared.directory) }
+        #expect(prepared.text == "Hello, 世界\n")
+        #expect(try Data(contentsOf: prepared.file) == contents)
+        let permissions = try FileManager.default.attributesOfItem(atPath: prepared.directory.path)[.posixPermissions] as? NSNumber
+        #expect(permissions?.intValue == 0o700)
         #expect(Set(try FileManager.default.contentsOfDirectory(atPath: root.path)) == Set([folder.lastPathComponent, archive.lastPathComponent]))
         #expect(try Data(contentsOf: file) == contents)
         if operation == .encryptedSevenZip {
@@ -80,6 +86,69 @@ struct ArchiveBrowserTests {
         #expect(entries.contains { $0.path == "nested/deep" && $0.isDirectory })
         #expect(entries.filter { $0.normalizedPath == "duplicate.txt" }.count == 1)
         #expect(entries.first { $0.name == "duplicate.txt" }?.canPreview == false)
+    }
+
+    @Test func indexedDirectoryKeepsNaturalOrderAndSearchesNestedPaths() async throws {
+        var entries = (0..<20_000).map {
+            ArchiveEntry(path: "large/file\($0).txt", size: 1, isDirectory: false)
+        }
+        entries += [
+            ArchiveEntry(path: "large/nested/a.txt", size: 1, isDirectory: false),
+            ArchiveEntry(path: "large/file2.txt", size: 2, isDirectory: false),
+        ]
+        let index = try await ArchiveBrowserIndex.build(entries)
+        let children = try #require(index.children["large"])
+        #expect(children.count == 20_001)
+        #expect(children.prefix(4).map(\.name) == ["nested", "file0.txt", "file1.txt", "file2.txt"])
+        #expect(index.byID["large/file2.txt"]?.canPreview == false)
+        #expect(index.children[""]?.map(\.name) == ["large"])
+        let results = try await index.search("nested/a")
+        #expect(results.map(\.path) == ["large/nested/a.txt"])
+        let cancelled = Task { try await index.search("file") }
+        cancelled.cancel()
+        await #expect(throws: CancellationError.self) { try await cancelled.value }
+    }
+
+    @Test @MainActor func rapidNavigationAndSelectionKeepLatestPreview() async throws {
+        let root = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let folder = root.appendingPathComponent("source")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: false)
+        let first = folder.appendingPathComponent("first.txt")
+        let second = folder.appendingPathComponent("second.txt")
+        try Data(repeating: 65, count: 2 * 1_024 * 1_024).write(to: first)
+        try Data("latest selection".utf8).write(to: second)
+        let archive = try await ArchiveService.perform(ArchiveRequest(operation: .zip, urls: [folder]))
+        let model = ArchiveBrowserModel(url: archive)
+        defer { model.close() }
+        model.load()
+        try await waitUntil { !model.loading }
+        #expect(model.error == nil)
+        model.navigate(to: "source")
+        #expect(model.visibleEntries.map(\.name) == ["first.txt", "second.txt"])
+        model.search = "first"
+        model.search = "second"
+        try await waitUntil { model.visibleEntries.map(\.name) == ["second.txt"] }
+        model.search = ""
+        model.selection = "source/first.txt"
+        model.showPreview()
+        model.selection = "source/second.txt"
+        model.showPreview()
+        try await waitUntil { !model.previewing }
+        #expect(model.previewError == nil)
+        #expect(model.previewText == "latest selection")
+        let previewURL = try #require(model.previewURL)
+        #expect(try String(contentsOf: previewURL, encoding: .utf8) == "latest selection")
+        model.close()
+        try await waitUntil { !FileManager.default.fileExists(atPath: previewURL.deletingLastPathComponent().path) }
+    }
+
+    @MainActor private func waitUntil(_ condition: () -> Bool) async throws {
+        let deadline = ContinuousClock.now + .seconds(10)
+        while !condition() {
+            guard ContinuousClock.now < deadline else { throw CocoaError(.fileReadUnknown) }
+            try await Task.sleep(for: .milliseconds(10))
+        }
     }
 
     @Test(arguments: [ArchiveOperation.zip, .tarGzip])

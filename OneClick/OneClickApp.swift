@@ -157,7 +157,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
             // Preload icons for all apps to improve performance
             Task { @MainActor in
-                IconCache.shared.preloadIcons(for: appState.apps.map { $0.url })
+                for url in appState.apps.map(\.url) {
+                    _ = await IconCache.shared.loadIcon(for: url)
+                }
             }
 
             // Register message handlers using type-safe API

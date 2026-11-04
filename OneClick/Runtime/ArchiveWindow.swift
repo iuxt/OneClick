@@ -159,6 +159,8 @@ final class ArchiveViewModel: ObservableObject {
                     self.rows[index].error = AppLocalization.localized("Cancelled")
                 } catch let error as ArchiveError {
                     switch error {
+                    case .sourceDeletionFailed(let output, _):
+                        self.rows[index].output = output
                     case .passwordRequired, .incorrectPassword, .invalidPassword, .invalidZIPPassword:
                         self.rows[index].needsPassword = true
                     default: break
@@ -354,7 +356,7 @@ private struct ArchiveView: View {
     private func archiveRow(_ row: ArchiveViewModel.Row) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .top, spacing: 10) {
-                Image(systemName: row.request.operation == .extract ? "archivebox" : "doc.on.doc")
+                Image(systemName: row.request.operation.isExtraction ? "archivebox" : "doc.on.doc")
                     .font(.title2)
                     .foregroundStyle(.secondary)
                 VStack(alignment: .leading, spacing: 4) {
@@ -365,15 +367,15 @@ private struct ArchiveView: View {
                 }
                 Spacer(minLength: 0)
             }
+            if let error = row.error {
+                Text(error).foregroundStyle(.secondary).textSelection(.enabled)
+            }
             if let output = row.output {
                 Text(output.path).font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
                 Button(AppLocalization.localized("Show in Finder")) {
                     NSWorkspace.shared.activateFileViewerSelecting([output])
                 }
             } else {
-                if let error = row.error {
-                    Text(error).foregroundStyle(.secondary).textSelection(.enabled)
-                }
                 if row.id == pendingRow?.id {
                     Group {
                         if row.needsConfiguration {

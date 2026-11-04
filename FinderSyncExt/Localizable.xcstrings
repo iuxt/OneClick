@@ -246,6 +246,41 @@
         }
       }
     },
+    "Extract and Delete Archive": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Extract and Delete Archive"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "解压并删除压缩包"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "展開してアーカイブを削除"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Extraer y eliminar archivo"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Extraire et supprimer l’archive"
+          }
+        }
+      }
+    },
     "Extract Here": {
       "extractionState": "manual",
       "localizations": {

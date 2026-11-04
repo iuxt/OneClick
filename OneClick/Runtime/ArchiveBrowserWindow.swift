@@ -1,9 +1,7 @@
 import AppKit
 import Combine
-import ImageIO
 import QuickLook
 import SwiftUI
-import UniformTypeIdentifiers
 
 @MainActor
 final class ArchiveBrowserPresenter {
@@ -58,9 +56,12 @@ final class ArchiveBrowserModel: ObservableObject {
     @Published private(set) var previewText: String?
     @Published private(set) var previewImage: NSImage?
     @Published private(set) var previewError: String?
-    @Published var folder = ""
-    @Published var search = ""
+    @Published private(set) var visibleEntries: [ArchiveEntry] = []
+    @Published var folder = "" { didSet { updateVisibleEntries() } }
+    @Published var search = "" { didSet { updateVisibleEntries() } }
     @Published var selection: String?
+    private var index = ArchiveBrowserIndex()
+    private var searchTask: Task<Void, Never>?
     private var password: String?
     private var task: Task<Void, Never>?
     private var previewTask: Task<Void, Never>?
@@ -73,19 +74,29 @@ final class ArchiveBrowserModel: ObservableObject {
         scoped = url.startAccessingSecurityScopedResource()
     }
 
-    var visibleEntries: [ArchiveEntry] {
+    var selectedEntry: ArchiveEntry? { selection.flatMap { index.byID[$0] } }
+
+    private func updateVisibleEntries() {
+        searchTask?.cancel()
+        guard !closed else { return }
         let query = search.trimmingCharacters(in: .whitespacesAndNewlines)
-        return entries.filter {
-            query.isEmpty ? $0.parent == folder : $0.normalizedPath.localizedStandardContains(query)
-        }.sorted {
-            if $0.isDirectory != $1.isDirectory { return $0.isDirectory }
-            return $0.name.localizedStandardCompare($1.name) == .orderedAscending
+        guard !query.isEmpty else {
+            visibleEntries = index.children[folder] ?? []
+            return
+        }
+        let snapshot = index
+        searchTask = Task { [weak self] in
+            do {
+                try await Task.sleep(for: .milliseconds(120))
+                let results = try await snapshot.search(query)
+                try Task.checkCancellation()
+                self?.visibleEntries = results
+            } catch { /* A new query or closing the window cancels stale results. */ }
         }
     }
 
-    var selectedEntry: ArchiveEntry? { entries.first { $0.id == selection } }
-
     func load(password: String? = nil) {
+        guard !closed else { return }
         task?.cancel()
         self.password = password
         error = nil; needsPassword = false; loading = true
@@ -104,9 +115,14 @@ final class ArchiveBrowserModel: ObservableObject {
                 }
                 let listed = try await ArchiveBrowserService.list(url, password: password)
                 try Task.checkCancellation()
-                entries = try Self.directoryEntries(listed)
+                let built = try await ArchiveBrowserIndex.build(listed)
+                try Task.checkCancellation()
+                index = built
+                entries = built.entries
+                updateVisibleEntries()
             } catch is CancellationError { return }
             catch {
+                guard !Task.isCancelled else { return }
                 self.error = error.localizedDescription
                 if let archiveError = error as? ArchiveError,
                    [.passwordRequired, .incorrectPassword, .invalidPassword].contains(archiveError) { needsPassword = true }
@@ -115,9 +131,10 @@ final class ArchiveBrowserModel: ObservableObject {
         }
     }
 
-    static func directoryEntries(_ listed: [ArchiveEntry]) throws -> [ArchiveEntry] {
+    nonisolated static func directoryEntries(_ listed: [ArchiveEntry]) throws -> [ArchiveEntry] {
         var nodes: [String: ArchiveEntry] = [:]
         for entry in listed {
+            try Task.checkCancellation()
             let path = entry.normalizedPath
             guard !path.isEmpty else { continue }
             if var duplicate = nodes[path] {
@@ -127,6 +144,7 @@ final class ArchiveBrowserModel: ObservableObject {
             } else { nodes[path] = entry }
         }
         for entry in Array(nodes.values) {
+            try Task.checkCancellation()
             let parts = entry.normalizedPath.components(separatedBy: "/")
             guard parts.count <= 256 else { throw ArchiveBrowserError.listingTooLarge }
             guard !parts.contains(".."), !parts.contains("") else { continue }
@@ -143,6 +161,7 @@ final class ArchiveBrowserModel: ObservableObject {
     }
 
     func showPreview() {
+        guard !closed else { return }
         previewTask?.cancel()
         previewURL = nil; previewText = nil; previewImage = nil; previewError = nil; previewing = false
         guard let entry = selectedEntry, !entry.isDirectory else { return }
@@ -151,34 +170,20 @@ final class ArchiveBrowserModel: ObservableObject {
         previewTask = Task { [weak self] in
             guard let self else { return }
             do {
-                let data = try await ArchiveBrowserService.preview(url, entry: entry, password: password)
-                try Task.checkCancellation()
-                // Every preview has an isolated directory; names are never taken from an archive path.
-                if let previous = previewDirectory { try? FileManager.default.removeItem(at: previous) }
-                let directory = FileManager.default.temporaryDirectory.appendingPathComponent("oneclick-preview-\(UUID())", isDirectory: true)
-                try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
-                previewDirectory = directory
-                let ext = (entry.name as NSString).pathExtension
-                let safeExtension = ext.count <= 20 && ext.unicodeScalars.allSatisfy(CharacterSet.alphanumerics.contains) ? ext : ""
-                let file = directory.appendingPathComponent("Preview" + (safeExtension.isEmpty ? "" : "." + safeExtension))
-                try data.write(to: file, options: .atomic)
-                previewURL = file
-                let type = UTType(filenameExtension: safeExtension)
-                if type?.conforms(to: .image) == true,
-                   let source = CGImageSourceCreateWithData(data as CFData, nil),
-                   let thumbnail = CGImageSourceCreateThumbnailAtIndex(source, 0, [
-                    kCGImageSourceCreateThumbnailFromImageAlways: true,
-                    kCGImageSourceCreateThumbnailWithTransform: true,
-                    kCGImageSourceThumbnailMaxPixelSize: 1_600,
-                   ] as CFDictionary) {
-                    previewImage = NSImage(cgImage: thumbnail, size: .zero)
+                let prepared = try await ArchivePreparedPreview.prepare(url, entry: entry, password: password)
+                guard !Task.isCancelled else {
+                    await ArchivePreparedPreview.removeDirectory(prepared.directory)
+                    return
                 }
-                if data.count <= 2 * 1_024 * 1_024,
-                   type?.conforms(to: .text) == true || ["md", "json", "yaml", "yml", "swift", "js", "ts", "py", "sh", "log", "csv", "xml", "toml"].contains(safeExtension.lowercased()) {
-                    previewText = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .utf16)
-                }
+                let previous = previewDirectory
+                previewDirectory = prepared.directory
+                previewURL = prepared.file
+                previewText = prepared.text
+                previewImage = prepared.image.map { NSImage(cgImage: $0, size: .zero) }
+                if let previous { Task { await ArchivePreparedPreview.removeDirectory(previous) } }
             } catch is CancellationError { return }
             catch {
+                guard !Task.isCancelled else { return }
                 previewError = error.localizedDescription
                 if let archiveError = error as? ArchiveError,
                    archiveError == .passwordRequired || archiveError == .incorrectPassword { needsPassword = true }
@@ -196,9 +201,9 @@ final class ArchiveBrowserModel: ObservableObject {
     func close() {
         guard !closed else { return }
         closed = true
-        task?.cancel(); previewTask?.cancel()
+        task?.cancel(); previewTask?.cancel(); searchTask?.cancel()
         password = nil
-        if let previewDirectory { try? FileManager.default.removeItem(at: previewDirectory) }
+        if let previewDirectory { Task { await ArchivePreparedPreview.removeDirectory(previewDirectory) } }
         if scoped { url.stopAccessingSecurityScopedResource(); scoped = false }
     }
 }
@@ -316,10 +321,7 @@ private struct ArchiveBrowserView: View {
         } else if let file = model.previewURL {
             VStack(spacing: 16) {
                 if let text = model.previewText {
-                    ScrollView([.horizontal, .vertical]) {
-                        Text(verbatim: text).font(.system(.body, design: .monospaced)).textSelection(.enabled)
-                            .frame(maxWidth: .infinity, alignment: .topLeading).padding(16)
-                    }
+                    ArchiveTextPreview(text: text)
                 } else if let image = model.previewImage {
                     Image(nsImage: image).resizable().scaledToFit().padding(20)
                 } else {
@@ -343,5 +345,45 @@ private struct ArchiveBrowserView: View {
         password = ""
         model.load(password: value)
         model.showPreview()
+    }
+}
+
+/// NSTextView lays out the visible portion of large text previews on demand.
+/// A single SwiftUI Text measures the entire file before drawing its first frame.
+private struct ArchiveTextPreview: NSViewRepresentable {
+    let text: String
+
+    final class Coordinator { var text: String? }
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    func makeNSView(context: Context) -> NSScrollView {
+        let scroll = NSScrollView()
+        scroll.hasVerticalScroller = true
+        scroll.hasHorizontalScroller = true
+        scroll.drawsBackground = false
+        let view = NSTextView(frame: .zero)
+        view.isEditable = false
+        view.isSelectable = true
+        view.isRichText = false
+        view.drawsBackground = false
+        view.font = .monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
+        view.textColor = .labelColor
+        view.textContainerInset = NSSize(width: 16, height: 16)
+        view.isVerticallyResizable = true
+        view.isHorizontallyResizable = true
+        view.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        view.textContainer?.containerSize = view.maxSize
+        view.textContainer?.widthTracksTextView = false
+        view.layoutManager?.allowsNonContiguousLayout = true
+        view.usesFindBar = true
+        scroll.documentView = view
+        return scroll
+    }
+
+    func updateNSView(_ scroll: NSScrollView, context: Context) {
+        guard context.coordinator.text != text, let view = scroll.documentView as? NSTextView else { return }
+        context.coordinator.text = text
+        view.string = text
+        view.scrollToBeginningOfDocument(nil)
     }
 }

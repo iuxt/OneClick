@@ -152,7 +152,7 @@ final class ActionService {
         case "compress-zip-separately":
             guard trigger == "ctx-items" else { return }
             await showArchives(target, operation: .zip, separately: true)
-        case "compress", "compress-zip", "compress-targz", "compress-zip-encrypted", "compress-7z-encrypted", "extract":
+        case "compress", "compress-zip", "compress-targz", "compress-zip-encrypted", "compress-7z-encrypted", "extract", "extract-and-delete":
             guard trigger == "ctx-items", let operation = ArchiveOperation(rawValue: rcitem.id) else { return }
             await showArchives(target, operation: operation)
         default:
@@ -174,7 +174,7 @@ final class ActionService {
             }
         }
         let accessError = AppLocalization.localized("File access was not granted.")
-        if operation == .extract || separately {
+        if operation.isExtraction || separately {
             archives.show(requests: urls.map { url in
                 ArchiveRequest(operation: operation, urls: [url],
                                error: denied.contains(url.deletingLastPathComponent().resolvingSymlinksInPath()) ? accessError : nil)

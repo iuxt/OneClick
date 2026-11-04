@@ -145,7 +145,8 @@ struct ArchiveViewModelTests {
         #expect(model.rows[0].error == nil)
     }
 
-    @Test func passwordRetryPreservesOtherBatchResults() async throws {
+    @Test(arguments: [ArchiveOperation.extract, .extractAndDelete])
+    func passwordRetryPreservesOtherBatchResults(operation: ArchiveOperation) async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("oneclick-password-retry-\(UUID())")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
@@ -155,23 +156,47 @@ struct ArchiveViewModelTests {
         try Data("plain".utf8).write(to: plain)
         let encrypted = try await ArchiveService.perform(ArchiveRequest(operation: .encryptedZip, urls: [locked]), password: "password")
         let regular = try await ArchiveService.perform(ArchiveRequest(operation: .zip, urls: [plain]))
-        let model = ArchiveViewModel(requests: [encrypted, regular].map { ArchiveRequest(operation: .extract, urls: [$0]) })
+        let model = ArchiveViewModel(requests: [encrypted, regular].map { ArchiveRequest(operation: operation, urls: [$0]) })
         model.start()
         try await waitUntilIdle(model)
         #expect(model.rows[0].needsPassword)
+        #expect(FileManager.default.fileExists(atPath: encrypted.path))
         let plainOutput = try #require(model.rows[1].output)
+        #expect(FileManager.default.fileExists(atPath: regular.path) == (operation == .extract))
 
         model.submitPassword(for: 0, password: "wrong")
         try await waitUntilIdle(model)
         #expect(model.rows[0].needsPassword)
         #expect(model.rows[0].output == nil)
         #expect(model.rows[0].error == ArchiveError.incorrectPassword.localizedDescription)
+        #expect(FileManager.default.fileExists(atPath: encrypted.path))
 
         model.submitPassword(for: 0, password: "password")
         try await waitUntilIdle(model)
         #expect(model.rows[0].output != nil)
         #expect(model.rows[0].error == nil)
+        #expect(FileManager.default.fileExists(atPath: encrypted.path) == (operation == .extract))
         #expect(model.rows[1].output == plainOutput)
         #expect(try String(contentsOf: plainOutput.appendingPathComponent("plain.txt"), encoding: .utf8) == "plain")
+    }
+
+    @Test func deletionFailureKeepsExtractedOutputAvailable() async throws {
+        let fm = FileManager.default
+        let root = fm.temporaryDirectory.appendingPathComponent("oneclick-delete-failure-\(UUID())")
+        try fm.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: root) }
+        let source = root.appendingPathComponent("source.txt")
+        try Data("contents".utf8).write(to: source)
+        let archive = try await ArchiveService.perform(ArchiveRequest(operation: .zip, urls: [source]))
+        try fm.setAttributes([.immutable: true], ofItemAtPath: archive.path)
+        defer { try? fm.setAttributes([.immutable: false], ofItemAtPath: archive.path) }
+        let model = ArchiveViewModel(requests: [ArchiveRequest(operation: .extractAndDelete, urls: [archive])])
+        model.start()
+        try await waitUntilIdle(model)
+        let output = try #require(model.rows[0].output)
+        #expect(try Data(contentsOf: output.appendingPathComponent("source.txt")) == Data("contents".utf8))
+        #expect(fm.fileExists(atPath: archive.path))
+        #expect(model.rows[0].error != nil)
+        #expect(!model.rows[0].needsPassword)
     }
 }

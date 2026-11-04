@@ -79,9 +79,7 @@ struct AppsSettingsTabView: View {
                             HStack(spacing: 8) {
                                 Image(systemName: "line.3.horizontal")
                                     .foregroundColor(.secondary)
-                                Image(nsImage: IconCache.shared.icon(for: item.url))
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fit)
+                                SettingsIcon(source: .application(item.url))
                                     .frame(width: 24, height: 24)
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(item.name)
@@ -224,9 +222,7 @@ struct PresetAppsSheetView: View {
         HStack(spacing: 10) {
             Group {
                 if let url = installedURL {
-                    Image(nsImage: IconCache.shared.icon(for: url))
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
+                    SettingsIcon(source: .application(url))
                 } else {
                     Image(systemName: preset.symbol)
                         .foregroundColor(.secondary)

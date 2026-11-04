@@ -16,9 +16,21 @@ enum Tabs: String, CaseIterable, Identifiable {
     case inputMethods = "Input Method Switching"
     case newFile = "New File"
     case cdirs = "Common Dir"
+    case iconStyle = "Icon Style"
     case about = "About"
 
     var id: String { self.rawValue }
+
+    var titleKey: String {
+        self == .archives ? "Archive Tools" : rawValue
+    }
+
+    var sidebarTitleKey: String {
+        switch self {
+        case .archives, .inputMethods: "Settings"
+        default: titleKey
+        }
+    }
 
     var icon: String {
         switch self {
@@ -30,6 +42,7 @@ enum Tabs: String, CaseIterable, Identifiable {
         case .archives: "archivebox"
         case .newFile: "doc.badge.plus"
         case .cdirs: "folder.badge.gearshape"
+        case .iconStyle: "paintpalette"
         case .about: "info.circle"
         }
     }
@@ -40,20 +53,35 @@ struct SettingsView: View {
     @State private var selectedTab: Tabs = .home
     @EnvironmentObject var appState: AppState
 
+    private var tabSelection: Binding<Tabs> {
+        Binding(get: { selectedTab }, set: { tab in
+            // Replacing two large Forms in an animated navigation transaction
+            // forces both layouts through the transition on every sidebar click.
+            var transaction = Transaction(animation: nil)
+            transaction.disablesAnimations = true
+            withTransaction(transaction) { selectedTab = tab }
+        })
+    }
+
     private var sidebar: some View {
         // Use system selection, keyboard navigation and Liquid Glass sidebar chrome.
         // No outer padding or custom background: the column meets the window edges.
-        List(selection: $selectedTab) {
+        List(selection: tabSelection) {
             sidebarRow(.home)
             Section {
-                ForEach([Tabs.actions, .archives, .inputMethods]) { sidebarRow($0) }
+                ForEach([Tabs.actions, .apps, .newFile, .cdirs, .iconStyle]) { sidebarRow($0) }
             } header: {
-                Text(appLocalized: "Tools")
+                Text(appLocalized: "Right-click Tools")
             }
             Section {
-                ForEach([Tabs.apps, .newFile, .cdirs]) { sidebarRow($0) }
+                sidebarRow(.archives)
             } header: {
-                Text(appLocalized: "Finder Settings")
+                Text(appLocalized: "Archive Tools")
+            }
+            Section {
+                sidebarRow(.inputMethods)
+            } header: {
+                Text(appLocalized: "Input Method Switching")
             }
             Section {
                 sidebarRow(.general)
@@ -66,7 +94,7 @@ struct SettingsView: View {
     }
 
     private func sidebarRow(_ tab: Tabs) -> some View {
-        Label(AppLocalization.localized(tab == .actions ? "Right-click Tools" : tab.rawValue), systemImage: tab.icon)
+        Label(AppLocalization.localized(tab.sidebarTitleKey), systemImage: tab.icon)
             .symbolRenderingMode(.monochrome)
             .tag(tab)
     }
@@ -76,7 +104,7 @@ struct SettingsView: View {
         Group {
             switch self.selectedTab {
             case .home:
-                ToolboxHomeView { selectedTab = $0 }
+                ToolboxHomeView { tabSelection.wrappedValue = $0 }
             case .inputMethods:
                 InputMethodSettingsView()
             case .general:
@@ -91,6 +119,8 @@ struct SettingsView: View {
                 NewFileSettingsTabView()
             case .cdirs:
                 CommonDirsSettingTabView()
+            case .iconStyle:
+                IconStyleSettingsView()
             case .about:
                 AboutSettingsTabView()
             }
@@ -104,10 +134,12 @@ struct SettingsView: View {
             self.sidebar
         } detail: {
             self.detailView
-                .navigationTitle(AppLocalization.localized(selectedTab == .actions ? "Right-click Tools" : selectedTab.rawValue))
+                .navigationTitle(AppLocalization.localized(selectedTab.titleKey))
                 .toolbar {
-                    ToolbarItem(placement: .primaryAction) {
-                        ArchiveLaunchControls(presentation: .toolbar)
+                    if selectedTab == .home || selectedTab == .archives {
+                        ToolbarItem(placement: .primaryAction) {
+                            ArchiveLaunchControls(presentation: .toolbar)
+                        }
                     }
                 }
         }

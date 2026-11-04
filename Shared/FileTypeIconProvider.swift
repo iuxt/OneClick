@@ -19,6 +19,7 @@ final class FileTypeIconProvider: @unchecked Sendable {
 
     /// 内存缓存: [扩展名: NSImage]
     private var cache: [String: NSImage] = [:]
+    private var resolvedWorkspaceIcons: Set<String> = []
 
     private init() {}
 
@@ -39,7 +40,7 @@ final class FileTypeIconProvider: @unchecked Sendable {
         let cleanExt = ext.hasPrefix(".") ? String(ext.dropFirst()) : ext
 
         // 1. 系统 App 图标（优先）
-        if let icon = workspaceIcon(for: cleanExt) {
+        if !resolvedWorkspaceIcons.contains(ext), let icon = workspaceIcon(for: cleanExt) {
             cache[ext] = icon
             return icon
         }
@@ -67,6 +68,26 @@ final class FileTypeIconProvider: @unchecked Sendable {
     /// 清除缓存（菜单配置更新时调用）
     func clearCache() {
         cache.removeAll()
+        resolvedWorkspaceIcons.removeAll()
+    }
+
+    func loadIcon(for ext: String, fallbackSymbol: String = "doc") async -> NSImage? {
+        if let cached = cache[ext] { return cached }
+        if !resolvedWorkspaceIcons.contains(ext) {
+            let cleanExt = ext.hasPrefix(".") ? String(ext.dropFirst()) : ext
+            let image = await Self.loadWorkspaceIcon(for: cleanExt)
+            resolvedWorkspaceIcons.insert(ext)
+            if cache[ext] == nil, let image {
+                cache[ext] = image.resized(to: NSSize(width: iconSize, height: iconSize))
+            }
+        }
+        return icon(for: ext, fallbackSymbol: fallbackSymbol)
+    }
+
+    @concurrent
+    nonisolated private static func loadWorkspaceIcon(for ext: String) async -> NSImage? {
+        let icon = NSWorkspace.shared.icon(for: UTType(filenameExtension: ext) ?? .data)
+        return icon === NSWorkspace.shared.icon(for: .data) ? nil : icon
     }
 
     /// 后台预热：批量计算扩展名对应的工作区图标（UTType + NSWorkspace 查询，首次很贵）。

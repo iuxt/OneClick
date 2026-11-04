@@ -238,15 +238,33 @@ final class ActionServiceTests {
         #expect(archives.requests.first?.error == nil)
     }
 
-    @Test func unrelatedArchivePermissionDoesNotAllowExtraction() async {
+    @Test(arguments: [ArchiveOperation.extract, .extractAndDelete])
+    func unrelatedArchivePermissionDoesNotAllowExtraction(operation: ArchiveOperation) async {
         let permission = MockPermission()
         permission.promptResult = URL(fileURLWithPath: "/unrelated")
         let archives = MockArchives()
         let service = ActionService(state: MockState(), permission: permission, confirmation: MockConfirmation(), archives: archives)
-        await service.showArchives(["/tmp/a.zip", "/tmp/b.tar.gz"], operation: .extract)
+        await service.showArchives(["/tmp/a.zip", "/tmp/b.tar.gz"], operation: operation)
         #expect(permission.promptCalls.count == 1)
         #expect(archives.requests.count == 2)
         #expect(archives.requests.allSatisfy { $0.error != nil })
+    }
+
+    @Test func extractAndDeleteDispatchesEachArchiveOnlyFromSelectionMenus() async {
+        let permission = MockPermission()
+        permission.hasAccessResult = true
+        let archives = MockArchives()
+        let state = MockState()
+        state.actions = [.extractAndDelete]
+        let service = ActionService(state: state, permission: permission, confirmation: MockConfirmation(), archives: archives)
+        let target = ["/tmp/literal%20.zip", "/tmp/other.7z"]
+        for trigger in ["ctx-container", "toolbar", "ctx-sidebar"] {
+            await service.actionHandler(rid: "extract-and-delete", target: target, trigger: trigger)
+            #expect(archives.requests.isEmpty)
+        }
+        await service.actionHandler(rid: "extract-and-delete", target: target, trigger: "ctx-items")
+        #expect(archives.requests.map(\.urls) == target.map { [URL(fileURLWithPath: $0)] })
+        #expect(archives.requests.allSatisfy { $0.operation == .extractAndDelete && $0.error == nil })
     }
 
     @Test func checksumActionKeepsLiteralPercentPathsAndRequestsPermission() async {

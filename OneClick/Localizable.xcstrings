@@ -4236,6 +4236,76 @@
         }
       }
     },
+    "Extract and Delete Archive": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Extract and Delete Archive"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "解压并删除压缩包"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "展開してアーカイブを削除"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Extraer y eliminar archivo"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Extraire et supprimer l’archive"
+          }
+        }
+      }
+    },
+    "Extraction completed, but the archive could not be deleted.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Extraction completed, but the archive could not be deleted."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "解压已完成，但无法删除原压缩包。"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "展開は完了しましたが、アーカイブを削除できませんでした。"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La extracción se completó, pero no se pudo eliminar el archivo."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L’extraction est terminée, mais l’archive n’a pas pu être supprimée."
+          }
+        }
+      }
+    },
     "Extract Here": {
       "extractionState": "manual",
       "localizations": {

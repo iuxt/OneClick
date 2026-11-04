@@ -3,6 +3,43 @@ import Testing
 @testable import OneClick
 
 struct ArchiveServiceTests {
+    @Test(arguments: [ArchiveOperation.zip, .sevenZip, .tarGzip, .encryptedZip, .encryptedSevenZip])
+    func extractAndDeleteRemovesOnlyTheSuccessfullyExtractedArchive(operation: ArchiveOperation) async throws {
+        let root = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = root.appendingPathComponent("literal%20.txt")
+        let contents = Data("keep extracted contents".utf8)
+        try contents.write(to: source)
+        let password = operation.isEncryptedCompression ? "test-password" : nil
+        let archive = try await ArchiveService.perform(ArchiveRequest(operation: operation, urls: [source]), password: password)
+        let unrelated = root.appendingPathComponent("unrelated.zip")
+        try Data("keep original".utf8).write(to: unrelated)
+        let output = try await ArchiveService.perform(ArchiveRequest(operation: .extractAndDelete, urls: [archive]), password: password)
+        #expect(try Data(contentsOf: output.appendingPathComponent(source.lastPathComponent)) == contents)
+        #expect(!FileManager.default.fileExists(atPath: archive.path))
+        #expect(try Data(contentsOf: source) == contents)
+        #expect(try Data(contentsOf: unrelated) == Data("keep original".utf8))
+    }
+
+    @Test func failedOrCancelledExtractionPreservesArchive() async throws {
+        let root = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let archive = root.appendingPathComponent("broken.zip")
+        let contents = Data("not an archive".utf8)
+        try contents.write(to: archive)
+        let request = ArchiveRequest(operation: .extractAndDelete, urls: [archive])
+        await #expect(throws: (any Error).self) {
+            try await ArchiveService.perform(request)
+        }
+        let progress = ArchiveProgress()
+        progress.cancel()
+        await #expect(throws: CancellationError.self) {
+            try await ArchiveService.perform(request, progress: progress)
+        }
+        #expect(try Data(contentsOf: archive) == contents)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: root.path) == ["broken.zip"])
+    }
+
     @Test(arguments: [ArchiveOperation.zip, .sevenZip, .encryptedZip, .encryptedSevenZip])
     func splitVolumesRespectSizeAndRoundTrip(operation: ArchiveOperation) async throws {
         let root = try temporaryDirectory()

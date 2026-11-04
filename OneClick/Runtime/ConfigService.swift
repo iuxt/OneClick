@@ -51,7 +51,15 @@ final class ConfigService {
 
         // Actions
         let actionDescriptor = FetchDescriptor<ActionEntity>(sortBy: [SortDescriptor(\.sortOrder)])
-        data.actions = (try? modelContext.fetch(actionDescriptor))?.map { entity in
+        let savedActions = (try? modelContext.fetch(actionDescriptor)) ?? []
+        // Password protection is configured in Compress…; retire the standalone shortcuts.
+        let retiredActionIDs: Set<String> = ["compress-zip-encrypted", "compress-7z-encrypted"]
+        var changedActions = false
+        for entity in savedActions where retiredActionIDs.contains(entity.id) {
+            modelContext.delete(entity)
+            changedActions = true
+        }
+        data.actions = savedActions.filter { !retiredActionIDs.contains($0.id) }.map { entity in
             RCAction(
                 id: entity.id,
                 name: entity.name,
@@ -59,19 +67,18 @@ final class ConfigService {
                 idx: entity.sortOrder,
                 icon: entity.icon
             )
-        } ?? []
+        }
 
         // Append newly introduced actions once, preserving saved ordering and
         // disabled choices on subsequent loads.
-        let newActions: [RCAction] = [.checksum, .compressZip, .compressTarGzip, .extract, .compressEncryptedZip, .compressEncryptedSevenZip, .compress, .compressZipSeparately]
-        var addedActions = false
+        let newActions: [RCAction] = [.checksum, .compressZip, .compressTarGzip, .extract, .compress, .compressZipSeparately, .extractAndDelete]
         for var action in newActions where !data.actions.isEmpty && !data.actions.contains(where: { $0.id == action.id }) {
             action.idx = (data.actions.map(\.idx).max() ?? -1) + 1
             data.actions.append(action)
             modelContext.insert(ActionEntity(from: action))
-            addedActions = true
+            changedActions = true
         }
-        if addedActions {
+        if changedActions {
             do {
                 try modelContext.save()
             } catch {

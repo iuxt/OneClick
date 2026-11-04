@@ -56,10 +56,9 @@ final class ActionEntity {
             ActionEntity(id: "compress-zip", name: "Compress to ZIP", icon: "archivebox", isEnabled: true, sortOrder: 6),
             ActionEntity(id: "compress-targz", name: "Compress to TAR.GZ", icon: "archivebox", isEnabled: true, sortOrder: 7),
             ActionEntity(id: "extract", name: "Extract Here", icon: "shippingbox", isEnabled: true, sortOrder: 8),
-            ActionEntity(id: "compress-zip-encrypted", name: "Compress to Encrypted ZIP…", icon: "lock.doc", isEnabled: true, sortOrder: 9),
-            ActionEntity(id: "compress-7z-encrypted", name: "Compress to Encrypted 7Z…", icon: "lock.doc", isEnabled: true, sortOrder: 10),
-            ActionEntity(id: "compress", name: "Compress…", icon: "archivebox", isEnabled: true, sortOrder: 11),
-            ActionEntity(id: "compress-zip-separately", name: "Compress to Separate ZIPs", icon: "archivebox", isEnabled: true, sortOrder: 12),
+            ActionEntity(id: "compress", name: "Compress…", icon: "archivebox", isEnabled: true, sortOrder: 9),
+            ActionEntity(id: "compress-zip-separately", name: "Compress to Separate ZIPs", icon: "archivebox", isEnabled: true, sortOrder: 10),
+            ActionEntity(id: "extract-and-delete", name: "Extract and Delete Archive", icon: "shippingbox", isEnabled: true, sortOrder: 11),
         ]
     }
 }

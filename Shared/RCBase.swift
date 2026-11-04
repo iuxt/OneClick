@@ -210,7 +210,7 @@ struct RCAction: @MainActor RCBase {
 
 extension RCAction {
 
-    nonisolated static let archiveIDs: Set<String> = ["compress", "compress-zip", "compress-zip-separately", "compress-targz", "compress-zip-encrypted", "compress-7z-encrypted", "extract"]
+    nonisolated static let archiveIDs: Set<String> = ["compress", "compress-zip", "compress-zip-separately", "compress-targz", "compress-zip-encrypted", "compress-7z-encrypted", "extract", "extract-and-delete"]
     var isArchive: Bool { Self.archiveIDs.contains(id) }
 
     static let copyPath = RCAction(id: "copy-path", name: "Copy Path", enabled: true, idx: 0, icon: "doc.on.doc")
@@ -222,12 +222,14 @@ extension RCAction {
     static let compressZip = RCAction(id: "compress-zip", name: "Compress to ZIP", idx: 6, icon: "archivebox")
     static let compressTarGzip = RCAction(id: "compress-targz", name: "Compress to TAR.GZ", idx: 7, icon: "archivebox")
     static let extract = RCAction(id: "extract", name: "Extract Here", idx: 8, icon: "shippingbox")
+    // Retained for legacy action dispatch; excluded from the available menu actions.
     static let compressEncryptedZip = RCAction(id: "compress-zip-encrypted", name: "Compress to Encrypted ZIP…", idx: 9, icon: "lock.doc")
     static let compressEncryptedSevenZip = RCAction(id: "compress-7z-encrypted", name: "Compress to Encrypted 7Z…", idx: 10, icon: "lock.doc")
-    static let compress = RCAction(id: "compress", name: "Compress…", idx: 11, icon: "archivebox")
-    static let compressZipSeparately = RCAction(id: "compress-zip-separately", name: "Compress to Separate ZIPs", idx: 12, icon: "archivebox")
+    static let compress = RCAction(id: "compress", name: "Compress…", idx: 9, icon: "archivebox")
+    static let compressZipSeparately = RCAction(id: "compress-zip-separately", name: "Compress to Separate ZIPs", idx: 10, icon: "archivebox")
+    static let extractAndDelete = RCAction(id: "extract-and-delete", name: "Extract and Delete Archive", idx: 11, icon: "shippingbox")
 
-    static let all: [RCAction] = [.copyPath, .deleteDirect, .airdrop, .hideFileDir, .unhideFileDir, .checksum, .compressZip, .compressTarGzip, .extract, .compressEncryptedZip, .compressEncryptedSevenZip, .compress, .compressZipSeparately]
+    static let all: [RCAction] = [.copyPath, .deleteDirect, .airdrop, .hideFileDir, .unhideFileDir, .checksum, .compressZip, .compressTarGzip, .extract, .compress, .compressZipSeparately, .extractAndDelete]
 }
 
 // New File Type
@@ -421,6 +423,7 @@ extension RCAction {
         case "compress": return AppLocalization.localized("Compress…")
         case "compress-targz": return AppLocalization.localized("Compress to TAR.GZ")
         case "extract": return AppLocalization.localized("Extract Here")
+        case "extract-and-delete": return AppLocalization.localized("Extract and Delete Archive")
         case "compress-zip-encrypted": return AppLocalization.localized("Compress to Encrypted ZIP…")
         case "compress-7z-encrypted": return AppLocalization.localized("Compress to Encrypted 7Z…")
         default: return name

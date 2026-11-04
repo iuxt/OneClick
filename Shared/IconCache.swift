@@ -34,6 +34,21 @@ public class IconCache {
         return icon
     }
 
+    /// Settings rows must not block their first layout on LaunchServices or disk.
+    public func loadIcon(for url: URL) async -> NSImage {
+        if let cached = memoryCache[url.path] { return cached }
+        let image = await Self.workspaceIcon(for: url)
+        if let cached = memoryCache[url.path] { return cached }
+        image.size = iconSize
+        memoryCache[url.path] = image
+        return image
+    }
+
+    @concurrent
+    nonisolated private static func workspaceIcon(for url: URL) async -> NSImage {
+        NSWorkspace.shared.icon(forFile: url.path)
+    }
+
     /// 预加载图标
     /// - Parameter urls: 需要预加载的 URL 列表
     public func preloadIcons(for urls: [URL]) {
