@@ -23,6 +23,38 @@ final class BookmarkManager: ObservableObject {
     /// 当前已授权并激活访问的目录
     @Published var authorizedDirectories: [URL] = []
 
+    private struct ActiveGrant {
+        let scopedURL: URL
+        let directory: URL
+    }
+    private var activeGrants: [String: ActiveGrant] = [:]
+    private var context: ModelContext?
+    private let startAccess: (URL) -> Bool
+    private let stopAccess: (URL) -> Void
+    private let resolve: (Data) throws -> (URL, Bool)
+
+    init(context: ModelContext? = nil,
+         startAccess: @escaping (URL) -> Bool = { $0.startAccessingSecurityScopedResource() },
+         stopAccess: @escaping (URL) -> Void = { $0.stopAccessingSecurityScopedResource() },
+         resolve: @escaping (Data) throws -> (URL, Bool) = { data in
+             var stale = false
+             let url = try URL(resolvingBookmarkData: data, options: .withSecurityScope,
+                               relativeTo: nil, bookmarkDataIsStale: &stale)
+             return (url, stale)
+         }) {
+        self.context = context
+        self.startAccess = startAccess
+        self.stopAccess = stopAccess
+        self.resolve = resolve
+    }
+
+    private var persistenceContext: ModelContext {
+        if let context { return context }
+        let context = ModelContext(SharedDataManager.sharedModelContainer)
+        self.context = context
+        return context
+    }
+
     private var isPrompting = false
 
     private let logger = Logger(
@@ -34,59 +66,33 @@ final class BookmarkManager: ObservableObject {
 
     /// 从 SwiftData 恢复所有 bookmark 并 startAccessing
     func restoreBookmarks(context: ModelContext) {
-        let descriptor = FetchDescriptor<BookmarkEntity>()
-        guard let entities = try? context.fetch(descriptor) else { return }
-
-        for entity in entities {
-            // 解析失败不代表用户撤销了授权：卷暂时不可用、系统服务异常或
-            // 签名变化都可能导致失败。保留原始书签，供后续启动重试。
-            let url: URL
-            var isStale = false
+        self.context = context
+        guard let entities = try? context.fetch(FetchDescriptor<BookmarkEntity>()) else { return }
+        for entity in entities where activeGrants[entity.id] == nil {
             do {
-                url = try URL(
-                    resolvingBookmarkData: entity.bookmarkData,
-                    options: .withSecurityScope,
-                    relativeTo: nil,
-                    bookmarkDataIsStale: &isStale
-                )
+                let (url, stale) = try resolve(entity.bookmarkData)
+                guard startAccess(url) else { continue }
+                let normalized = url.resolvingSymlinksInPath()
+                activeGrants[entity.id] = ActiveGrant(scopedURL: url, directory: normalized)
+                if stale {
+                    // Keep the old bookmark if refreshing fails; access is still active.
+                    if let data = try? url.bookmarkData(options: .withSecurityScope,
+                                                       includingResourceValuesForKeys: nil, relativeTo: nil) {
+                        entity.bookmarkData = data
+                    }
+                }
+                entity.pathString = normalized.path
+                if !authorizedDirectories.contains(normalized) { authorizedDirectories.append(normalized) }
             } catch {
+                // An unavailable volume or changed signature is not a revocation.
                 logger.error("恢复 bookmark 失败，保留记录供下次重试：\(entity.pathString) — \(error.localizedDescription)")
-                continue
             }
-
-            if isStale {
-                // 刷新 bookmark
-                guard url.startAccessingSecurityScopedResource() else {
-                    logger.warning("无法访问 bookmark（startAccessing 失败，可能是外置盘未挂载，跳过不删）：\(entity.pathString)")
-                    continue
-                }
-                do {
-                    let newData = try url.bookmarkData(
-                        options: .withSecurityScope,
-                        includingResourceValuesForKeys: nil,
-                        relativeTo: nil
-                    )
-                    entity.bookmarkData = newData
-                } catch {
-                    logger.error("刷新 bookmark 失败，保留旧数据：\(entity.pathString) — \(error.localizedDescription)")
-                }
-                url.stopAccessingSecurityScopedResource()
-            }
-
-            // startAccessing 失败 = 临时不可达（外置盘未挂载等），不立即删，下次启动再试
-            guard url.startAccessingSecurityScopedResource() else {
-                logger.warning("无法访问 bookmark（startAccessing 失败，跳过不删）：\(entity.pathString)")
-                continue
-            }
-
-            let normalized = url.resolvingSymlinksInPath()
-            if !authorizedDirectories.contains(normalized) {
-                authorizedDirectories.append(normalized)
-            }
-            logger.debug("已恢复 bookmark：\(entity.pathString)")
         }
-        try? context.save()
-        logger.info("Bookmark 恢复完成：\(self.authorizedDirectories.count) 个目录")
+        do { try context.save() }
+        catch {
+            context.rollback()
+            logger.error("保存 bookmark 路径失败：\(error.localizedDescription)")
+        }
     }
 
     // MARK: - 访问检查
@@ -152,55 +158,48 @@ final class BookmarkManager: ObservableObject {
 
     /// 保存目录的 security-scoped bookmark
     func saveBookmark(for url: URL) {
+        let normalized = url.resolvingSymlinksInPath()
+        guard !activeGrants.values.contains(where: { $0.directory == normalized }) else { return }
+        let context = persistenceContext
+        var started = false
         do {
-            let bookmarkData = try url.bookmarkData(
-                options: .withSecurityScope,
-                includingResourceValuesForKeys: nil,
-                relativeTo: nil
-            )
-
-            guard url.startAccessingSecurityScopedResource() else {
-                logger.error("startAccessing 失败：\(url.path)")
-                return
-            }
-
-            let normalized = url.resolvingSymlinksInPath()
-            if !authorizedDirectories.contains(normalized) {
-                authorizedDirectories.append(normalized)
-            }
-
-            let entity = BookmarkEntity(bookmarkData: bookmarkData, pathString: url.path)
-            let context = ModelContext(SharedDataManager.sharedModelContainer)
+            let data = try url.bookmarkData(options: .withSecurityScope,
+                                           includingResourceValuesForKeys: nil, relativeTo: nil)
+            guard startAccess(url) else { return }
+            started = true
+            let entity = BookmarkEntity(bookmarkData: data, pathString: normalized.path)
             context.insert(entity)
             try context.save()
-
-            logger.debug("已保存 bookmark：\(url.path)")
+            activeGrants[entity.id] = ActiveGrant(scopedURL: url, directory: normalized)
+            if !authorizedDirectories.contains(normalized) { authorizedDirectories.append(normalized) }
         } catch {
+            context.rollback()
+            if started { stopAccess(url) }
             logger.error("保存 bookmark 失败：\(url.path) — \(error.localizedDescription)")
         }
     }
 
-    /// 移除某个目录的 bookmark
+    /// Delete by the stable IDs of resolved bookmarks, including duplicate grants.
+    /// Commit first so a failed save cannot silently restore permission next launch.
     func removeDirectory(_ url: URL) {
         let normalized = url.resolvingSymlinksInPath()
-        authorizedDirectories.removeAll { $0.resolvingSymlinksInPath() == normalized }
-
-        // 停止访问
-        normalized.stopAccessingSecurityScopedResource()
-
-        // 从 SwiftData 删除
-        let context = ModelContext(SharedDataManager.sharedModelContainer)
-        let path = normalized.path
-        let descriptor = FetchDescriptor<BookmarkEntity>(
-            predicate: #Predicate { $0.pathString == path }
-        )
-        if let entities = try? context.fetch(descriptor) {
-            for entity in entities {
+        let ids = Set(activeGrants.filter { $0.value.directory == normalized }.map(\.key))
+        let context = persistenceContext
+        do {
+            let entities = try context.fetch(FetchDescriptor<BookmarkEntity>())
+            for entity in entities where ids.contains(entity.id)
+                || URL(fileURLWithPath: entity.pathString).resolvingSymlinksInPath() == normalized {
                 context.delete(entity)
             }
-            try? context.save()
+            try context.save()
+            for id in ids {
+                if let grant = activeGrants.removeValue(forKey: id) { stopAccess(grant.scopedURL) }
+            }
+            authorizedDirectories.removeAll { $0 == normalized }
+        } catch {
+            context.rollback()
+            logger.error("移除 bookmark 失败：\(error.localizedDescription)")
         }
-        logger.debug("已移除 bookmark：\(path)")
     }
 
     // MARK: - 设置页工具

@@ -220,6 +220,7 @@ struct EditFileTypeSheetView: View {
         saveError = nil
         defer { isSaving = false }
         do {
+            let normalizedExtension = try FileCreationPolicy.normalizedExtension(ext)
             let savedTemplate: URL?
             if let template {
                 guard let templatesDir else { throw CocoaError(.fileNoSuchFile) }
@@ -237,7 +238,7 @@ struct EditFileTypeSheetView: View {
                 ? NewFile(ext: ext, name: name, idx: appState.newFiles.count, icon: icon)
                 : file
             updated.name = name
-            updated.ext = ext
+            updated.ext = normalizedExtension
             updated.icon = icon
             updated.openApp = openApp
             updated.template = savedTemplate

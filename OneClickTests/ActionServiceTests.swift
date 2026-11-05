@@ -163,7 +163,7 @@ final class ActionServiceTests {
         #expect(archives.requests.first?.operation == .compress)
     }
 
-    @Test func silentExtractionWritesContentsWithoutPresentingWindows() async throws {
+    @Test func browserExtractionWritesContentsWithoutPresentingAnotherWindow() async throws {
         let fm = FileManager.default
         let root = fm.temporaryDirectory.appendingPathComponent("oneclick-silent-extract-\(UUID())")
         try fm.createDirectory(at: root, withIntermediateDirectories: true)
@@ -177,25 +177,27 @@ final class ActionServiceTests {
         let archives = MockArchives()
         let service = ActionService(state: MockState(), permission: permission, confirmation: MockConfirmation(), archives: archives)
 
-        let output = try #require(await service.extractArchiveSilently(archive))
+        let output = try await service.extractArchive(archive)
         #expect(try Data(contentsOf: output.appendingPathComponent(source.lastPathComponent)) == contents)
         #expect(fm.fileExists(atPath: archive.path))
         #expect(permission.promptCalls.isEmpty)
         #expect(archives.requests.isEmpty)
 
-        let failed = await service.extractArchiveSilently(root.appendingPathComponent("missing.zip"))
-        #expect(failed == nil)
+        await #expect(throws: (any Error).self) {
+            try await service.extractArchive(root.appendingPathComponent("missing.zip"))
+        }
         #expect(permission.promptCalls.isEmpty)
         #expect(archives.requests.isEmpty)
     }
 
-    @Test func silentExtractionDoesNotPromptForMissingPermission() async {
+    @Test func browserExtractionPromptsAndReportsMissingPermission() async {
         let permission = MockPermission()
         let archives = MockArchives()
         let service = ActionService(state: MockState(), permission: permission, confirmation: MockConfirmation(), archives: archives)
-        let output = await service.extractArchiveSilently(URL(fileURLWithPath: "/tmp/denied/archive.zip"))
-        #expect(output == nil)
-        #expect(permission.promptCalls.isEmpty)
+        await #expect(throws: CocoaError.self) {
+            try await service.extractArchive(URL(fileURLWithPath: "/tmp/denied/archive.zip"))
+        }
+        #expect(permission.promptCalls.count == 1)
         #expect(archives.requests.isEmpty)
     }
 

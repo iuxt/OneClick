@@ -51,7 +51,7 @@ class AppState: ObservableObject, ActionStateProviding {
     // 这里曾有一份重复声明，没有任何地方读它；两份 store 不同，留着就是个陷阱。
 
     /// 配置持久化服务
-    let configService = ConfigService()
+    let configService: ConfigService
 
     /// Layout toggles that used to live in `UserDefaults.standard`.
     ///
@@ -81,15 +81,14 @@ class AppState: ObservableObject, ActionStateProviding {
         }
     }
 
-    init(inExt: Bool = false) {
+    init(inExt: Bool = false, configService: ConfigService? = nil) {
+        self.configService = configService ?? ConfigService()
         // Before anything reads the switches above.
         Self.migrateLayoutToggles(from: .standard, to: .group)
         self.inExt = inExt
-        Task { @MainActor in
-            logger.debug("start load")
-            refresh()
-            bookmarkManager.restoreBookmarks(context: configService.modelContext)
-        }
+        // SharedDataManager commits defaults before exposing its container.
+        refresh()
+        bookmarkManager.restoreBookmarks(context: ModelContext(self.configService.modelContext.container))
     }
 
     // MARK: - Apps

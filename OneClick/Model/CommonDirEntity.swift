@@ -14,6 +14,7 @@ final class CommonDirEntity {
     @Attribute(.unique) var id: String
     var name: String
     var pathString: String
+    var pathEncodingVersion: Int = 0
     var icon: String
     var sortOrder: Int
     var isEnabled: Bool
@@ -28,7 +29,8 @@ final class CommonDirEntity {
          isEnabled: Bool = true) {
         self.id = id
         self.name = name
-        self.pathString = path.path()
+        self.pathString = path.path
+        self.pathEncodingVersion = 1
         self.icon = icon
         self.sortOrder = sortOrder
         self.isEnabled = isEnabled
@@ -38,11 +40,29 @@ final class CommonDirEntity {
 
     var path: URL {
         get {
-            URL(fileURLWithPath: pathString)
+            URL(fileURLWithPath: pathEncodingVersion == 0 ? (pathString.removingPercentEncoding ?? pathString) : pathString)
         }
         set {
-            pathString = newValue.path()
+            pathString = newValue.path
+            pathEncodingVersion = 1
         }
+    }
+
+    /// Decode old URL.path() storage exactly once, then repair only untouched
+    /// built-in shortcuts that still point into this app's sandbox home.
+    @discardableResult
+    func migratePath(sandboxHome: URL = FileManager.default.homeDirectoryForCurrentUser,
+                     realHome: URL = SharedAppGroup.realHomeDirectory) -> Bool {
+        guard pathEncodingVersion == 0 else { return false }
+        path = self.path
+        let suffixes = ["home": "", "desktop": "Desktop", "documents": "Documents", "downloads": "Downloads"]
+        if sandboxHome.pathComponents != realHome.pathComponents, let suffix = suffixes[id] {
+            let old = suffix.isEmpty ? sandboxHome : sandboxHome.appendingPathComponent(suffix)
+            if path.standardizedFileURL.pathComponents == old.standardizedFileURL.pathComponents {
+                path = suffix.isEmpty ? realHome : realHome.appendingPathComponent(suffix)
+            }
+        }
+        return true
     }
 
     /// 从 CommonDir 转换
@@ -56,11 +76,9 @@ final class CommonDirEntity {
     }
 
     // 预定义常用目录的工厂方法
-    static func createDefaultCommonDirs() -> [CommonDirEntity] {
-        let fileManager = FileManager.default
+    static func createDefaultCommonDirs(homeDir: URL = SharedAppGroup.realHomeDirectory) -> [CommonDirEntity] {
         var dirs: [CommonDirEntity] = []
 
-        let homeDir = fileManager.homeDirectoryForCurrentUser
         let desktop = homeDir.appendingPathComponent("Desktop")
         let documents = homeDir.appendingPathComponent("Documents")
         let downloads = homeDir.appendingPathComponent("Downloads")

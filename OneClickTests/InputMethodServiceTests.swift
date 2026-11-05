@@ -31,7 +31,7 @@ struct InputMethodServiceTests {
         let defaults = try #require(UserDefaults(suiteName: name))
         defer { defaults.removePersistentDomain(forName: name) }
         let provider = FakeInputMethods()
-        let service = InputMethodService(defaults: defaults, provider: provider)
+        let service = InputMethodService(defaults: defaults, provider: provider, secureInputEnabled: { false })
         service.update { $0.enabled = true; $0.rules = [InputMethodRule(bundleID: "editor", name: "Editor", sourceID: "chinese")] }
         service.activate(bundleID: "editor")
         service.activate(bundleID: "unconfigured")
@@ -41,7 +41,7 @@ struct InputMethodServiceTests {
         try await Task.sleep(for: .milliseconds(350))
         #expect(provider.selected == ["chinese"])
         service.stop()
-        let restored = InputMethodService(defaults: defaults, provider: provider)
+        let restored = InputMethodService(defaults: defaults, provider: provider, secureInputEnabled: { false })
         #expect(restored.configuration.enabled)
         #expect(restored.configuration.target(for: "editor") == "chinese")
     }
@@ -51,10 +51,23 @@ struct InputMethodServiceTests {
         let defaults = try #require(UserDefaults(suiteName: name))
         defer { defaults.removePersistentDomain(forName: name) }
         let provider = FakeInputMethods()
-        let service = InputMethodService(defaults: defaults, provider: provider)
+        let service = InputMethodService(defaults: defaults, provider: provider, secureInputEnabled: { false })
         service.update { $0.defaultSourceID = "chinese" }
         service.activate(bundleID: "editor")
         try await Task.sleep(for: .milliseconds(300))
+        #expect(provider.selected.isEmpty)
+        service.stop()
+    }
+
+    @Test func secureInputPreventsSwitching() async throws {
+        let name = "oneclick-input-secure-\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: name))
+        defer { defaults.removePersistentDomain(forName: name) }
+        let provider = FakeInputMethods()
+        let service = InputMethodService(defaults: defaults, provider: provider, secureInputEnabled: { true })
+        service.update { $0.enabled = true; $0.defaultSourceID = "chinese" }
+        service.activate(bundleID: "editor")
+        try await Task.sleep(for: .milliseconds(350))
         #expect(provider.selected.isEmpty)
         service.stop()
     }

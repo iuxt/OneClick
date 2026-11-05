@@ -90,11 +90,13 @@ class SharedDataManager {
         // The test host launches the app too. Its startup must never restore or
         // mutate folder grants from the user's real database.
         if ProcessInfo.processInfo.environment["ONECLICK_TESTING"] == "1" {
-            return try ModelContainer(
+            let container = try ModelContainer(
                 for: AppEntity.self, ActionEntity.self, NewFileTypeEntity.self,
                      CommonDirEntity.self, BookmarkEntity.self, DataVersion.self,
                 configurations: ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
             )
+            try initializeDefaultData(context: ModelContext(container))
+            return container
         }
         // 开发者构建使用 App Group，本地构建使用单独授权的数据目录。
         guard let containerURL = SharedAppGroup.containerURL else {
@@ -112,7 +114,8 @@ class SharedDataManager {
         // 创建 ModelContainer，注册所有模型
         do {
             try FileManager.default.createDirectory(at: containerURL, withIntermediateDirectories: true)
-            return try ModelContainer(
+            let existed = FileManager.default.fileExists(atPath: storeURL.path)
+            let container = try ModelContainer(
                 for: AppEntity.self,
                      ActionEntity.self,
                      NewFileTypeEntity.self,
@@ -121,58 +124,42 @@ class SharedDataManager {
                      DataVersion.self,
                 configurations: configuration
             )
+            try initializeDefaultData(context: ModelContext(container), isExistingStore: existed)
+            return container
         } catch {
             logger.error("打开共享 ModelContainer 失败: \(error)")
             throw SharedStoreError.storeUnreadable(url: storeURL, underlying: error)
         }
     }
 
-    /// 初始化默认数据
-    static func initializeDefaultData(context: ModelContext) async {
-        // 检查是否已有数据
-        let actionDescriptor = FetchDescriptor<ActionEntity>()
-        let actionCount = try? context.fetchCount(actionDescriptor)
+    static let defaultsVersionKey = "default-configuration-initialized"
 
-        if actionCount == 0 {
-            // 插入默认动作
-            for action in ActionEntity.createDefaultActions() {
-                context.insert(action)
+    /// The marker and seed rows commit together. An existing store (including a
+    /// deliberately empty legacy store) must never be repopulated on launch.
+    static func initializeDefaultData(context: ModelContext, isExistingStore: Bool = false) throws {
+        let key = defaultsVersionKey
+        guard try context.fetchCount(FetchDescriptor<DataVersion>(predicate: #Predicate { $0.key == key })) == 0 else { return }
+        let hasData = try context.fetchCount(FetchDescriptor<AppEntity>()) > 0
+            || context.fetchCount(FetchDescriptor<ActionEntity>()) > 0
+            || context.fetchCount(FetchDescriptor<NewFileTypeEntity>()) > 0
+            || context.fetchCount(FetchDescriptor<CommonDirEntity>()) > 0
+            || context.fetchCount(FetchDescriptor<BookmarkEntity>()) > 0
+        do {
+            try context.transaction {
+                if !isExistingStore && !hasData {
+                    for action in ActionEntity.createDefaultActions() { context.insert(action) }
+                    for file in NewFileTypeEntity.createDefaultFileTypes() { context.insert(file) }
+                    for (index, app) in OpenWithApp.defaultApps.enumerated() {
+                        context.insert(AppEntity(from: app, sortOrder: index))
+                    }
+                    for directory in CommonDirEntity.createDefaultCommonDirs() { context.insert(directory) }
+                }
+                context.insert(DataVersion(key: key, version: 1))
+                try context.save()
             }
-            Self.logger.info("已初始化默认动作")
+        } catch {
+            context.rollback()
+            throw error
         }
-
-        let fileTypeDescriptor = FetchDescriptor<NewFileTypeEntity>()
-        let fileTypeCount = try? context.fetchCount(fileTypeDescriptor)
-
-        if fileTypeCount == 0 {
-            // 插入默认文件类型
-            for fileType in NewFileTypeEntity.createDefaultFileTypes() {
-                context.insert(fileType)
-            }
-            Self.logger.info("已初始化默认文件类型")
-        }
-
-        let appDescriptor = FetchDescriptor<AppEntity>()
-        let appCount = try? context.fetchCount(appDescriptor)
-
-        if appCount == 0 {
-            for app in OpenWithApp.defaultApps {
-                context.insert(AppEntity(from: app))
-            }
-            Self.logger.info("已初始化默认应用")
-        }
-
-        let commonDirDescriptor = FetchDescriptor<CommonDirEntity>()
-        let commonDirCount = try? context.fetchCount(commonDirDescriptor)
-
-        if commonDirCount == 0 {
-            // 插入默认常用目录
-            for dir in CommonDirEntity.createDefaultCommonDirs() {
-                context.insert(dir)
-            }
-            Self.logger.info("已初始化默认常用目录")
-        }
-
-        try? context.save()
     }
 }

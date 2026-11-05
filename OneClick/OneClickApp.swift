@@ -143,13 +143,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // 迁移旧的"开机登录"设置（修复前该开关只写入 UserDefaults，未真正注册登录项）
         migrateLegacyLaunchAtLoginSetting()
 
-        // 执行数据迁移
+        // 数据已在 bootstrap 中初始化；注册通信并预加载图标。
         Task { @MainActor [weak self] in
             guard let self = self else { return }
-
-            // 初始化默认数据
-            let context = ModelContext(SharedDataManager.sharedModelContainer)
-            await SharedDataManager.initializeDefaultData(context: context)
 
             // Preload icons for all apps to improve performance
             Task { @MainActor in

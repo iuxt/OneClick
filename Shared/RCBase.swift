@@ -269,12 +269,12 @@ extension NewFile {
     static let json = NewFile(ext: ".json", name: "JSON", enabled: false, idx: 0, icon: "curlybraces", id: "json")
     static let txt = NewFile(ext: ".txt", name: "TXT", idx: 1, icon: "doc.text", id: "txt")
     static let md = NewFile(ext: ".md", name: "Markdown", idx: 2, icon: "doc.richtext", id: "md")
-    static let docx = NewFile(ext: ".docx", name: "DOCX", idx: 3, icon: "doc.richtext.fill", id: "docx")
-    static let pptx = NewFile(ext: ".pptx", name: "PPTX", idx: 4, icon: "rectangle.on.rectangle.fill", id: "pptx")
+    static let docx = NewFile(ext: ".docx", name: "DOCX", enabled: false, idx: 3, icon: "doc.richtext.fill", id: "docx")
+    static let pptx = NewFile(ext: ".pptx", name: "PPTX", enabled: false, idx: 4, icon: "rectangle.on.rectangle.fill", id: "pptx")
     static let xlsx = NewFile(ext: ".xlsx", name: "XLSX", idx: 5, icon: "tablecells", id: "xlsx")
-    static let pages = NewFile(ext: ".pages", name: "Pages", idx: 6, icon: "doc.richtext", id: "pages")
-    static let key = NewFile(ext: ".key", name: "Keynote", idx: 7, icon: "rectangle.on.rectangle", id: "key")
-    static let numbers = NewFile(ext: ".numbers", name: "Numbers", idx: 8, icon: "tablecells", id: "numbers")
+    static let pages = NewFile(ext: ".pages", name: "Pages", enabled: false, idx: 6, icon: "doc.richtext", id: "pages")
+    static let key = NewFile(ext: ".key", name: "Keynote", enabled: false, idx: 7, icon: "rectangle.on.rectangle", id: "key")
+    static let numbers = NewFile(ext: ".numbers", name: "Numbers", enabled: false, idx: 8, icon: "tablecells", id: "numbers")
 }
 
 extension NewFile {

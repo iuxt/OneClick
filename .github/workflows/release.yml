@@ -43,6 +43,9 @@ jobs:
           fi
           swift --version
 
+      - name: Verify Sandbox IPC Entitlements
+        run: python3 scripts/test-local-ipc.py
+
       - name: Get Version from Tag
         id: version
         run: |
@@ -86,21 +89,7 @@ jobs:
       - name: Ad-hoc Sign App and Finder Extension
         run: |
           # 保留沙盒；无证书构建改用单独授权的数据目录，不申请 App Group。
-          python3 - "$BUILD_DIR/Signing" <<'PYTHON'
-          import pathlib
-          import plistlib
-          import sys
-
-          output = pathlib.Path(sys.argv[1])
-          output.mkdir(parents=True, exist_ok=True)
-          for name in ("OneClick", "FinderSyncExt"):
-              entitlements = plistlib.loads(pathlib.Path(name, f"{name}.entitlements").read_bytes())
-              entitlements.pop("com.apple.security.application-groups", None)
-              entitlements["com.apple.security.temporary-exception.files.home-relative-path.read-write"] = [
-                  "/Library/Application Support/RClickLocal/"
-              ]
-              (output / f"{name}.entitlements").write_bytes(plistlib.dumps(entitlements))
-          PYTHON
+          python3 scripts/local-entitlements.py "$PWD" "$BUILD_DIR/Signing"
 
           EXT_PATH="$APP_PATH/Contents/PlugIns/${EXTENSION_NAME}.appex"
           rm -f "$APP_PATH/Contents/embedded.provisionprofile" "$EXT_PATH/Contents/embedded.provisionprofile"

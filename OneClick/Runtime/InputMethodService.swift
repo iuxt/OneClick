@@ -102,15 +102,18 @@ final class InputMethodService: ObservableObject {
     @Published private(set) var error: String?
     private let defaults: UserDefaults
     private let provider: any InputMethodProviding
+    private let secureInputEnabled: () -> Bool
     private var activeBundleID: String?
     private var activationTask: Task<Void, Never>?
     private var sourceTask: Task<Void, Never>?
     private var switchingTask: Task<Void, Never>?
     private var switching = false
 
-    init(defaults: UserDefaults = .group, provider: any InputMethodProviding = SystemInputMethodProvider()) {
+    init(defaults: UserDefaults = .group, provider: any InputMethodProviding = SystemInputMethodProvider(),
+         secureInputEnabled: @escaping () -> Bool = { IsSecureEventInputEnabled() }) {
         self.defaults = defaults
         self.provider = provider
+        self.secureInputEnabled = secureInputEnabled
         if let data = defaults.data(forKey: Self.storageKey) {
             do { configuration = try JSONDecoder().decode(InputMethodConfiguration.self, from: data) }
             catch {
@@ -186,7 +189,7 @@ final class InputMethodService: ObservableObject {
 
     private func sourceChanged() {
         refresh()
-        guard configuration.enabled, configuration.remember, !switching, !IsSecureEventInputEnabled(),
+        guard configuration.enabled, configuration.remember, !switching, !secureInputEnabled(),
               NSWorkspace.shared.frontmostApplication?.bundleIdentifier == activeBundleID,
               let id = activeBundleID, let source = currentSourceID,
               !configuration.rules.contains(where: { $0.bundleID == id }),
@@ -223,7 +226,7 @@ final class InputMethodService: ObservableObject {
             // A bounded read-back handles input methods that report success before switching.
             for _ in 0..<3 {
                 guard !Task.isCancelled, self.activeBundleID == bundleID else { return }
-                if IsSecureEventInputEnabled() { return }
+                if secureInputEnabled() { return }
                 if self.provider.currentID() == target { self.refresh(); return }
                 guard self.provider.select(target) else {
                     self.error = AppLocalization.localized("The selected input method is unavailable. Enable it in System Settings.")

@@ -32,9 +32,11 @@ no extra networking permissions for this arrangement.
 
 Local (`RC_LOCAL_BUILD`) builds keep the sandbox and use the existing
 `Library/Application Support/RClickLocal` directory. Its existing file-access
-exception alone does not allow a socket bind. The local installer therefore
-adds a development-only SBPL exception for this installation's exact `ipc.sock`
-path: bind/outbound for the host, outbound for the extension. This uses the local
+exception alone does not allow a socket bind. Both the local installer and the
+release workflow use `scripts/local-entitlements.py` to add an SBPL exception for
+the exact `ipc.sock` path: bind/outbound for the host, outbound for the extension.
+The rule uses `home-literal`, resolved relative to the recipient's real home at
+launch, so release artifacts never embed the CI runner's home path. This uses the local
 macOS sandbox's temporary-exception mechanism; it is not included in provisioned
 or App Store entitlements. It grants no TCP listener or general network access.
 The socket is mode 0600 and its parent is shared only as an endpoint location,
@@ -49,6 +51,9 @@ version never reads, replaces or deletes it.
 host restart/reconnection, rejection before dispatch and preservation of a
 pre-existing regular file at the endpoint path. `IPCEnvelopeTests` verifies
 freshness, direction, replay and legacy-envelope rejection. A separate real
-sandboxed, ad-hoc-signed integration harness exercises bidirectional code
-validation and rejects a third executable's attempted command without
-retrieving credentials or requesting Keychain authorization.
+sandboxed, ad-hoc-signed integration harness (`python3 scripts/test-local-ipc.py`)
+uses the production transport and entitlement generator to exercise bidirectional
+code validation. A negative control verifies that file-access permission alone
+cannot bind the socket. It uses disposable bundles and a separate socket directory,
+and never launches the installed app or accesses its settings. The release workflow
+runs this check before building the artifact.

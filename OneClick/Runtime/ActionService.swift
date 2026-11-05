@@ -167,20 +167,15 @@ final class ActionService {
         }
     }
 
-    /// The archive browser's Extract All action must never present another window.
-    @discardableResult
-    func extractArchiveSilently(_ url: URL, password: String? = nil) async -> URL? {
-        let parent = url.deletingLastPathComponent().resolvingSymlinksInPath()
-        guard permission.hasAccess(to: parent) else {
-            logger.error("Background extraction skipped: folder access was not granted for \(parent.path)")
-            return nil
+    /// The browser owns progress and errors; only folder authorization uses a panel.
+    func extractArchive(_ url: URL, password: String? = nil) async throws -> URL {
+        let parent = await FileActionWorker.resolveDirectory(url.deletingLastPathComponent())
+        var decisions: [URL: Bool] = [:]
+        guard await authorize(parent, decisions: &decisions) else {
+            throw CocoaError(.fileWriteNoPermission)
         }
-        do {
-            return try await ArchiveService.perform(ArchiveRequest(operation: .extract, urls: [url]), password: password)
-        } catch {
-            logger.error("Background extraction failed for \(url.path): \(error.localizedDescription)")
-            return nil
-        }
+        try Task.checkCancellation()
+        return try await ArchiveService.perform(ArchiveRequest(operation: .extract, urls: [url]), password: password)
     }
 
     func showChecksums(_ target: [String]) async {
@@ -351,7 +346,8 @@ final class ActionService {
         } else {
             guard let item = state.getFileType(rid: rid) else { return }
             ext = item.ext
-            template = item.template ?? Bundle.main.url(forResource: "template", withExtension: ext.trimmingCharacters(in: CharacterSet(charactersIn: ".")))
+            let suffix = (try? FileCreationPolicy.normalizedExtension(ext))?.dropFirst().lowercased()
+            template = item.template ?? suffix.flatMap { Bundle.main.url(forResource: "template", withExtension: $0) }
         }
         let activity = FileActionActivity()
         do {

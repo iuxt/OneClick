@@ -117,9 +117,9 @@ nonisolated enum FileActionWorker {
 
     @concurrent
     static func create(in directory: URL, extension ext: String, template: URL?, baseName: String) async throws -> URL {
-        // Reject separators rather than accidentally creating files outside the chosen folder.
-        guard !ext.contains("/"), !ext.contains("\\"), !ext.contains("\0") else {
-            throw CocoaError(.fileWriteInvalidFileName)
+        let ext = try FileCreationPolicy.normalizedExtension(ext)
+        if template == nil && FileCreationPolicy.requiresTemplate(ext) {
+            throw FileCreationPolicy.Failure.templateRequired
         }
         for counter in 0..<100_000 {
             let name = baseName + (counter == 0 ? "" : String(counter)) + ext

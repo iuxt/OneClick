@@ -39,12 +39,18 @@ nonisolated enum SharedAppGroup {
     // folder permissions remain available after the product rename.
     static let identifier = "group.cn.wflixu.RClick"
 
+    static let realHomeDirectory: URL = {
+        guard let home = getpwuid(getuid())?.pointee.pw_dir else {
+            return FileManager.default.homeDirectoryForCurrentUser
+        }
+        return URL(fileURLWithPath: String(cString: home), isDirectory: true)
+    }()
+
     /// 本地签名无法获得 App Group 授权，改用双方明确获准访问的普通目录。
     /// getpwuid 返回真实用户目录；沙盒内的 homeDirectoryForCurrentUser 指向应用容器。
     static var containerURL: URL? {
 #if RC_LOCAL_BUILD
-        guard let home = getpwuid(getuid())?.pointee.pw_dir else { return nil }
-        return URL(fileURLWithPath: String(cString: home), isDirectory: true)
+        return realHomeDirectory
             .appendingPathComponent("Library/Application Support/RClickLocal", isDirectory: true)
 #else
         return FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: identifier)

@@ -1,6 +1,76 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+  "Extracting…": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Extracting…"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "正在解压…"
+        }
+      },
+      "ja": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "展開中…"
+        }
+      },
+      "es": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Extrayendo…"
+        }
+      },
+      "fr": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Extraction…"
+        }
+      }
+    }
+  },
+  "This file type requires a template. Choose a valid template in New File settings.": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "This file type requires a template. Choose a valid template in New File settings."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "此文件类型需要模板。请在“新建文件”设置中选择有效的模板。"
+        }
+      },
+      "ja": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "このファイル形式にはテンプレートが必要です。「新規ファイル」設定で有効なテンプレートを選択してください。"
+        }
+      },
+      "es": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Este tipo de archivo requiere una plantilla. Selecciona una plantilla válida en los ajustes de Nuevo archivo."
+        }
+      },
+      "fr": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Ce type de fichier nécessite un modèle. Choisissez un modèle valide dans les réglages Nouveau fichier."
+        }
+      }
+    }
+  },
   "No Application Rules": {
     "extractionState": "manual",
     "localizations": {

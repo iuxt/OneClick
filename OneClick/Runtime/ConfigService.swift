@@ -117,6 +117,7 @@ final class ConfigService {
         let commonDirDescriptor = FetchDescriptor<CommonDirEntity>(sortBy: [SortDescriptor(\.sortOrder)])
         var needSaveCommonDirs = false
         data.commonDirs = (try? modelContext.fetch(commonDirDescriptor))?.map { entity in
+            if entity.migratePath() { needSaveCommonDirs = true }
             let resolvedIcon: String
             if entity.icon == "folder" || entity.icon.isEmpty {
                 let newIcon = iconForDirectory(url: entity.path)
@@ -199,7 +200,8 @@ final class ConfigService {
                 }) { entity, directory, index in
                     var changed = false
                     self.assign(entity, \.name, directory.name, changed: &changed)
-                    self.assign(entity, \.pathString, directory.url.path(), changed: &changed)
+                    self.assign(entity, \.pathString, directory.url.path, changed: &changed)
+                    self.assign(entity, \.pathEncodingVersion, 1, changed: &changed)
                     self.assign(entity, \.icon, directory.icon, changed: &changed)
                     self.assign(entity, \.sortOrder, index, changed: &changed)
                     if changed { entity.updatedAt = Date() }

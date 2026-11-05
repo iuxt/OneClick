@@ -317,7 +317,7 @@ struct ArchiveBrowserTests {
         }
     }
 
-    @Test @MainActor func extractAllClosesBrowserAndKeepsPasswordForBackgroundWork() async throws {
+    @Test @MainActor func extractAllKeepsBrowserOpenUntilSuccessAndPassesPassword() async throws {
         let root = try temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
         let file = root.appendingPathComponent("notes.txt")
@@ -328,26 +328,27 @@ struct ArchiveBrowserTests {
         var closed = false
         var extractionCount = 0
         var output: URL?
-        var extractionError: Error?
         let model = ArchiveBrowserModel(url: archive) { url, capturedPassword in
-            #expect(closed)
+            #expect(!closed)
             #expect(url == archive)
             #expect(capturedPassword == password)
             extractionCount += 1
-            do {
-                output = try await ArchiveService.perform(ArchiveRequest(operation: .extract, urls: [url]), password: capturedPassword)
-            } catch { extractionError = error }
+            let result = try await ArchiveService.perform(ArchiveRequest(operation: .extract, urls: [url]), password: capturedPassword)
+            output = result
+            return result
         }
         defer { model.close() }
         model.load(password: password)
         try await waitUntil { !model.loading }
         #expect(model.error == nil)
         model.extract { closed = true }
+        #expect(!closed)
+        #expect(model.extracting)
+        model.extract { Issue.record("An active extraction must not run twice") }
+        try await waitUntil { !model.extracting }
         #expect(closed)
-        model.close()
+        #expect(model.extractionError == nil)
         model.extract { Issue.record("A closed browser must not extract twice") }
-        try await waitUntil { output != nil || extractionError != nil }
-        #expect(extractionError == nil)
         #expect(extractionCount == 1)
         let extracted = try #require(output)
         #expect(try Data(contentsOf: extracted.appendingPathComponent(file.lastPathComponent)) == contents)

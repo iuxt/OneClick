@@ -74,10 +74,13 @@ final class ArchiveBrowserModel: ObservableObject {
     private var previewDirectory: URL?
     private var scoped = false
     private var closed = false
-    private let extractArchive: @MainActor (URL, String?) async -> Void
+    @Published private(set) var extracting = false
+    @Published private(set) var extractionError: String?
+    private var extractionTask: Task<Void, Never>?
+    private let extractArchive: @MainActor (URL, String?) async throws -> URL
 
-    init(url: URL, extractArchive: @escaping @MainActor (URL, String?) async -> Void = { url, password in
-        await RCRuntime.shared.actionService.extractArchiveSilently(url, password: password)
+    init(url: URL, extractArchive: @escaping @MainActor (URL, String?) async throws -> URL = { url, password in
+        try await RCRuntime.shared.actionService.extractArchive(url, password: password)
     }) {
         self.url = url
         self.extractArchive = extractArchive
@@ -226,22 +229,34 @@ final class ArchiveBrowserModel: ObservableObject {
 
     func navigate(to path: String) { selection = nil; folder = path; search = ""; showPreview() }
 
-    func extract(closeWindow: () -> Void) {
-        guard !closed else { return }
-        // Keep the extraction independent of browser teardown, which cancels
-        // listing/preview tasks and clears the browser's password.
-        let url = self.url
-        let password = self.password
-        let extractArchive = self.extractArchive
-        close()
-        closeWindow()
-        Task { await extractArchive(url, password) }
+    func extract(closeWindow: @escaping () -> Void) {
+        guard !closed, !extracting else { return }
+        extracting = true
+        extractionError = nil
+        extractionTask = Task {
+            defer { extracting = false }
+            do {
+                _ = try await extractArchive(url, password)
+                try Task.checkCancellation()
+                close()
+                closeWindow()
+            } catch is CancellationError {
+                // Closing the browser cancels extraction and its temporary output.
+            } catch {
+                guard !closed else { return }
+                extractionError = error.localizedDescription
+                if let archiveError = error as? ArchiveError,
+                   [.passwordRequired, .incorrectPassword, .invalidPassword].contains(archiveError) {
+                    needsPassword = true
+                }
+            }
+        }
     }
 
     func close() {
         guard !closed else { return }
         closed = true
-        task?.cancel(); previewTask?.cancel(); searchTask?.cancel()
+        task?.cancel(); previewTask?.cancel(); searchTask?.cancel(); extractionTask?.cancel()
         password = nil
         if let previewDirectory { Task { await ArchivePreparedPreview.removeDirectory(previewDirectory) } }
         if scoped { url.stopAccessingSecurityScopedResource(); scoped = false }
@@ -267,9 +282,15 @@ private struct ArchiveBrowserView: View {
                 Spacer()
                 Button(AppLocalization.localized("Extract All…"), systemImage: "arrow.down.doc") { model.extract(closeWindow: close) }
                     .buttonStyle(.borderedProminent)
-                    .disabled(model.loading)
+                    .disabled(model.loading || model.extracting)
             }.padding(20)
             Divider()
+            if model.extracting {
+                ProgressView(AppLocalization.localized("Extracting…")).padding(12)
+            }
+            if let error = model.extractionError {
+                Label(error, systemImage: "exclamationmark.triangle").foregroundStyle(.red).padding(12)
+            }
             if model.needsPassword {
                 HStack {
                     Image(systemName: "lock.fill").foregroundStyle(.secondary)
