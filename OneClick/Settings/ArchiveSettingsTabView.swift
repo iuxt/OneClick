@@ -4,6 +4,7 @@ import SwiftUI
 struct ArchiveSettingsTabView: View {
     @Environment(\.isSettingsPageActive) private var isActive
     @EnvironmentObject var appState: AppState
+    @State private var confirmingReset = false
     @AppStorage("archiveCompressionFormat", store: .group) private var format: ArchiveCompressionFormat = .zip
     @AppStorage("archiveCompressionLevel", store: .group) private var level: ArchiveCompressionLevel = .normal
     @AppStorage("archiveCompressionThreads", store: .group) private var threadCount = 0
@@ -72,22 +73,37 @@ struct ArchiveSettingsTabView: View {
                 ActionSettingsList(archives: true)
             } header: {
                 Text(appLocalized: "Context Menu")
-            } footer: {
+            }
+            Section {
                 HStack {
                     Spacer()
-                    Button(AppLocalization.localized("Restore Defaults")) {
-                        format = .zip
-                        level = .normal
-                        threadCount = 0
-                        excludeFiles = false
-                        exclusionList = ArchiveCompressionSettings.defaultExclusionList
-                        appState.foldArchivesMenu = false
-                        appState.resetActionItems(archives: true)
+                    Button(AppLocalization.localized("Reset Archive Settings…")) {
+                        confirmingReset = true
                     }
                 }
+            } footer: {
+                Text(appLocalized: "Resets compression options, exclusion rules and archive menu settings. File associations are kept.")
             }
         }
         .formStyle(.grouped)
+        .confirmationDialog(
+            AppLocalization.localized("Restore Archive Defaults?"),
+            isPresented: $confirmingReset,
+            titleVisibility: .visible
+        ) {
+            Button(AppLocalization.localized("Reset"), role: .destructive) {
+                format = .zip
+                level = .normal
+                threadCount = 0
+                excludeFiles = false
+                exclusionList = ArchiveCompressionSettings.defaultExclusionList
+                appState.foldArchivesMenu = false
+                appState.resetActionItems(archives: true)
+            }
+            Button(AppLocalization.localized("Cancel"), role: .cancel) {}
+        } message: {
+            Text(appLocalized: "Resets compression options, exclusion rules and archive menu settings. File associations are kept.")
+        }
         .onChange(of: isActive, initial: true) {
             guard isActive else { return }
             threadCount = min(max(0, threadCount), ArchiveCompressionSettings.maximumThreadCount)

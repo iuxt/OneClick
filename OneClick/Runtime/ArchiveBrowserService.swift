@@ -20,6 +20,8 @@ nonisolated struct ArchiveEntry: Identifiable, Equatable, Sendable {
     let isDirectory: Bool
     var isLink = false
     var encrypted = false
+    var modifiedDate: Date? = nil
+    var createdDate: Date? = nil
 
     var normalizedPath: String {
         var result = path
@@ -75,6 +77,23 @@ nonisolated enum ArchiveBrowserService {
     static func parseSevenZipListing(_ listing: String) throws -> [ArchiveEntry] {
         var entries: [ArchiveEntry] = []
         var fields: [String: String] = [:]
+        // 7-Zip prints entry times in the local time zone, with optional
+        // fractional seconds. Missing times are common (especially creation).
+        let dateFormatter = DateFormatter()
+        dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+        dateFormatter.calendar = Calendar(identifier: .gregorian)
+        dateFormatter.timeZone = .current
+        dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        dateFormatter.isLenient = false
+        func date(_ text: String?) -> Date? {
+            guard let text, !text.isEmpty else { return nil }
+            let parts = text.split(separator: ".", maxSplits: 1, omittingEmptySubsequences: false)
+            guard parts[0].count == 19, let base = dateFormatter.date(from: String(parts[0])) else { return nil }
+            guard parts.count == 2 else { return base }
+            guard !parts[1].isEmpty, parts[1].allSatisfy({ $0.isASCII && $0.isNumber }),
+                  let fraction = Double("0." + parts[1]) else { return nil }
+            return base.addingTimeInterval(fraction)
+        }
         func finish() throws {
             guard !fields.isEmpty else { return }
             guard let path = fields["Path"], let sizeText = fields["Size"], let size = Int64(sizeText), size >= 0 else {
@@ -85,7 +104,9 @@ nonisolated enum ArchiveBrowserService {
                                         isDirectory: fields["Folder"] == "+" || fields["Attributes"]?.hasPrefix("D") == true,
                                         isLink: fields["Symbolic Link"] != nil || fields["Hard Link"] != nil
                                             || fields["Attributes"]?.contains("lrwx") == true,
-                                        encrypted: fields["Encrypted"] == "+"))
+                                        encrypted: fields["Encrypted"] == "+",
+                                        modifiedDate: date(fields["Modified"]),
+                                        createdDate: date(fields["Created"])))
             fields = [:]
         }
         for line in listing.components(separatedBy: "\n") {

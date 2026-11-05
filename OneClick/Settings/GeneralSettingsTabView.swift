@@ -72,8 +72,12 @@ struct GeneralSettingsTabView: View {
                 // 辅助功能权限（行标签跟随系统设置的实际叫法：
                 // macOS 26 前叫"辅助功能"，27 起叫"设备控制和数据访问"）
                 LabeledContent {
-                    Button(AppLocalization.localized("Settings…")) {
-                        openAccessibilitySettings()
+                    HStack(spacing: 8) {
+                        Text(accessibilityStatus.description)
+                            .foregroundStyle(.secondary)
+                        Button(AppLocalization.localized("Settings…")) {
+                            openAccessibilitySettings()
+                        }
                     }
                 } label: {
                     Label(SystemSettingsNaming.accessibilitySection, systemImage: accessibilityStatus.icon)

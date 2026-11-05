@@ -32,13 +32,25 @@ struct EditFileTypeSheetView: View {
 
     let messager = Messager.shared
 
-    private let iconToSF: [String: String] = [
+    private static let legacyIconSymbols: [String: String] = [
         "icon-file-json": "curlybraces",
         "icon-file-txt": "doc.text",
         "icon-file-md": "doc.richtext",
         "icon-file-docx": "doc.richtext.fill",
         "icon-file-pptx": "rectangle.on.rectangle.fill",
         "icon-file-xlsx": "tablecells",
+        "document": "doc",
+    ]
+
+    private static let iconChoices = [
+        (symbol: "doc", title: "Document Icon"),
+        (symbol: "doc.text", title: "Text Icon"),
+        (symbol: "doc.richtext", title: "Rich Text Icon"),
+        (symbol: "curlybraces", title: "Data Icon"),
+        (symbol: "chevron.left.forwardslash.chevron.right", title: "Code Icon"),
+        (symbol: "tablecells", title: "Table Icon"),
+        (symbol: "photo", title: "Image Icon"),
+        (symbol: "doc.zipper", title: "Archive Icon"),
     ]
 
     let templatesDir: URL? = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?
@@ -49,7 +61,7 @@ struct EditFileTypeSheetView: View {
         self.appState = appState
         _name = State(initialValue: file.name)
         _ext = State(initialValue: file.ext)
-        _icon = State(initialValue: file.icon)
+        _icon = State(initialValue: Self.legacyIconSymbols[file.icon] ?? file.icon)
         _openApp = State(initialValue: file.openApp)
         _template = State(initialValue: file.template)
     }
@@ -115,27 +127,24 @@ struct EditFileTypeSheetView: View {
                 }
 
                 Section {
-                    TextField(AppLocalization.localized("SF Symbol Name"), text: $icon)
-                        .textFieldStyle(.roundedBorder)
-
-                    if !icon.isEmpty {
-                        HStack {
-                            Text(appLocalized: "Preview:")
-                            if let preview = FileTypeIconProvider.shared.icon(for: ext, fallbackSymbol: icon) {
-                                Image(nsImage: preview)
-                                    .resizable()
-                                    .frame(width: 20, height: 20)
-                            } else {
-                                Image(systemName: "doc")
-                                    .resizable()
-                                    .frame(width: 20, height: 20)
-                            }
+                    Picker(AppLocalization.localized("Fallback Icon"), selection: $icon) {
+                        if !Self.iconChoices.contains(where: { $0.symbol == icon }) {
+                            Text(appLocalized: "Current Icon").tag(icon)
                         }
+                        ForEach(Self.iconChoices, id: \.symbol) { choice in
+                            Label(AppLocalization.localized(choice.title), systemImage: choice.symbol)
+                                .tag(choice.symbol)
+                        }
+                    }
+                    LabeledContent(AppLocalization.localized("Menu Preview")) {
+                        SettingsIcon(source: openApp.map { .application($0) } ?? .fileType(ext, fallback: icon))
+                            .frame(width: 24, height: 24)
+                            .accessibilityHidden(true)
                     }
                 } header: {
                     Text(appLocalized: "Icon")
                 } footer: {
-                    Text(appLocalized: "Enter an SF Symbol name, for example doc.text or curlybraces")
+                    Text(appLocalized: "Uses the chosen app’s icon or the file type’s system icon automatically. The fallback icon is used when neither is available.")
                         .foregroundColor(.secondary)
                 }
 

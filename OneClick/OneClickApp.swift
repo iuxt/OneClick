@@ -27,8 +27,6 @@ struct OneClickApp: App {
 
     @AppStorage(Key.showMenuBarExtra, store: .group) private var showMenuBarExtra = true
 
-    @Environment(\.openWindow) var openWindow
-
     @AppLog(category: "main")
     private var logger
     let messager = Messager.shared
@@ -47,15 +45,13 @@ struct OneClickApp: App {
             .environmentObject(updateManager)
             .modelContainer(SharedDataManager.sharedModelContainer)
 
-        // showMenuBarExtra 为 true 时显示菜单条。label 必须用自定义视图
-        // （MenuBarExtraLabel）：openSettingsRequested 的订阅挂在那里，默认的
-        // 字符串+图片标签里没有我们的代码可挂。
+        // SettingsWindow receives open/reopen requests independently of this icon.
         MenuBarExtra(
             isInserted: $showMenuBarExtra
         ) {
             MenuBarView()
         } label: {
-            MenuBarExtraLabel()
+            Image("MenuBar")
         }
         .defaultAppStorage(.group)
     }
@@ -210,8 +206,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// 用户在 App 已运行时再次打开（Finder 双击 / `open` 命令）：launch 流程不会
     /// 重跑，applicationDidFinishLaunching 不再执行——这正是"App 明明开着，
     /// 再点一次却什么都没发生"的原因。这里把它转成与首次手动启动一致的行为：
-    /// 调出设置窗口。订阅方是 MenuBarExtra 的标签视图（MenuBarExtraLabel），
-    /// 它从启动起就存在。
+    /// 调出设置窗口。订阅方由 SettingsWindow scene 持有，不依赖菜单栏图标。
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         // 提示点击落在「App 已在运行 / 正在退出收尾」的窗口里时，系统忽略
         // RC_QUIET_LAUNCH 环境变量、只派发 reopen——时间戳是识别这种点击的唯一

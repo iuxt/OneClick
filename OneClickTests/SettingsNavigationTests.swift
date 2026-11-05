@@ -6,6 +6,21 @@ import Testing
 
 @MainActor
 struct SettingsNavigationTests {
+    @Test func settingsRequestsAreDeliveredWithoutMountedViews() async throws {
+        // No MenuBarExtra or settings content is mounted. The Scene's receiver
+        // must still deliver every manual launch/reopen request.
+        let center = NotificationCenter()
+        let requests = SettingsWindowRequests(center: center)
+        for expected in 1...3 {
+            center.post(name: .openSettingsRequested, object: nil)
+            for _ in 0..<50 {
+                if requests.generation == expected { break }
+                try await Task.sleep(for: .milliseconds(10))
+            }
+            #expect(requests.generation == expected)
+        }
+    }
+
     @Test func navigationRetainsPageStateAndOnlyActivatesTheSelectedPage() async throws {
         let model = NavigationProbe()
         let host = NSHostingView(rootView: NavigationHarness(model: model))

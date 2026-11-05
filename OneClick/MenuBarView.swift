@@ -25,18 +25,19 @@ func showSettingsWindow(openWindow: OpenWindowAction) {
     NSApplication.shared.activate(ignoringOtherApps: true)
 }
 
-/// MenuBarExtra 的标签视图。菜单栏图标从 App 启动第一刻就常驻渲染，这个视图
-/// 连同它对 `openSettingsRequested` 的订阅从启动早期就存在；而 MenuBarExtra 的
-/// 内容视图（MenuBarView）要等用户第一次点开菜单才构建——启动期的"打开设置"
-/// 请求（手动 open 的 applicationDidFinishLaunching、已运行时的 reopen）只能
-/// 由这里接住。
-struct MenuBarExtraLabel: View {
-    @Environment(\.openWindow) private var openWindow
+/// Owned by the settings Scene, so hiding the menu bar icon or closing the last
+/// window never removes the receiver for a manual launch/reopen request.
+@MainActor
+final class SettingsWindowRequests: ObservableObject {
+    @Published private(set) var generation = 0
+    private var subscription: AnyCancellable?
 
-    var body: some View {
-        Image("MenuBar")
-            .onReceive(NotificationCenter.default.publisher(for: .openSettingsRequested)) { _ in
-                showSettingsWindow(openWindow: openWindow)
+    init(center: NotificationCenter = .default) {
+        subscription = center.publisher(for: .openSettingsRequested)
+            .sink { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    self?.generation += 1
+                }
             }
     }
 }

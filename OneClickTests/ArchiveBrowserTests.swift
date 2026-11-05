@@ -18,12 +18,16 @@ struct ArchiveBrowserTests {
         let contents = Data("Hello, 世界\n".utf8)
         let file = folder.appendingPathComponent("notes [1]*.txt")
         try contents.write(to: file)
+        let modified = Date(timeIntervalSince1970: 1_700_000_000)
+        try FileManager.default.setAttributes([.modificationDate: modified], ofItemAtPath: file.path)
         try Data("different".utf8).write(to: folder.appendingPathComponent("notes 1-other.txt"))
         let password = operation.isEncryptedCompression ? "test-password" : nil
         let archive = try await ArchiveService.perform(ArchiveRequest(operation: operation, urls: [folder]), password: password)
         let listed = try await ArchiveBrowserService.list(archive, password: password)
         let entry = try #require(listed.first { $0.name == file.lastPathComponent })
         #expect(entry.size == contents.count)
+        let listedModified = try #require(entry.modifiedDate)
+        #expect(abs(listedModified.timeIntervalSince(modified)) < 2)
         let preview = try await ArchiveBrowserService.preview(archive, entry: entry, password: password)
         #expect(preview == contents)
         let prepared = try await ArchivePreparedPreview.prepare(archive, entry: entry, password: password)
@@ -43,6 +47,119 @@ struct ArchiveBrowserTests {
             let encryptedEntry = try #require(visible.first { $0.name == file.lastPathComponent })
             await #expect(throws: ArchiveError.passwordRequired) { try await ArchiveBrowserService.preview(archive, entry: encryptedEntry) }
         }
+    }
+
+    @Test func sevenZipListingReadsOptionalDatesAndFractionalSeconds() throws {
+        let entries = try ArchiveBrowserService.parseSevenZipListing("""
+        Path = folder/report.txt
+        Size = 1234
+        Modified = 2025-03-04 05:06:07.1234567
+        Created = 2024-01-02 03:04:05
+
+        Path = missing.txt
+        Size = 0
+        Modified =
+        Created = invalid
+
+        Path = folder/
+        Size = 0
+        Folder = +
+        Modified = 2025-03-04 05:06:07
+
+        """.replacingOccurrences(of: "Modified =\n", with: "Modified = \n"))
+        #expect(entries.count == 3)
+        let calendar = Calendar(identifier: .gregorian)
+        let modified = try #require(calendar.date(from: DateComponents(year: 2025, month: 3, day: 4, hour: 5, minute: 6, second: 7)))
+        let created = try #require(calendar.date(from: DateComponents(year: 2024, month: 1, day: 2, hour: 3, minute: 4, second: 5)))
+        #expect(abs(try #require(entries[0].modifiedDate).timeIntervalSince(modified) - 0.1234567) < 0.000001)
+        #expect(entries[0].createdDate == created)
+        #expect(entries[1].modifiedDate == nil)
+        #expect(entries[1].createdDate == nil)
+        #expect(entries[2].isDirectory)
+        #expect(entries[2].modifiedDate == modified)
+        #expect(entries[2].createdDate == nil)
+        let indexed = try ArchiveBrowserModel.directoryEntries(entries)
+        #expect(indexed.first { $0.normalizedPath == "folder" }?.modifiedDate == modified)
+    }
+
+    @Test func nativeReaderPreservesCreationTimeWhenStoredInPaxArchive() throws {
+        let root = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let file = root.appendingPathComponent("dates.txt")
+        try Data("metadata".utf8).write(to: file)
+        let created = Date(timeIntervalSince1970: 1_600_000_000)
+        let modified = Date(timeIntervalSince1970: 1_700_000_000)
+        try FileManager.default.setAttributes([.creationDate: created, .modificationDate: modified], ofItemAtPath: file.path)
+        let archive = root.appendingPathComponent("dates.tar")
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/tar")
+        process.arguments = ["--format=pax", "-cf", archive.path, "-C", root.path, file.lastPathComponent]
+        process.environment = ["PATH": "/usr/bin:/bin", "COPYFILE_DISABLE": "1"]
+        try process.run()
+        process.waitUntilExit()
+        #expect(process.terminationStatus == 0)
+        let entries = try SystemArchiveReader.list(archive)
+        let entry = try #require(entries.first { $0.path == file.lastPathComponent })
+        #expect(entry.modifiedDate == modified)
+        #expect(entry.createdDate == created)
+    }
+
+    @Test(arguments: [SortOrder.forward, .reverse])
+    func sortingUsesNumericSizesDatesAndKeepsUnknownValuesLast(order: SortOrder) async throws {
+        let early = Date(timeIntervalSince1970: 100)
+        let late = Date(timeIntervalSince1970: 200)
+        let entries = [
+            ArchiveEntry(path: "folder", size: 0, isDirectory: true),
+            ArchiveEntry(path: "file10", size: 100, isDirectory: false, modifiedDate: early, createdDate: late),
+            ArchiveEntry(path: "file2", size: 20, isDirectory: false, modifiedDate: late, createdDate: early),
+            ArchiveEntry(path: "unknown", size: 0, isDirectory: false),
+        ]
+        let forward = order == .forward
+        let names = try await ArchiveBrowserIndex.sorted(entries, using: [.init(field: .name, order: order)])
+        #expect(names.map(\.path) == (forward ? ["folder", "file2", "file10", "unknown"] : ["folder", "unknown", "file10", "file2"]))
+        let sizes = try await ArchiveBrowserIndex.sorted(entries, using: [.init(field: .size, order: order)])
+        #expect(sizes.map(\.path) == (forward ? ["folder", "unknown", "file2", "file10"] : ["folder", "file10", "file2", "unknown"]))
+        let modified = try await ArchiveBrowserIndex.sorted(entries, using: [.init(field: .modified, order: order)])
+        #expect(modified.map(\.path) == (forward ? ["folder", "file10", "file2", "unknown"] : ["folder", "file2", "file10", "unknown"]))
+        let created = try await ArchiveBrowserIndex.sorted(entries, using: [.init(field: .created, order: order)])
+        #expect(created.map(\.path) == (forward ? ["folder", "file2", "file10", "unknown"] : ["folder", "file10", "file2", "unknown"]))
+        let ties = try await ArchiveBrowserIndex.sorted([
+            ArchiveEntry(path: "b/file2", size: 10, isDirectory: false),
+            ArchiveEntry(path: "file10", size: 10, isDirectory: false),
+            ArchiveEntry(path: "a/file2", size: 10, isDirectory: false),
+        ], using: [.init(field: .size, order: order)])
+        #expect(ties.map(\.path) == ["a/file2", "b/file2", "file10"])
+    }
+
+    @Test @MainActor func sortingSurvivesSearchAndNavigationWithoutChangingSelection() async throws {
+        let root = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let folder = root.appendingPathComponent("source")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: false)
+        try Data(repeating: 65, count: 200).write(to: folder.appendingPathComponent("file2.txt"))
+        try Data(repeating: 66, count: 10).write(to: folder.appendingPathComponent("file10.txt"))
+        let archive = try await ArchiveService.perform(ArchiveRequest(operation: .zip, urls: [folder]))
+        let model = ArchiveBrowserModel(url: archive)
+        defer { model.close() }
+        model.load()
+        try await waitUntil { !model.loading }
+        #expect(model.error == nil)
+        model.navigate(to: "source")
+        model.selection = "source/file2.txt"
+        model.sortOrder = [.init(field: .size, order: .reverse)]
+        model.sortOrder = [.init(field: .size)]
+        try await waitUntil { model.visibleEntries.map(\.name) == ["file10.txt", "file2.txt"] }
+        #expect(model.selectedEntry?.path == "source/file2.txt")
+        model.search = "file2"
+        try await waitUntil { model.visibleEntries.map(\.name) == ["file2.txt"] }
+        model.search = "file"
+        try await waitUntil { model.visibleEntries.map(\.name) == ["file10.txt", "file2.txt"] }
+        model.navigate(to: "")
+        try await waitUntil { model.visibleEntries.map(\.name) == ["source"] }
+        model.navigate(to: "source")
+        try await waitUntil { model.visibleEntries.map(\.name) == ["file10.txt", "file2.txt"] }
+        model.sortOrder = [.init()]
+        #expect(model.visibleEntries.map(\.name) == ["file2.txt", "file10.txt"])
     }
 
     @Test func unsafeAndOversizedEntriesCannotBePreviewed() async throws {
@@ -141,6 +258,55 @@ struct ArchiveBrowserTests {
         #expect(try String(contentsOf: previewURL, encoding: .utf8) == "latest selection")
         model.close()
         try await waitUntil { !FileManager.default.fileExists(atPath: previewURL.deletingLastPathComponent().path) }
+    }
+
+    @Test @MainActor func previewSwitchRetainsContentUntilReadyAndClearsOnFailure() async throws {
+        let root = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let first = root.appendingPathComponent("first.txt")
+        let second = root.appendingPathComponent("second.json")
+        try Data("first preview".utf8).write(to: first)
+        try Data("{\"second\":true}".utf8).write(to: second)
+        let archive = try await ArchiveService.perform(ArchiveRequest(operation: .zip, urls: [first, second]))
+        let model = ArchiveBrowserModel(url: archive)
+        defer { model.close() }
+        model.load()
+        try await waitUntil { !model.loading }
+        #expect(model.error == nil)
+        model.selection = "first.txt"
+        model.showPreview()
+        try await waitUntil { !model.previewing }
+        let firstURL = try #require(model.previewURL)
+
+        model.selection = "second.json"
+        model.showPreview()
+        #expect(model.previewing)
+        #expect(model.previewURL == firstURL)
+        #expect(model.previewName == "first.txt")
+        #expect(model.previewText == "first preview")
+        #expect(FileManager.default.fileExists(atPath: firstURL.path))
+        try await waitUntil { !model.previewing }
+        #expect(model.previewError == nil)
+        #expect(model.previewName == "second.json")
+        #expect(model.previewText == "{\"second\":true}")
+        let secondURL = try #require(model.previewURL)
+        #expect(secondURL != firstURL)
+        try await waitUntil { !FileManager.default.fileExists(atPath: firstURL.deletingLastPathComponent().path) }
+
+        try FileManager.default.removeItem(at: archive)
+        model.selection = "first.txt"
+        model.showPreview()
+        #expect(model.previewURL == secondURL)
+        try await waitUntil { !model.previewing }
+        #expect(model.previewError != nil)
+        #expect(model.previewURL == nil)
+        #expect(model.previewName == nil)
+        #expect(model.previewText == nil)
+        #expect(model.previewImage == nil)
+        try await waitUntil { !FileManager.default.fileExists(atPath: secondURL.deletingLastPathComponent().path) }
+        model.navigate(to: "")
+        #expect(model.previewError == nil)
+        #expect(!model.previewing)
     }
 
     @MainActor private func waitUntil(_ condition: () -> Bool) async throws {

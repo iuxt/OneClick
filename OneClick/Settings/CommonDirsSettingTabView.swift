@@ -58,8 +58,22 @@ struct CommonDirsSettingTabView: View {
                             Image(systemName: "trash")
                         }
                         .buttonStyle(.borderless)
+                        .help(AppLocalization.localized("Remove Folder"))
+                        .accessibilityLabel(String(format: AppLocalization.localized("Remove folder %@"), item.url.path))
                     } label: {
-                        Label(item.displayName, systemImage: item.icon.isEmpty ? "folder" : item.icon)
+                        Label {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(item.displayName)
+                                Text(item.url.path)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                                    .truncationMode(.middle)
+                            }
+                        } icon: {
+                            Image(systemName: item.icon.isEmpty ? "folder" : item.icon)
+                        }
+                        .help(item.url.path)
                     }
                 }
             } header: {

@@ -16,7 +16,6 @@ enum Tabs: String, CaseIterable, Identifiable {
     case inputMethods = "Input Method Switching"
     case newFile = "New File"
     case cdirs = "Common Dir"
-    case iconStyle = "Icon Style"
     case about = "About"
 
     var id: String { self.rawValue }
@@ -27,7 +26,8 @@ enum Tabs: String, CaseIterable, Identifiable {
 
     var sidebarTitleKey: String {
         switch self {
-        case .archives, .inputMethods: "Settings"
+        case .archives: "Archive Settings"
+        case .inputMethods: "Input Method Settings"
         default: titleKey
         }
     }
@@ -42,7 +42,6 @@ enum Tabs: String, CaseIterable, Identifiable {
         case .archives: "archivebox"
         case .newFile: "doc.badge.plus"
         case .cdirs: "folder.badge.gearshape"
-        case .iconStyle: "paintpalette"
         case .about: "info.circle"
         }
     }
@@ -68,7 +67,7 @@ struct SettingsView: View {
         List(selection: tabSelection) {
             sidebarRow(.home)
             Section {
-                ForEach([Tabs.actions, .apps, .newFile, .cdirs, .iconStyle]) { sidebarRow($0) }
+                ForEach([Tabs.actions, .apps, .newFile, .cdirs]) { sidebarRow($0) }
             } header: {
                 Text(appLocalized: "Right-click Tools")
             }
@@ -116,8 +115,6 @@ struct SettingsView: View {
             NewFileSettingsTabView()
         case .cdirs:
             CommonDirsSettingTabView()
-        case .iconStyle:
-            IconStyleSettingsView()
         case .about:
             AboutSettingsTabView()
         }

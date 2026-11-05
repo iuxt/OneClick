@@ -97,6 +97,7 @@ final class ArchiveViewModel: ObservableObject {
     var shouldCloseAutomatically: Bool {
         !isRunning && !rows.isEmpty && rows.allSatisfy {
             $0.output != nil && $0.error == nil && !$0.isRunning && !$0.needsPassword && !$0.needsConfiguration
+                && !($0.request.verifyAfterCompression && !$0.request.operation.isExtraction)
         }
     }
 

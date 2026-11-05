@@ -10,6 +10,8 @@ import SwiftUI
 @available(macOS 27, *)
 struct SettingsWindow: Scene {
     @ObservedObject var appState: AppState
+    @StateObject private var windowRequests = SettingsWindowRequests()
+    @Environment(\.openWindow) private var openWindow
     
     @EnvironmentObject var updateManager: UpdateManager
     
@@ -41,6 +43,9 @@ struct SettingsWindow: Scene {
         // 上次会话的窗口状态。
         .defaultLaunchBehavior(.suppressed)
         .restorationBehavior(.disabled)
+        .onChange(of: windowRequests.generation) {
+            showSettingsWindow(openWindow: openWindow)
+        }
     }
     
 }

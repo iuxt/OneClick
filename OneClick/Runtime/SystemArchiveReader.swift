@@ -14,6 +14,12 @@ nonisolated private struct SystemArchiveAPI: @unchecked Sendable {
     let size: @convention(c) (OpaquePointer) -> Int64
     let filetype: @convention(c) (OpaquePointer) -> UInt32
     let hardlink: @convention(c) (OpaquePointer) -> UnsafePointer<CChar>?
+    let mtimeIsSet: @convention(c) (OpaquePointer) -> Int32
+    let mtime: @convention(c) (OpaquePointer) -> Int
+    let mtimeNanoseconds: @convention(c) (OpaquePointer) -> Int
+    let birthtimeIsSet: @convention(c) (OpaquePointer) -> Int32
+    let birthtime: @convention(c) (OpaquePointer) -> Int
+    let birthtimeNanoseconds: @convention(c) (OpaquePointer) -> Int
     let read: @convention(c) (OpaquePointer, UnsafeMutableRawPointer, Int) -> Int
     let skip: @convention(c) (OpaquePointer) -> Int32
     let error: @convention(c) (OpaquePointer) -> UnsafePointer<CChar>?
@@ -35,6 +41,12 @@ nonisolated private struct SystemArchiveAPI: @unchecked Sendable {
         size = try symbol("archive_entry_size", as: type(of: size))
         filetype = try symbol("archive_entry_filetype", as: type(of: filetype))
         hardlink = try symbol("archive_entry_hardlink", as: type(of: hardlink))
+        mtimeIsSet = try symbol("archive_entry_mtime_is_set", as: type(of: mtimeIsSet))
+        mtime = try symbol("archive_entry_mtime", as: type(of: mtime))
+        mtimeNanoseconds = try symbol("archive_entry_mtime_nsec", as: type(of: mtimeNanoseconds))
+        birthtimeIsSet = try symbol("archive_entry_birthtime_is_set", as: type(of: birthtimeIsSet))
+        birthtime = try symbol("archive_entry_birthtime", as: type(of: birthtime))
+        birthtimeNanoseconds = try symbol("archive_entry_birthtime_nsec", as: type(of: birthtimeNanoseconds))
         read = try symbol("archive_read_data", as: type(of: read))
         skip = try symbol("archive_read_data_skip", as: type(of: skip))
         error = try symbol("archive_error_string", as: type(of: error))
@@ -70,9 +82,14 @@ nonisolated enum SystemArchiveReader {
                 pathBytes += name.utf8.count
                 guard entries.count < 100_000, pathBytes <= 32 * 1_024 * 1_024 else { throw ArchiveBrowserError.listingTooLarge }
                 let type = api.filetype(entry)
+                let modified = api.mtimeIsSet(entry) != 0
+                    ? Date(timeIntervalSince1970: Double(api.mtime(entry)) + Double(api.mtimeNanoseconds(entry)) / 1_000_000_000) : nil
+                let created = api.birthtimeIsSet(entry) != 0
+                    ? Date(timeIntervalSince1970: Double(api.birthtime(entry)) + Double(api.birthtimeNanoseconds(entry)) / 1_000_000_000) : nil
                 entries.append(ArchiveEntry(path: name, size: max(0, api.size(entry)),
                                             isDirectory: type == 0o040000,
-                                            isLink: type != 0o040000 && type != 0o100000 || api.hardlink(entry) != nil))
+                                            isLink: type != 0o040000 && type != 0o100000 || api.hardlink(entry) != nil,
+                                            modifiedDate: modified, createdDate: created))
                 guard api.skip(reader) >= 0 else { throw failure(api, reader) }
             }
             return entries

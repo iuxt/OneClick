@@ -122,7 +122,7 @@ struct ArchiveViewModelTests {
         #expect(model.rows[0].request.verifyAfterCompression)
         #expect(model.rows[0].error == nil)
         #expect(!model.isVerifying)
-        #expect(model.shouldCloseAutomatically)
+        #expect(!model.shouldCloseAutomatically)
         if encrypted {
             await #expect(throws: ArchiveError.passwordRequired) {
                 try await ArchiveService.perform(ArchiveRequest(operation: .extract, urls: [archive]))

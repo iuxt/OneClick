@@ -50,4 +50,54 @@ nonisolated struct ArchiveBrowserIndex: Sendable {
         }
         return result
     }
+
+    @concurrent
+    static func sorted(_ entries: [ArchiveEntry], using sortOrder: [ArchiveEntrySortComparator]) async throws -> [ArchiveEntry] {
+        try Task.checkCancellation()
+        let result = entries.sorted(using: sortOrder.isEmpty ? [ArchiveEntrySortComparator()] : sortOrder)
+        try Task.checkCancellation()
+        return result
+    }
+}
+
+/// Keep folders first and unavailable metadata last in either direction.
+/// Equal values use natural filename order and then the full path for stability.
+nonisolated struct ArchiveEntrySortComparator: SortComparator, Sendable {
+    enum Field: Hashable, Sendable { case name, size, modified, created }
+    var field: Field = .name
+    var order: SortOrder = .forward
+
+    func compare(_ lhs: ArchiveEntry, _ rhs: ArchiveEntry) -> ComparisonResult {
+        if lhs.isDirectory != rhs.isDirectory { return lhs.isDirectory ? .orderedAscending : .orderedDescending }
+        let result: ComparisonResult
+        switch field {
+        case .name: result = ordered(lhs.name.localizedStandardCompare(rhs.name))
+        case .size: result = compareValues(lhs.isDirectory ? nil : lhs.size, rhs.isDirectory ? nil : rhs.size)
+        case .modified: result = compareValues(lhs.modifiedDate, rhs.modifiedDate)
+        case .created: result = compareValues(lhs.createdDate, rhs.createdDate)
+        }
+        if result != .orderedSame { return result }
+        let name = lhs.name.localizedStandardCompare(rhs.name)
+        if name != .orderedSame { return name }
+        if lhs.normalizedPath == rhs.normalizedPath { return .orderedSame }
+        return lhs.normalizedPath < rhs.normalizedPath ? .orderedAscending : .orderedDescending
+    }
+
+    private func compareValues<Value: Comparable>(_ lhs: Value?, _ rhs: Value?) -> ComparisonResult {
+        switch (lhs, rhs) {
+        case let (lhs?, rhs?): ordered(lhs == rhs ? .orderedSame : lhs < rhs ? .orderedAscending : .orderedDescending)
+        case (nil, nil): .orderedSame
+        case (nil, _): .orderedDescending
+        case (_, nil): .orderedAscending
+        }
+    }
+
+    private func ordered(_ result: ComparisonResult) -> ComparisonResult {
+        guard order == .reverse else { return result }
+        switch result {
+        case .orderedAscending: return .orderedDescending
+        case .orderedDescending: return .orderedAscending
+        case .orderedSame: return .orderedSame
+        }
+    }
 }

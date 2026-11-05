@@ -27,6 +27,8 @@ They require selected items; Finder's empty-space and toolbar menus disable them
 
 The operation window shows current activity, errors, and a
 **Show in Finder** button for each completed result. **Cancel** closes the window.
+When **Verify After Compression** is enabled, the window stays open after success
+to show the verification result and output location. Click **Done** to close it.
 Closing the window cancels unfinished work. Folder authorization uses OneClick's
 existing bookmark service.
 Cancelling authorization never produces a partially selected compression archive.
@@ -92,6 +94,12 @@ their existing behavior.
 
 **Toolbox → Compression & Extraction → Open Archive…** opens a dedicated browser.
 Navigate folders, search paths across the archive, and select a file to preview.
+The file table shows name, uncompressed size, modification time and creation time.
+Click a column heading to sort ascending or descending; the same order applies
+when navigating folders or searching. Folders stay first, equal values use natural
+filename order, and unavailable times appear as **—** and sort last. Times are
+read from archive metadata; formats that do not store creation times leave them
+unavailable. Hover over a size or time to see the exact byte count or full date.
 Text up to 2 MiB is shown in a selectable text pane, images display inline, and
 **Quick Look** opens the system preview for PDF and other supported formats.
 Preview content is limited to 64 MiB, including incorrectly declared sizes.

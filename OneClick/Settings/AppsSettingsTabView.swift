@@ -112,6 +112,8 @@ struct AppsSettingsTabView: View {
             } header: {
                 Text(AppLocalization.localized("Show In"))
             }
+
+            AppIconStyleSection()
         }
         .formStyle(.grouped)
         .sheet(isPresented: $showSelectApp) {

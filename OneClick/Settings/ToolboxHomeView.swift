@@ -31,7 +31,7 @@ struct ToolboxHomeView: View {
                     VStack(spacing: 0) {
                         toolRow(.actions, title: "Right-click Tools",
                                 description: "Create files, open apps and run useful actions directly in Finder.",
-                                detail: String(format: AppLocalization.localized("%lld actions configured"), appState.actions.count))
+                                detail: String(format: AppLocalization.localized("%lld actions enabled"), appState.actions.filter { !$0.isArchive && $0.enabled }.count))
                         Divider().padding(.leading, 60)
                         toolRow(.archives, title: "Archive Tools",
                                 description: "Compress, extract and explore archives. Preview just the files you need.",

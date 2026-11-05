@@ -19,6 +19,7 @@ struct NewFileSettingsTabView: View {
     @EnvironmentObject var appState: AppState
     @State private var editingFile: NewFile?
     @State private var fileToDelete: NewFile?
+    @State private var confirmingRestore = false
 
     let messager = Messager.shared
 
@@ -37,7 +38,7 @@ struct NewFileSettingsTabView: View {
                 // 操作按钮放在列表顶部，始终可见
                 HStack {
                     Button {
-                        appState.resetFiletypeItems()
+                        confirmingRestore = true
                     } label: {
                         Label(AppLocalization.localized("Restore Defaults"), systemImage: "arrow.triangle.2.circlepath")
                     }
@@ -110,6 +111,18 @@ struct NewFileSettingsTabView: View {
         .formStyle(.grouped)
         .sheet(item: $editingFile) { file in
             EditFileTypeSheetView(file: file, appState: appState)
+        }
+        .confirmationDialog(
+            AppLocalization.localized("Restore Default File Types?"),
+            isPresented: $confirmingRestore,
+            titleVisibility: .visible
+        ) {
+            Button(AppLocalization.localized("Restore Defaults"), role: .destructive) {
+                appState.resetFiletypeItems()
+            }
+            Button(AppLocalization.localized("Cancel"), role: .cancel) {}
+        } message: {
+            Text(appLocalized: "This replaces all file types with the defaults, removing custom types and resetting names, templates, icons, app choices and enabled states. This cannot be undone.")
         }
         .confirmationDialog(
             AppLocalization.localized("Delete File Type"),
