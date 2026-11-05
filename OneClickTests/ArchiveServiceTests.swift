@@ -3,6 +3,61 @@ import Testing
 @testable import OneClick
 
 struct ArchiveServiceTests {
+    @Test func progressParsesPipeChunksAndTerminalRedrawsWithoutLeakingPrompts() throws {
+        let progress = ArchiveProgress()
+        progress.configure(entries: [
+            ArchiveEntry(path: "中文 first.bin", size: 200, isDirectory: false),
+            ArchiveEntry(path: "second.bin", size: 800, isDirectory: false)
+        ])
+        // Feed single bytes to exercise split UTF-8 names and split percentages.
+        for byte in Data("Enter password:\n+ 中文 first.bin\n 10%".utf8) { progress.append(Data([byte])) }
+        #expect(progress.passwordFailure)
+        #expect(progress.snapshot.fileName == "中文 first.bin")
+        #expect(progress.snapshot.fraction == 0.1)
+        #expect(progress.snapshot.fileFraction == 0.5)
+        progress.append(Data("\u{8}\u{8}\u{8}   \u{8}\u{8}\u{8}+ second.bin\n 60% 1".utf8))
+        #expect(progress.snapshot.fileName == "second.bin")
+        #expect(progress.snapshot.fraction == 0.6)
+        #expect(progress.snapshot.fileFraction == 0.5)
+        progress.append(Data("\r 55%\r 101%\nWrong password\n".utf8))
+        #expect(progress.snapshot.fraction == 0.6)
+        #expect(progress.snapshot.fileName == "second.bin")
+        #expect(progress.snapshot.fileFraction == 0.5)
+        progress.complete()
+        #expect(progress.snapshot.fraction == 1)
+        #expect(progress.snapshot.fileFraction == 1)
+    }
+
+    @Test func tarProgressUsesFileBoundariesAndLeavesUnknownFileBytesIndeterminate() {
+        let progress = ArchiveProgress()
+        progress.configure(entries: [ArchiveEntry(path: "a", size: 100, isDirectory: false),
+                                     ArchiveEntry(path: "b", size: 300, isDirectory: false)])
+        progress.append(Data("a ./a\na ./b\n".utf8))
+        #expect(progress.snapshot.fileName == "b")
+        #expect(progress.snapshot.fraction == 0.25)
+        #expect(progress.snapshot.fileFraction == nil)
+        // TAR and filenames can contain '%'; only numeric progress records count.
+        progress.append(Data("a ./100% real file\n".utf8))
+        #expect(progress.snapshot.fileName == "100% real file")
+        #expect(progress.snapshot.fraction == 1)
+    }
+
+    @Test func progressResetsForVerificationAndDoesNotCompleteFailedProcesses() throws {
+        let progress = ArchiveProgress()
+        progress.append(Data(" 40%".utf8))
+        progress.setVerifying(true)
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/false")
+        try progress.launch(process)
+        #expect(progress.snapshot.fraction == nil)
+        #expect(progress.snapshot.isVerifying)
+        process.waitUntilExit()
+        try progress.finish()
+        #expect(progress.snapshot.fraction == nil)
+        progress.setVerifying(false)
+        #expect(!progress.snapshot.isVerifying)
+    }
+
     @Test(arguments: [ArchiveOperation.zip, .sevenZip, .tarGzip, .encryptedZip, .encryptedSevenZip])
     func extractAndDeleteRemovesOnlyTheSuccessfullyExtractedArchive(operation: ArchiveOperation) async throws {
         let root = try temporaryDirectory()
@@ -11,10 +66,18 @@ struct ArchiveServiceTests {
         let contents = Data("keep extracted contents".utf8)
         try contents.write(to: source)
         let password = operation.isEncryptedCompression ? "test-password" : nil
-        let archive = try await ArchiveService.perform(ArchiveRequest(operation: operation, urls: [source]), password: password)
+        let compressionProgress = ArchiveProgress()
+        let archive = try await ArchiveService.perform(ArchiveRequest(operation: operation, urls: [source]), password: password,
+                                                       progress: compressionProgress)
+        #expect(compressionProgress.snapshot.fraction == 1)
+        #expect(compressionProgress.snapshot.fileName == source.lastPathComponent)
         let unrelated = root.appendingPathComponent("unrelated.zip")
         try Data("keep original".utf8).write(to: unrelated)
-        let output = try await ArchiveService.perform(ArchiveRequest(operation: .extractAndDelete, urls: [archive]), password: password)
+        let extractionProgress = ArchiveProgress()
+        let output = try await ArchiveService.perform(ArchiveRequest(operation: .extractAndDelete, urls: [archive]), password: password,
+                                                      progress: extractionProgress)
+        #expect(extractionProgress.snapshot.fraction == 1)
+        #expect(extractionProgress.snapshot.fileName == source.lastPathComponent)
         #expect(try Data(contentsOf: output.appendingPathComponent(source.lastPathComponent)) == contents)
         #expect(!FileManager.default.fileExists(atPath: archive.path))
         #expect(try Data(contentsOf: source) == contents)

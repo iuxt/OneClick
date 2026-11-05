@@ -14,13 +14,24 @@ struct ArchiveViewModelTests {
         var progressChanges = 0
         let batch = model.objectWillChange.sink { batchChanges += 1 }
         let progress = model.activity.objectWillChange.sink { progressChanges += 1 }
-        for _ in 0..<20 { model.activity.update(detail: "processing", isVerifying: false) }
+        for _ in 0..<20 { model.activity.update(.init(fileName: "processing")) }
         #expect(batchChanges == 0)
         #expect(progressChanges == 1)
         model.cancel()
         #expect(model.pendingRow == nil)
         #expect(model.rows.allSatisfy { !$0.needsConfiguration && $0.error != nil })
         withExtendedLifetime((batch, progress)) {}
+    }
+
+    @Test func activityCombinesBatchAndVerificationProgress() {
+        let activity = ArchiveViewModel.Activity()
+        activity.update(.init(fraction: 0.5), completedCount: 1, totalCount: 2)
+        #expect(activity.state.overallFraction == 0.75)
+        activity.update(.init(fraction: 1), completedCount: 0, totalCount: 1, includesVerification: true)
+        #expect(activity.state.overallFraction == 0.9)
+        activity.update(.init(fraction: 0.5, isVerifying: true), includesVerification: true)
+        #expect(abs((activity.state.overallFraction ?? 0) - 0.95) < 0.0001)
+        #expect(activity.isVerifying)
     }
 
     @Test func volumePresetsAndCustomSizeValidation() {

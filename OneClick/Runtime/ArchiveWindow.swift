@@ -27,6 +27,7 @@ final class ArchiveWindowPresenter: ArchivePresenting {
 private final class ArchiveWindowController: NSWindowController, NSWindowDelegate {
     private let model: ArchiveViewModel
     private let onClose: () -> Void
+    private var sizing: AnyCancellable?
 
     init(requests: [ArchiveRequest], onClose: @escaping () -> Void) {
         model = ArchiveViewModel(requests: requests)
@@ -37,18 +38,21 @@ private final class ArchiveWindowController: NSWindowController, NSWindowDelegat
         })
         window.title = AppLocalization.localized("Archives")
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
-        let contentHeight: CGFloat = if requests.contains(where: { $0.operation == .compress }) {
-            640
-        } else if requests.contains(where: { $0.operation.isEncryptedCompression }) {
-            320
-        } else {
-            280
-        }
-        window.setContentSize(NSSize(width: 560, height: contentHeight))
+        window.setContentSize(NSSize(width: 520, height: model.preferredWindowHeight))
         window.contentMinSize = NSSize(width: 500, height: 280)
         window.center()
         super.init(window: window)
         window.delegate = self
+        sizing = model.$rows.combineLatest(model.$isRunning)
+            .map { rows, running in ArchiveViewModel.windowHeight(rows: rows, isRunning: running) }
+            .removeDuplicates()
+            .sink { [weak window] height in
+                guard let window else { return }
+                let size = NSSize(width: window.contentLayoutRect.width, height: height)
+                var frame = window.frameRect(forContentRect: NSRect(origin: .zero, size: size))
+                frame.origin = NSPoint(x: window.frame.minX, y: window.frame.maxY - frame.height)
+                window.setFrame(frame, display: true, animate: window.isVisible)
+            }
     }
 
     required init?(coder: NSCoder) { nil }
@@ -77,12 +81,22 @@ final class ArchiveViewModel: ObservableObject {
 
     /// Progress invalidates only the activity view, not the entire batch list.
     final class Activity: ObservableObject {
-        @Published private(set) var detail = ""
-        @Published private(set) var isVerifying = false
+        struct State: Equatable {
+            var progress = ArchiveProgress.Snapshot()
+            var overallFraction: Double?
+        }
+        @Published private(set) var state = State()
+        var isVerifying: Bool { state.progress.isVerifying }
 
-        func update(detail: String, isVerifying: Bool) {
-            if self.detail != detail { self.detail = detail }
-            if self.isVerifying != isVerifying { self.isVerifying = isVerifying }
+        func update(_ snapshot: ArchiveProgress.Snapshot, completedCount: Int = 0, totalCount: Int = 1,
+                    includesVerification: Bool = false) {
+            let fraction = includesVerification && snapshot.isVerifying
+                ? 0.9 + (snapshot.fraction ?? 0) * 0.1
+                : snapshot.fraction.map { includesVerification ? $0 * 0.9 : $0 }
+            let overall = fraction.map { (Double(completedCount) + $0) / Double(max(1, totalCount)) }
+                ?? (completedCount > 0 ? Double(completedCount) / Double(max(1, totalCount)) : nil)
+            let updated = State(progress: snapshot, overallFraction: overall)
+            if state != updated { state = updated }
         }
     }
     let activity = Activity()
@@ -93,6 +107,14 @@ final class ArchiveViewModel: ObservableObject {
     private var progress: ArchiveProgress?
     private var hasStarted = false
     private let compressionSettings: ArchiveCompressionSettings
+
+    var preferredWindowHeight: CGFloat { Self.windowHeight(rows: rows, isRunning: isRunning) }
+
+    static func windowHeight(rows: [Row], isRunning: Bool) -> CGFloat {
+        if !isRunning, rows.contains(where: { $0.needsConfiguration }) { return 640 }
+        if !isRunning, rows.contains(where: { $0.needsPassword }) { return 360 }
+        return 340 + CGFloat(min(3, max(0, rows.count - 1))) * 72
+    }
 
     var shouldCloseAutomatically: Bool {
         !isRunning && !rows.isEmpty && rows.allSatisfy {
@@ -173,10 +195,13 @@ final class ArchiveViewModel: ObservableObject {
                 let progress = ArchiveProgress()
                 self.progress = progress
                 self.rows[index].isRunning = true
-                self.activity.update(detail: "", isVerifying: false)
+                let completedCount = self.rows.filter { $0.output != nil || ($0.error != nil && !$0.needsPassword) }.count
+                let includesVerification = self.rows[index].request.verifyAfterCompression && !self.rows[index].request.operation.isExtraction
+                self.activity.update(.init(), completedCount: completedCount, totalCount: self.rows.count)
                 self.polling = Task { [weak self] in
                     while !Task.isCancelled {
-                        self?.activity.update(detail: progress.detail, isVerifying: progress.isVerifying)
+                        self?.activity.update(progress.snapshot, completedCount: completedCount, totalCount: self?.rows.count ?? 1,
+                                              includesVerification: includesVerification)
                         do { try await Task.sleep(for: .milliseconds(150)) } catch { break }
                     }
                 }
@@ -202,7 +227,7 @@ final class ArchiveViewModel: ObservableObject {
                 self.polling?.cancel()
                 self.polling = nil
                 self.progress = nil
-                self.activity.update(detail: progress.detail, isVerifying: false)
+                self.activity.update(progress.snapshot, completedCount: completedCount, totalCount: self.rows.count)
             }
             self.isRunning = false
             self.task = nil
@@ -305,7 +330,7 @@ private struct ArchiveView: View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
                 Label(AppLocalization.localized("Archives"), systemImage: "archivebox")
-                    .font(.title2.bold())
+                    .font(.headline)
                 Spacer()
                 if pendingRow?.needsConfiguration == true {
                     Picker(AppLocalization.localized("Archive Format"), selection: $form.format) {
@@ -319,10 +344,10 @@ private struct ArchiveView: View {
                     .disabled(model.isRunning)
                 }
             }
-            .padding(20)
+            .padding(16)
 
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 16) {
+                LazyVStack(alignment: .leading, spacing: 14) {
                     if model.isRunning {
                         ArchiveActivityView(activity: model.activity)
                     }
@@ -333,8 +358,8 @@ private struct ArchiveView: View {
                         }
                     }
                 }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 20)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 16)
             }
             .scrollBounceBehavior(.basedOnSize)
 
@@ -442,18 +467,39 @@ private struct ArchiveActivityView: View {
     @ObservedObject var activity: ArchiveViewModel.Activity
 
     var body: some View {
-        HStack(spacing: 12) {
-            ProgressView().controlSize(.small)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(appLocalized: activity.isVerifying ? "Verifying archive…" : "Processing archive…")
-                if let detail = activity.detail.components(separatedBy: .newlines).last(where: { !$0.isEmpty }) {
-                    Text(detail)
-                        .font(.caption).foregroundStyle(.secondary)
-                        .lineLimit(1).truncationMode(.middle)
-                }
+        VStack(alignment: .leading, spacing: 12) {
+            Text(appLocalized: activity.isVerifying ? "Verifying archive…" : "Processing archive…")
+                .font(.subheadline.weight(.medium))
+            progressBar(title: "Overall Progress", fraction: activity.state.overallFraction)
+            VStack(alignment: .leading, spacing: 6) {
+                Text(activity.state.progress.fileName.isEmpty
+                     ? AppLocalization.localized("Preparing files…") : activity.state.progress.fileName)
+                    .font(.caption).foregroundStyle(.secondary)
+                    .lineLimit(1).truncationMode(.middle)
+                    .help(activity.state.progress.fileName)
+                progressBar(title: activity.isVerifying ? "Verification Progress" :
+                                (activity.state.progress.fileFraction == nil ? "Current File Progress" : "Current File Progress (Estimated)"),
+                            fraction: activity.isVerifying ? activity.state.progress.fraction : activity.state.progress.fileFraction)
             }
         }
+        .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.quinary, in: RoundedRectangle(cornerRadius: 10))
+    }
+
+    private func progressBar(title: String, fraction: Double?) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack {
+                Text(appLocalized: title)
+                Spacer()
+                Text(fraction.map { "\(Int(($0 * 100).rounded(.down)))%" } ?? "—")
+                    .monospacedDigit().foregroundStyle(.secondary)
+            }
+            .font(.caption)
+            ProgressView(value: fraction, total: 1)
+                .progressViewStyle(.linear)
+                .accessibilityLabel(AppLocalization.localized(title))
+        }
     }
 }
 

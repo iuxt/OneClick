@@ -193,6 +193,13 @@ nonisolated enum ArchiveError: LocalizedError, Equatable {
 /// The worker and UI share only this small, locked state. Output is bounded,
 /// including when a damaged archive or a huge directory produces many lines.
 nonisolated final class ArchiveProgress: @unchecked Sendable {
+    struct Snapshot: Equatable, Sendable {
+        var fraction: Double?
+        var fileFraction: Double?
+        var fileName = ""
+        var isVerifying = false
+    }
+
     private let lock = NSLock()
     private var process: Process?
     private var cancelled = false
@@ -200,11 +207,44 @@ nonisolated final class ArchiveProgress: @unchecked Sendable {
     private var askedForPassword = false
     private var reportedWrongPassword = false
     private var verifying = false
+    private var state = Snapshot()
+    private var record = Data()
+    private var fileSizes: [String: Double] = [:]
+    private var totalSize = 0.0
+    private var completedSize = 0.0
+    private var visitedFiles = Set<String>()
+    private var nativeFraction: Double?
+
+    var snapshot: Snapshot { lock.withLock { state } }
+
+    func configure(entries: [ArchiveEntry]) {
+        lock.withLock {
+            fileSizes = [:]
+            for entry in entries where !entry.isDirectory && !entry.isLink {
+                fileSizes[entry.normalizedPath] = Double(entry.size)
+            }
+            totalSize = fileSizes.values.reduce(0, +)
+        }
+    }
+
+    func complete() {
+        lock.withLock {
+            state.fraction = 1
+            state.fileFraction = 1
+        }
+    }
 
     var isVerifying: Bool { lock.withLock { verifying } }
 
     func setVerifying(_ value: Bool) {
-        lock.withLock { verifying = value }
+        lock.withLock {
+            verifying = value
+            if value {
+                state = Snapshot(isVerifying: true)
+            } else {
+                state.isVerifying = false
+            }
+        }
     }
 
     var detail: String {
@@ -230,6 +270,11 @@ nonisolated final class ArchiveProgress: @unchecked Sendable {
         try lock.withLock {
             if cancelled { throw CancellationError() }
             output = Data()
+            record = Data()
+            state = Snapshot(isVerifying: verifying)
+            completedSize = 0
+            visitedFiles = []
+            nativeFraction = nil
             askedForPassword = false
             reportedWrongPassword = false
             try process.run()
@@ -239,6 +284,8 @@ nonisolated final class ArchiveProgress: @unchecked Sendable {
 
     func finish() throws {
         try lock.withLock {
+            consumeRecord()
+            record = Data()
             process = nil
             if cancelled { throw CancellationError() }
         }
@@ -251,6 +298,63 @@ nonisolated final class ArchiveProgress: @unchecked Sendable {
             askedForPassword = askedForPassword || text.contains("Enter password")
             reportedWrongPassword = reportedWrongPassword || text.contains("Wrong password")
             if output.count > 16_384 { output = Data(output.suffix(16_384)) }
+            // 7-Zip redraws percentages using backspaces on macOS. Keep the
+            // incomplete UTF-8 record between reads; pipe reads can split anywhere.
+            for byte in data {
+                if byte == 8 || byte == 10 || byte == 13 {
+                    consumeRecord()
+                    record.removeAll(keepingCapacity: true)
+                } else if record.count < 16_384 {
+                    record.append(byte)
+                }
+            }
+            // Percentages need not end in a newline. File names, however, are
+            // consumed only after their complete record arrives.
+            consumePercentage(String(decoding: record, as: UTF8.self))
+        }
+    }
+
+    private func consumeRecord() {
+        let text = String(decoding: record, as: UTF8.self)
+        guard !text.isEmpty else { return }
+        consumePercentage(text)
+        // Only file-operation records reach the UI. Banners, diagnostics and
+        // stdin password prompts remain available to error handling via detail.
+        for prefix in ["+ ", "- ", "T ", "a ", "x "] where text.hasPrefix(prefix) {
+            var name = String(text.dropFirst(prefix.count))
+            while name.hasPrefix("./") { name.removeFirst(2) }
+            guard !name.hasSuffix("/"), name != state.fileName else { return }
+            if let size = fileSizes[state.fileName], visitedFiles.insert(state.fileName).inserted {
+                completedSize += size
+            }
+            state.fileName = name
+            state.fileFraction = nil
+            updateFractions()
+            return
+        }
+    }
+
+    private func consumePercentage(_ text: String) {
+        let text = text.trimmingCharacters(in: .whitespaces)
+        let digits = text.prefix(while: { $0.isASCII && $0.isNumber })
+        guard !digits.isEmpty, text.dropFirst(digits.count).first == "%",
+              let percent = Double(digits), percent <= 100 else { return }
+        nativeFraction = max(nativeFraction ?? 0, percent / 100)
+        updateFractions()
+    }
+
+    private func updateFractions() {
+        if let nativeFraction {
+            state.fraction = nativeFraction
+            if let size = fileSizes[state.fileName], size > 0, totalSize > 0 {
+                // CLI progress is rounded, aggregate input bytes. This estimate
+                // can be coarse for tiny files, solid blocks and parallel ZIP.
+                state.fileFraction = min(1, max(0, (nativeFraction * totalSize - completedSize) / size))
+            }
+        } else if totalSize > 0 {
+            // bsdtar reports file boundaries but no byte percentages. Never
+            // invent a timed percentage for a file that is still being read.
+            state.fraction = min(1, completedSize / totalSize)
         }
     }
 }
@@ -308,6 +412,21 @@ nonisolated enum ArchiveService {
                 }
             }
 
+            if request.operation.isExtraction {
+                // Directory listing is optional progress metadata. Unsupported,
+                // damaged or locked archives still use the existing worker's
+                // validation and password retry flow.
+                if usesSevenZip(for: first) {
+                    do {
+                        progress.configure(entries: try await ArchiveBrowserService.list(first, password: password))
+                    } catch is CancellationError {
+                        throw CancellationError()
+                    } catch { }
+                }
+            } else {
+                progress.configure(entries: try compressionEntries(request.urls, settings: settings))
+            }
+            try Task.checkCancellation()
             let staging = parent.appendingPathComponent(".oneclick-archive-\(UUID().uuidString)", isDirectory: true)
             try fm.createDirectory(at: staging, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
             defer { try? fm.removeItem(at: staging) }
@@ -328,7 +447,7 @@ nonisolated enum ArchiveService {
                     // No -p on extraction: 7-Zip prompts on stdin only when the
                     // archive is encrypted. An empty -p would force an empty
                     // password on some versions. snld0 rejects unsafe symlinks.
-                    arguments = ["x", "-y", "-bd", "-bb1", "-snld0", "-o" + result.path, "--", first.path]
+                    arguments = ["x", "-y", "-bsp1", "-bb1", "-sccUTF-8", "-snld0", "-o" + result.path, "--", first.path]
                 } else {
                     arguments = ["-xvf", first.path, "-C", result.path, "--safe-writes",
                                  "--no-same-owner", "--no-same-permissions", "--no-acls", "--no-xattrs", "--no-fflags"]
@@ -350,7 +469,7 @@ nonisolated enum ArchiveService {
                     let exclusions = settings.exclusionPatterns.map { "-xr!" + $0 }
                     let volumes = request.volumeSize.map { ["-v\($0)b"] } ?? []
                     let solid = request.solid.map { [$0 ? "-ms=on" : "-ms=off"] } ?? []
-                    arguments = ["a"] + formatOptions + encryption + level + exclusions + volumes + solid + ["-snl", "-y", "-bd", "-bb1", result.path, "--"]
+                    arguments = ["a"] + formatOptions + encryption + level + exclusions + volumes + solid + ["-snl", "-y", "-bsp1", "-bb1", "-sccUTF-8", result.path, "--"]
                         + request.urls.map { "./" + $0.lastPathComponent }
                 } else {
                     let level = request.compressionLevel.map { ["--options", "gzip:compression-level=\($0.rawValue)"] } ?? []
@@ -369,7 +488,9 @@ nonisolated enum ArchiveService {
                 try Task.checkCancellation()
             }
             if request.volumeSize != nil {
-                return try publishVolumes(of: result, to: parent, name: name, extension: ext)
+                let published = try publishVolumes(of: result, to: parent, name: name, extension: ext)
+                progress.complete()
+                return published
             }
             // Reserve each destination with an exclusive rename. A separate
             // existence check followed by rename can overwrite a concurrent job.
@@ -387,6 +508,7 @@ nonisolated enum ArchiveService {
                 }
             }
             guard let published else { throw CocoaError(.fileWriteFileExists) }
+            progress.complete()
             if request.operation == .extractAndDelete {
                 do {
                     try Task.checkCancellation()
@@ -408,6 +530,38 @@ nonisolated enum ArchiveService {
         ["zip", "zip.001", "zipx", "7z", "7z.001", "rar", "jar", "war", "apk", "ipa", "xpi"].contains(ArchiveFormat.suffix(for: url) ?? "")
     }
 
+    private static func compressionEntries(_ urls: [URL], settings: ArchiveCompressionSettings) throws -> [ArchiveEntry] {
+        guard let parent = urls.first?.deletingLastPathComponent() else { return [] }
+        let keys: Set<URLResourceKey> = [.isDirectoryKey, .isSymbolicLinkKey, .fileSizeKey]
+        let exclusions = settings.exclusionPatterns
+        let prefix = parent.path == "/" ? "/" : parent.path + "/"
+        var entries: [ArchiveEntry] = []
+        for source in urls {
+            let sourceValues = try? source.resourceValues(forKeys: keys)
+            let enumerator = sourceValues?.isDirectory == true && sourceValues?.isSymbolicLink != true
+                ? FileManager.default.enumerator(at: source, includingPropertiesForKeys: Array(keys)) : nil
+            var next: URL? = source
+            while let url = next {
+                try Task.checkCancellation()
+                let path = String(url.path.dropFirst(prefix.count))
+                let excluded = exclusions.contains {
+                    fnmatch($0, path, 0) == 0 || fnmatch($0, url.lastPathComponent, 0) == 0
+                }
+                if excluded {
+                    if url == source { break }
+                    enumerator?.skipDescendants()
+                } else if let values = try? url.resourceValues(forKeys: keys) {
+                    entries.append(ArchiveEntry(path: path, size: Int64(values.fileSize ?? 0),
+                                                isDirectory: values.isDirectory == true, isLink: values.isSymbolicLink == true))
+                    // Progress metadata must remain bounded for huge trees.
+                    if entries.count > 200_000 { return [] }
+                }
+                next = enumerator?.nextObject() as? URL
+            }
+        }
+        return entries
+    }
+
     /// Read and validate every compressed stream before publishing the staged archive.
     /// Split ZIP/7Z archives are tested through their first volume; 7-Zip reads the rest.
     static func verifyArchive(at archive: URL, operation: ArchiveOperation, password: String? = nil,
@@ -425,7 +579,7 @@ nonisolated enum ArchiveService {
                 try run(executable: URL(fileURLWithPath: "/usr/bin/tar"), arguments: ["-tf", archive.path],
                         directory: directory, password: nil, progress: progress)
             } else {
-                try run(executable: sevenZipURL(), arguments: ["t", "-y", "-bd", "-bb1", "--", archive.path],
+                try run(executable: sevenZipURL(), arguments: ["t", "-y", "-bsp1", "-bb1", "-sccUTF-8", "--", archive.path],
                         directory: directory, password: password, progress: progress)
             }
         } catch is CancellationError {

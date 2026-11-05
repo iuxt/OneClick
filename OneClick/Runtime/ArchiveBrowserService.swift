@@ -154,7 +154,10 @@ nonisolated enum ArchiveBrowserService {
         try diagnostics.fileHandleForWriting.close()
         let drain = DispatchGroup()
         drain.enter()
-        DispatchQueue.global(qos: .userInitiated).async {
+        // A concurrent batch can occupy every cooperative worker while reading
+        // stdout. Give stderr its own thread so draining cannot be starved by
+        // those workers waiting for this group to finish.
+        let drainThread = Thread {
             defer { drain.leave() }
             var buffer = [UInt8](repeating: 0, count: 8_192)
             while true {
@@ -164,6 +167,8 @@ nonisolated enum ArchiveBrowserService {
                 progress.append(Data(buffer.prefix(count)))
             }
         }
+        drainThread.qualityOfService = .userInitiated
+        drainThread.start()
         var result = Data()
         do {
             var buffer = [UInt8](repeating: 0, count: 32_768)
