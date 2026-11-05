@@ -41,21 +41,21 @@ struct SettingsNavigationTests {
             Issue.record("The selected settings page did not become active")
         }
 
-        try await render(.home)
-        let homeState = try #require(model.states[.home])
+        try await render(.actions)
+        let actionState = try #require(model.states[.actions])
         #expect(model.states.count == 1)
 
         try await render(.archives)
         let archiveState = try #require(model.states[.archives])
-        #expect(model.active[.home] == false)
+        #expect(model.active[.actions] == false)
         #expect(model.states.count == 2)
 
-        try await render(.home)
-        #expect(model.states[.home] == homeState)
+        try await render(.actions)
+        #expect(model.states[.actions] == actionState)
         #expect(model.active[.archives] == false)
         try await render(.archives)
         #expect(model.states[.archives] == archiveState)
-        #expect(model.appearances[.home] == 1)
+        #expect(model.appearances[.actions] == 1)
         #expect(model.appearances[.archives] == 1)
         #expect(model.states.count == 2)
     }
@@ -63,7 +63,7 @@ struct SettingsNavigationTests {
 
 @MainActor
 private final class NavigationProbe: ObservableObject {
-    @Published var selection: Tabs = .home
+    @Published var selection: Tabs = .actions
     var states: [Tabs: UUID] = [:]
     var active: [Tabs: Bool] = [:]
     var appearances: [Tabs: Int] = [:]

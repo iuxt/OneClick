@@ -8,7 +8,6 @@
 import SwiftUI
 
 enum Tabs: String, CaseIterable, Identifiable {
-    case home = "Toolbox"
     case general = "General"
     case apps = "Apps"
     case actions = "Actions"
@@ -34,7 +33,6 @@ enum Tabs: String, CaseIterable, Identifiable {
 
     var icon: String {
         switch self {
-        case .home: "square.grid.2x2"
         case .inputMethods: "character.bubble"
         case .general: "gearshape"
         case .apps: "app.badge"
@@ -49,7 +47,7 @@ enum Tabs: String, CaseIterable, Identifiable {
 
 @available(macOS 27, *)
 struct SettingsView: View {
-    @State private var selectedTab: Tabs = .home
+    @State private var selectedTab: Tabs = .actions
     @EnvironmentObject var appState: AppState
 
     private var tabSelection: Binding<Tabs> {
@@ -65,7 +63,6 @@ struct SettingsView: View {
         // Use system selection, keyboard navigation and Liquid Glass sidebar chrome.
         // No outer padding or custom background: the column meets the window edges.
         List(selection: tabSelection) {
-            sidebarRow(.home)
             Section {
                 ForEach([Tabs.actions, .apps, .newFile, .cdirs]) { sidebarRow($0) }
             } header: {
@@ -99,8 +96,6 @@ struct SettingsView: View {
 
     @ViewBuilder private func page(for tab: Tabs) -> some View {
         switch tab {
-        case .home:
-            ToolboxHomeView { tabSelection.wrappedValue = $0 }
         case .inputMethods:
             InputMethodSettingsView()
         case .general:

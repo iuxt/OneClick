@@ -1,5 +1,4 @@
 import AppKit
-import ApplicationServices
 import Foundation
 import Testing
 @testable import OneClick
@@ -36,23 +35,6 @@ struct InteractionRegressionTests {
         let explicit = AppLaunchOptions(app: app, defaults: defaults).configuration()
         #expect(explicit.arguments == app.arguments)
         #expect(explicit.environment == app.environment)
-    }
-
-    @Test func renameRequiresFinderTheExactSelectionAndNoActiveEditor() {
-        let expected = URL(fileURLWithPath: "/tmp/Untitled.txt")
-        func allowed(_ selected: [URL], role: String = kAXOutlineRole,
-                     app: String = "com.apple.finder", modifiers: NSEvent.ModifierFlags = []) -> Bool {
-            FinderRenameService.canRename(expected: expected, selected: selected, focusedRole: role,
-                                          frontmostBundleID: app, modifiers: modifiers)
-        }
-        #expect(allowed([expected]))
-        #expect(!allowed([expected], app: "com.apple.TextEdit"))
-        #expect(!allowed([expected], role: kAXTextFieldRole))
-        #expect(!allowed([expected], role: kAXTextAreaRole))
-        #expect(!allowed([expected], modifiers: .command))
-        #expect(!allowed([]))
-        #expect(!allowed([expected, expected]))
-        #expect(!allowed([URL(fileURLWithPath: "/tmp/another.txt")]))
     }
 
     @Test func creatingFromTemplatesAvoidsOverwritingExistingFiles() async throws {

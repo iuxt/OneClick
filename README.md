@@ -117,7 +117,6 @@ Optional overrides: `CONFIGURATION=Debug ./build.sh`,
 | Requirement | Details |
 |-------------|---------|
 | **Folder Access** | Per-folder authorization for file operations (prompted automatically) |
-| **Accessibility** | Required for certain automation features |
 | **Finder Extension** | Must be enabled in System Settings |
 
 ## 🔧 Development

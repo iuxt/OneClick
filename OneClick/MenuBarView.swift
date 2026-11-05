@@ -50,7 +50,7 @@ struct MenuBarView: View {
     var body: some View {
         VStack {
             Button(action: actionSettings) {
-                Text(appLocalized: "Open Toolbox")
+                Text(appLocalized: "Settings")
             }
             .keyboardShortcut(",", modifiers: [.command])
 

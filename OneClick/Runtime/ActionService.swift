@@ -358,7 +358,7 @@ final class ActionService {
             let fileURL = try await FileActionWorker.create(in: dirURL, extension: ext, template: template,
                                                           baseName: AppLocalization.localized("Untitled"))
             activity.finish()
-            revealInFinderAndRename(fileURL)
+            NSWorkspace.shared.activateFileViewerSelecting([fileURL])
         } catch {
             activity.finish()
             showFileFailures([FileActionWorker.Failure(url: dirURL, message: error.localizedDescription)])
@@ -402,11 +402,5 @@ final class ActionService {
     /// Resolve directory metadata away from the UI thread, including network volumes.
     func targetDirectoryForNewFile(_ target: [String]) async -> String? {
         await FileActionWorker.targetDirectory(target)
-    }
-
-    /// 在 Finder 中选中新文件并触发重命名（需要辅助功能权限）
-    private func revealInFinderAndRename(_ fileURL: URL) {
-        NSWorkspace.shared.activateFileViewerSelecting([fileURL])
-        FinderRenameService.shared.renameWhenReady(fileURL)
     }
 }

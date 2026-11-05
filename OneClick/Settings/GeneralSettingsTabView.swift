@@ -29,7 +29,6 @@ struct GeneralSettingsTabView: View {
     @ObservedObject private var bookmarkManager = AppState.shared.bookmarkManager
 
     @State private var finderSyncStatus: PermissionStatus = .unknown
-    @State private var accessibilityStatus: PermissionStatus = .unknown
     @State private var showFolderPermissionsSheet = false
 
     @State private var showDirImporter = false
@@ -69,21 +68,6 @@ struct GeneralSettingsTabView: View {
                         .foregroundColor(finderSyncStatus.color)
                 }
 
-                // 辅助功能权限（行标签跟随系统设置的实际叫法：
-                // macOS 26 前叫"辅助功能"，27 起叫"设备控制和数据访问"）
-                LabeledContent {
-                    HStack(spacing: 8) {
-                        Text(accessibilityStatus.description)
-                            .foregroundStyle(.secondary)
-                        Button(AppLocalization.localized("Settings…")) {
-                            openAccessibilitySettings()
-                        }
-                    }
-                } label: {
-                    Label(SystemSettingsNaming.accessibilitySection, systemImage: accessibilityStatus.icon)
-                        .foregroundColor(accessibilityStatus.color)
-                }
-
                 // 文件夹权限（Bookmark）
                 LabeledContent {
                     HStack(spacing: 8) {
@@ -99,18 +83,9 @@ struct GeneralSettingsTabView: View {
             } header: {
                 Text(appLocalized: "Permissions")
             } footer: {
-                // 条目名按系统版本取实际叫法（27+ 的「扩展」「隐私与安全」「设备控制和数据访问」，
-                // 15/26 的「访达」「隐私与安全性」「辅助功能」）
-                Text(String(
-                    format: AppLocalization.localized(
-                        "Finder extension: enable \"OneClick\" under System Settings > General > Login Items & Extensions > %@. Accessibility: %@ > %@."
-                    ),
-                    SystemSettingsNaming.finderExtensionRow,
-                    SystemSettingsNaming.privacySecuritySection,
-                    SystemSettingsNaming.accessibilitySection
-                ))
-                .foregroundColor(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+                Text(appLocalized: "Finder extension: enable \"OneClick\" under System Settings > General > Login Items & Extensions > Extensions.")
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             // MARK: - 第三组：设置管理
@@ -212,13 +187,6 @@ struct GeneralSettingsTabView: View {
     private func updatePermissionStatus() {
         // Finder 扩展状态
         finderSyncStatus = FIFinderSyncController.isExtensionEnabled ? .enabled : .disabled
-
-        // 辅助功能权限检测
-        accessibilityStatus = PermissionChecker.hasAccessibilityPermission() ? .enabled : .disabled
-    }
-
-    private func hasAccessibilityPermission() -> Bool {
-        return PermissionChecker.hasAccessibilityPermission()
     }
 
     // MARK: - 权限设置打开
@@ -227,10 +195,6 @@ struct GeneralSettingsTabView: View {
         // macOS 13+ 的系统设置：Finder 扩展开关在"通用 → 登录项与扩展"面板里
         // （扩展区域底部）。旧锚点 com.apple.AppleFileProvider 在新版设置里无效。
         NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.LoginItems-Settings.extension")!)
-    }
-
-    private func openAccessibilitySettings() {
-        PermissionChecker.openAccessibilitySettings()
     }
 
     // MARK: - 设置管理
