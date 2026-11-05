@@ -1,6 +1,41 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+  "A built-in blank document is used by default. Custom templates are optional.": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "A built-in blank document is used by default. Custom templates are optional."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "默认使用内置空白文档，无需配置模板；也可按需选择自定义模板。"
+        }
+      },
+      "ja": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "標準では内蔵の空白書類を使用します。カスタムテンプレートの設定は任意です。"
+        }
+      },
+      "es": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "De forma predeterminada se usa un documento en blanco integrado. Las plantillas personalizadas son opcionales."
+        }
+      },
+      "fr": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Un document vierge intégré est utilisé par défaut. Les modèles personnalisés sont facultatifs."
+        }
+      }
+    }
+  },
   "Extracting…": {
     "extractionState": "manual",
     "localizations": {
@@ -36,37 +71,37 @@
       }
     }
   },
-  "This file type requires a template. Choose a valid template in New File settings.": {
+  "The built-in template is missing. Reinstall OneClick and try again.": {
     "extractionState": "manual",
     "localizations": {
       "en": {
         "stringUnit": {
           "state": "translated",
-          "value": "This file type requires a template. Choose a valid template in New File settings."
+          "value": "The built-in template is missing. Reinstall OneClick and try again."
         }
       },
       "zh-Hans": {
         "stringUnit": {
           "state": "translated",
-          "value": "此文件类型需要模板。请在“新建文件”设置中选择有效的模板。"
+          "value": "内置模板缺失。请重新安装 OneClick 后重试。"
         }
       },
       "ja": {
         "stringUnit": {
           "state": "translated",
-          "value": "このファイル形式にはテンプレートが必要です。「新規ファイル」設定で有効なテンプレートを選択してください。"
+          "value": "内蔵テンプレートが見つかりません。OneClick を再インストールして、もう一度お試しください。"
         }
       },
       "es": {
         "stringUnit": {
           "state": "translated",
-          "value": "Este tipo de archivo requiere una plantilla. Selecciona una plantilla válida en los ajustes de Nuevo archivo."
+          "value": "Falta la plantilla integrada. Reinstala OneClick e inténtalo de nuevo."
         }
       },
       "fr": {
         "stringUnit": {
           "state": "translated",
-          "value": "Ce type de fichier nécessite un modèle. Choisissez un modèle valide dans les réglages Nouveau fichier."
+          "value": "Le modèle intégré est manquant. Réinstallez OneClick et réessayez."
         }
       }
     }

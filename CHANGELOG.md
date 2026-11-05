@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Direct Delete now always asks for confirmation before permanently removing files. Hold Option while choosing it to skip the prompt
 
 ### Added
+- Built-in blank DOCX, PPTX, Pages, Keynote and Numbers documents; enable these file types by default without requiring user template configuration
 - Built-in app presets, per-app toolbar/context-menu visibility, and none/simple/original icon styles
 - Automatic/on/off containing-folder behavior for terminal and other apps, with compatible persistence and IPC
 - Offline Copy Path and a clickable hint that quietly relaunches the host

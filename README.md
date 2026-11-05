@@ -30,7 +30,7 @@ An everyday Mac toolkit for Finder right-click actions, archive browsing and inp
 - [x] **Delete Direct** — Delete files or folders directly, bypassing Trash. OneClick asks for confirmation first; hold **Option** while choosing the action to skip it.
 - [x] **Hide / Unhide** — Toggle file visibility in Finder.
 - [x] **AirDrop** — Share files instantly via AirDrop.
-- [x] **Create New Files** — Generate new files from templates directly in Finder. Supports `.txt`, `.json`, `.md`, `.docx`, `.pptx`, `.xlsx`, as well as Apple iWork formats: `.pages`, `.key`, `.numbers`.
+- [x] **Create New Files** — Create files directly in Finder. Office (`.docx`, `.pptx`, `.xlsx`) and Apple iWork (`.pages`, `.key`, `.numbers`) formats include built-in blank documents and work without template configuration. Custom templates are optional. Also supports `.txt`, `.json` and `.md`.
 - [x] **Quick Access Folders** — Pin frequently used directories to the right-click menu.
 - [x] **Terminal-aware Opening** — Terminal presets hand the containing folder to the app by default, with an automatic/on/off override per app.
 - [x] **Dark Mode** — Full light/dark appearance support with adaptive icons and SF Symbols.

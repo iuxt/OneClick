@@ -124,6 +124,10 @@ struct EditFileTypeSheetView: View {
                     }
                 } header: {
                     Text(appLocalized: "Template")
+                } footer: {
+                    if template == nil, FileCreationPolicy.builtInTemplate(for: ext) != nil {
+                        Text(appLocalized: "A built-in blank document is used by default. Custom templates are optional.")
+                    }
                 }
 
                 Section {

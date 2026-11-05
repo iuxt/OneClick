@@ -2,9 +2,9 @@ import Foundation
 
 nonisolated enum FileCreationPolicy {
     enum Failure: LocalizedError {
-        case templateRequired
+        case missingBuiltInTemplate
         var errorDescription: String? {
-            AppLocalization.localized("This file type requires a template. Choose a valid template in New File settings.")
+            AppLocalization.localized("The built-in template is missing. Reinstall OneClick and try again.")
         }
     }
 
@@ -21,5 +21,11 @@ nonisolated enum FileCreationPolicy {
 
     static func requiresTemplate(_ ext: String) -> Bool {
         [".docx", ".pptx", ".xlsx", ".pages", ".key", ".numbers"].contains(ext.lowercased())
+    }
+
+    /// Templates are ordinary bundle resources, not asset-catalog data sets.
+    static func builtInTemplate(for ext: String, bundle: Bundle = .main) -> URL? {
+        guard let normalized = try? normalizedExtension(ext), requiresTemplate(normalized) else { return nil }
+        return bundle.url(forResource: "template", withExtension: String(normalized.dropFirst()).lowercased())
     }
 }

@@ -95,8 +95,8 @@ swiftlint
 ### Adding New File Templates
 
 1. Add to `NewFile` model in [Shared/RCBase.swift](Shared/RCBase.swift)
-2. Add template file to [Assets.xcassets](OneClick/Assets.xcassets/)
-3. Handle creation in [ActionService.swift](OneClick/Runtime/ActionService.swift) in `createFile()` method
+2. Add a valid blank document as `OneClick/Resources/template.<extension>` (ordinary bundle resource, not an asset-catalog data set)
+3. Resolve built-in templates in `FileCreationPolicy`; `FileActionWorker.create` copies the custom template when present, otherwise the built-in blank document
 
 ### Inter-Process Communication
 

@@ -62,12 +62,12 @@ final class NewFileTypeEntity {
             NewFileTypeEntity(id: "txt", fileExtension: ".txt", name: "TXT", icon: "doc.text", sortOrder: 0),
             NewFileTypeEntity(id: "md", fileExtension: ".md", name: "Markdown", icon: "doc.richtext", sortOrder: 1),
             NewFileTypeEntity(id: "json", fileExtension: ".json", name: "JSON", icon: "curlybraces", isEnabled: false, sortOrder: 2),
-            NewFileTypeEntity(id: "docx", fileExtension: ".docx", name: "DOCX", icon: "doc.richtext.fill", isEnabled: false, sortOrder: 3),
-            NewFileTypeEntity(id: "pptx", fileExtension: ".pptx", name: "PPTX", icon: "rectangle.on.rectangle.fill", isEnabled: false, sortOrder: 4),
+            NewFileTypeEntity(id: "docx", fileExtension: ".docx", name: "DOCX", icon: "doc.richtext.fill", sortOrder: 3),
+            NewFileTypeEntity(id: "pptx", fileExtension: ".pptx", name: "PPTX", icon: "rectangle.on.rectangle.fill", sortOrder: 4),
             NewFileTypeEntity(id: "xlsx", fileExtension: ".xlsx", name: "XLSX", icon: "tablecells", sortOrder: 5),
-            NewFileTypeEntity(id: "pages", fileExtension: ".pages", name: "Pages", icon: "doc.richtext", isEnabled: false, sortOrder: 6),
-            NewFileTypeEntity(id: "key", fileExtension: ".key", name: "Keynote", icon: "rectangle.on.rectangle", isEnabled: false, sortOrder: 7),
-            NewFileTypeEntity(id: "numbers", fileExtension: ".numbers", name: "Numbers", icon: "tablecells", isEnabled: false, sortOrder: 8),
+            NewFileTypeEntity(id: "pages", fileExtension: ".pages", name: "Pages", icon: "doc.richtext", sortOrder: 6),
+            NewFileTypeEntity(id: "key", fileExtension: ".key", name: "Keynote", icon: "rectangle.on.rectangle", sortOrder: 7),
+            NewFileTypeEntity(id: "numbers", fileExtension: ".numbers", name: "Numbers", icon: "tablecells", sortOrder: 8),
         ]
     }
 }

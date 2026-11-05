@@ -99,7 +99,9 @@ final class ConfigService {
 
         // NewFiles
         let newFileDescriptor = FetchDescriptor<NewFileTypeEntity>(sortBy: [SortDescriptor(\.sortOrder)])
-        data.newFiles = (try? modelContext.fetch(newFileDescriptor))?.map { entity in
+        let savedFiles = (try? modelContext.fetch(newFileDescriptor)) ?? []
+        enableNewlyBundledFileTypes(savedFiles)
+        data.newFiles = savedFiles.map { entity in
             var file = NewFile(
                 ext: entity.fileExtension,
                 name: entity.name,
@@ -111,7 +113,7 @@ final class ConfigService {
             file.template = entity.templatePath.map { URL(fileURLWithPath: $0) }
             file.openApp = entity.openAppPath.map { URL(fileURLWithPath: $0) }
             return file
-        } ?? []
+        }
 
         // CommonDirs（含旧图标自动修复）
         let commonDirDescriptor = FetchDescriptor<CommonDirEntity>(sortBy: [SortDescriptor(\.sortOrder)])
@@ -140,6 +142,34 @@ final class ConfigService {
 
         logger.debug("Load from SwiftData: \(data.apps.count) apps, \(data.actions.count) actions, \(data.newFiles.count) newFiles, \(data.commonDirs.count) commonDirs")
         return data
+    }
+
+    /// The previous release disabled these defaults because their templates were
+    /// absent. Enable unchanged built-ins once when upgrading, then honor later
+    /// disabled choices. Custom types, templates and app choices stay untouched.
+    private func enableNewlyBundledFileTypes(_ files: [NewFileTypeEntity]) {
+        guard !files.isEmpty else { return }
+        let key = "built-in-document-templates-enabled"
+        do {
+            guard try modelContext.fetchCount(FetchDescriptor<DataVersion>(predicate: #Predicate { $0.key == key })) == 0 else { return }
+            let newlyAvailable: Set<String> = ["docx", "pptx", "pages", "key", "numbers"]
+            let defaults = NewFile.all.filter { newlyAvailable.contains($0.id) }
+            try modelContext.transaction {
+                for entity in files where !entity.isEnabled && entity.templatePath == nil && entity.openAppPath == nil {
+                    guard let original = defaults.first(where: { $0.id == entity.id }),
+                          entity.fileExtension == original.ext, entity.name == original.name,
+                          entity.icon == original.icon,
+                          FileCreationPolicy.builtInTemplate(for: original.ext) != nil else { continue }
+                    entity.isEnabled = true
+                    entity.updatedAt = Date()
+                }
+                modelContext.insert(DataVersion(key: key, version: 1))
+                try modelContext.save()
+            }
+        } catch {
+            modelContext.rollback()
+            logger.error("Could not enable built-in document templates: \(error.localizedDescription)")
+        }
     }
 
     /// Reconcile stable IDs in place. Unchanged rows never become database writes.

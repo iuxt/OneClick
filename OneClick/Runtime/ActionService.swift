@@ -346,8 +346,7 @@ final class ActionService {
         } else {
             guard let item = state.getFileType(rid: rid) else { return }
             ext = item.ext
-            let suffix = (try? FileCreationPolicy.normalizedExtension(ext))?.dropFirst().lowercased()
-            template = item.template ?? suffix.flatMap { Bundle.main.url(forResource: "template", withExtension: $0) }
+            template = item.template
         }
         let activity = FileActionActivity()
         do {

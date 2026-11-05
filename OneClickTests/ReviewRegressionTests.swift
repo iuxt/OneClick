@@ -165,24 +165,57 @@ struct ReviewRegressionTests {
         #expect(second.lastPathComponent == "Untitled1.txt")
     }
 
-    @Test(arguments: ["docx", "pptx", "xlsx", "pages", "key", "numbers"])
-    func structuredDocumentsRequireTemplates(ext: String) async throws {
+    @Test(arguments: ["docx", "pptx", "xlsx", "pages", "key", "numbers", " .DOCX\n"])
+    func structuredDocumentsUseBundledTemplates(ext: String) async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
-        await #expect(throws: FileCreationPolicy.Failure.self) {
-            try await FileActionWorker.create(in: root, extension: ext, template: nil, baseName: "Untitled")
-        }
-        #expect(try FileManager.default.contentsOfDirectory(atPath: root.path).isEmpty)
-        if ext != "xlsx" {
-            #expect(NewFile.all.first { $0.id == ext }?.enabled == false)
-            #expect(NewFileTypeEntity.createDefaultFileTypes().first { $0.id == ext }?.isEnabled == false)
-        }
-        let template = root.appendingPathComponent("template")
-        let bytes = Data("template content".utf8)
-        try bytes.write(to: template)
-        let file = try await FileActionWorker.create(in: root, extension: ext, template: template, baseName: "Untitled")
+        let bundled = try #require(FileCreationPolicy.builtInTemplate(for: ext))
+        let bytes = try Data(contentsOf: bundled)
+        #expect(bytes.starts(with: [0x50, 0x4B]))
+        let file = try await FileActionWorker.create(in: root, extension: ext, template: nil, baseName: "Untitled")
         #expect(try Data(contentsOf: file) == bytes)
+        let second = try await FileActionWorker.create(in: root, extension: ext, template: nil, baseName: "Untitled")
+        #expect(second.lastPathComponent == "Untitled1" + (try FileCreationPolicy.normalizedExtension(ext)))
+        #expect(try Data(contentsOf: second) == bytes)
+        let id = bundled.pathExtension
+        #expect(NewFile.all.first { $0.id == id }?.enabled == true)
+        #expect(NewFileTypeEntity.createDefaultFileTypes().first { $0.id == id }?.isEnabled == true)
+
+        // A user-supplied template still takes priority over the built-in blank.
+        let custom = root.appendingPathComponent("custom-template")
+        let customBytes = Data("custom template content".utf8)
+        try customBytes.write(to: custom)
+        let customized = try await FileActionWorker.create(in: root, extension: ext, template: custom, baseName: "Custom")
+        #expect(try Data(contentsOf: customized) == customBytes)
+        #expect(try Data(contentsOf: bundled) == bytes)
+    }
+
+    @Test func upgradingEnablesPreviouslyUnavailableDefaultsOnlyOnce() throws {
+        let context = try context()
+        for entity in NewFileTypeEntity.createDefaultFileTypes() {
+            entity.isEnabled = false
+            if entity.id == "pages" { entity.templatePath = "/custom/template.pages" }
+            if entity.id == "key" { entity.fileExtension = ".custom" }
+            if entity.id == "numbers" { entity.openAppPath = "/Applications/Custom.app" }
+            context.insert(entity)
+        }
+        try context.save()
+        let config = ConfigService(modelContext: context)
+        let upgraded = config.load()
+        for id in ["docx", "pptx"] {
+            #expect(upgraded.newFiles.first { $0.id == id }?.enabled == true)
+        }
+        for id in ["txt", "md", "json", "xlsx", "pages", "key", "numbers"] {
+            #expect(upgraded.newFiles.first { $0.id == id }?.enabled == false)
+        }
+        var edited = upgraded
+        let index = try #require(edited.newFiles.firstIndex { $0.id == "docx" })
+        edited.newFiles[index].enabled = false
+        try config.save(edited)
+        let restarted = ConfigService(modelContext: ModelContext(context.container)).load()
+        #expect(restarted.newFiles.first { $0.id == "docx" }?.enabled == false)
+        #expect(restarted.newFiles.first { $0.id == "pptx" }?.enabled == true)
     }
 
     @Test func extractionFailureKeepsBrowserAvailableForRetry() async throws {
