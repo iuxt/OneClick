@@ -13,15 +13,14 @@ concurrency:
 jobs:
   build-and-test:
     name: Build & Test (macOS)
-    runs-on: macos-latest
+    runs-on: xcode-27
     steps:
       - name: Checkout
         uses: actions/checkout@v5
 
       - name: Select Xcode
         run: |
-          XCODE_PATH=$(ls -d /Applications/Xcode*.app | sort -V | tail -1)
-          sudo xcode-select -s "$XCODE_PATH/Contents/Developer"
+          sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
           xcodebuild -version
           SDK_VERSION=$(xcrun --sdk macosx --show-sdk-version)
           if [[ "${SDK_VERSION%%.*}" -lt 27 ]]; then

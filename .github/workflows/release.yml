@@ -15,7 +15,7 @@ concurrency:
 jobs:
   build-and-release:
     name: Build and Release (no Apple certificate required)
-    runs-on: macos-latest
+    runs-on: xcode-27
     timeout-minutes: 30
     defaults:
       run:
@@ -33,8 +33,7 @@ jobs:
 
       - name: Select Xcode
         run: |
-          XCODE_PATH=$(ls -d /Applications/Xcode*.app | sort -V | tail -1)
-          sudo xcode-select -s "$XCODE_PATH/Contents/Developer"
+          sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
           xcodebuild -version
           SDK_VERSION=$(xcrun --sdk macosx --show-sdk-version)
           if [[ "${SDK_VERSION%%.*}" -lt 27 ]]; then
