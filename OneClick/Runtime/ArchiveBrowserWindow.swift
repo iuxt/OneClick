@@ -36,8 +36,9 @@ private final class ArchiveBrowserWindowController: NSWindowController, NSWindow
         })
         window.title = url.lastPathComponent
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
-        window.setContentSize(NSSize(width: 1180, height: 640))
-        window.contentMinSize = NSSize(width: 1020, height: 460)
+        window.applyOneClickChrome()
+        window.setContentSize(NSSize(width: 1080, height: 600))
+        window.contentMinSize = NSSize(width: 900, height: 420)
         window.center()
         super.init(window: window)
         window.delegate = self
@@ -272,21 +273,14 @@ private struct ArchiveBrowserView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 12) {
-                Image(systemName: "archivebox.fill").font(.title).foregroundStyle(.orange)
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(model.url.lastPathComponent).font(.headline).lineLimit(1)
-                    Text(appLocalized: "Browse files without extracting the entire archive")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-                Spacer()
-                Button(AppLocalization.localized("Extract All…"), systemImage: "arrow.down.doc") { model.extract(closeWindow: close) }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(model.loading || model.extracting)
-            }.padding(20)
-            Divider()
             if model.extracting {
-                ProgressView(AppLocalization.localized("Extracting…")).padding(12)
+                HStack(spacing: 10) {
+                    ProgressView().controlSize(.small)
+                    Text(appLocalized: "Extracting…")
+                        .font(.callout.weight(.medium))
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
             }
             if let error = model.extractionError {
                 Label(error, systemImage: "exclamationmark.triangle").foregroundStyle(.red).padding(12)
@@ -310,6 +304,11 @@ private struct ArchiveBrowserView: View {
                     Text(model.folder).lineLimit(1).truncationMode(.middle)
                 }
                 Spacer()
+                Button(AppLocalization.localized("Extract All…"), systemImage: "arrow.down.doc") {
+                    model.extract(closeWindow: close)
+                }
+                .buttonStyle(.glassProminent)
+                .disabled(model.loading || model.extracting)
                 TextField(AppLocalization.localized("Search Archive"), text: $model.search)
                     .textFieldStyle(.roundedBorder).frame(width: 220)
             }.padding(.horizontal, 16).padding(.vertical, 10)

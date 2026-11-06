@@ -38,16 +38,26 @@ private final class ArchiveWindowController: NSWindowController, NSWindowDelegat
         })
         window.title = AppLocalization.localized("Archives")
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
+        window.applyOneClickChrome()
         window.setContentSize(NSSize(width: 520, height: model.preferredWindowHeight))
         window.contentMinSize = NSSize(width: 500, height: 280)
         window.center()
         super.init(window: window)
         window.delegate = self
         sizing = model.$rows.combineLatest(model.$isRunning)
-            .map { rows, running in ArchiveViewModel.windowHeight(rows: rows, isRunning: running) }
-            .removeDuplicates()
-            .sink { [weak window] height in
+            .sink { [weak window] values in
                 guard let window else { return }
+                let (rows, running) = values
+                let height = ArchiveViewModel.windowHeight(rows: rows, isRunning: running)
+                let operation = rows.first(where: { $0.isRunning })?.request.operation ?? rows.first?.request.operation
+                window.title = running
+                    ? AppLocalization.localized(operation?.isExtraction == true ? "Extracting…" : "Processing archive…")
+                    : AppLocalization.localized("Archives")
+                window.contentMinSize = NSSize(width: 500, height: running ? height : 280)
+                window.contentMaxSize = NSSize(
+                    width: CGFloat.greatestFiniteMagnitude,
+                    height: running ? height : CGFloat.greatestFiniteMagnitude
+                )
                 let size = NSSize(width: window.contentLayoutRect.width, height: height)
                 var frame = window.frameRect(forContentRect: NSRect(origin: .zero, size: size))
                 frame.origin = NSPoint(x: window.frame.minX, y: window.frame.maxY - frame.height)
@@ -111,7 +121,7 @@ final class ArchiveViewModel: ObservableObject {
     var preferredWindowHeight: CGFloat { Self.windowHeight(rows: rows, isRunning: isRunning) }
 
     static func windowHeight(rows: [Row], isRunning: Bool) -> CGFloat {
-        if isRunning { return 340 }
+        if isRunning { return 80 }
         if !isRunning, rows.contains(where: { $0.needsConfiguration }) { return 640 }
         if !isRunning, rows.contains(where: { $0.needsPassword }) { return 360 }
         return 340 + CGFloat(min(3, max(0, rows.count - 1))) * 72
@@ -329,29 +339,30 @@ private struct ArchiveView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                Label(AppLocalization.localized("Archives"), systemImage: "archivebox")
-                    .font(.headline)
-                Spacer()
+            if model.isRunning {
+                ArchiveActivityView(activity: model.activity, cancel: close)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 12)
+            } else {
                 if pendingRow?.needsConfiguration == true {
-                    Picker(AppLocalization.localized("Archive Format"), selection: $form.format) {
-                        ForEach(ArchiveCompressionFormat.allCases, id: \.self) { format in
-                            Text(verbatim: format.rawValue).tag(format)
+                    HStack {
+                        Spacer()
+                        Picker(AppLocalization.localized("Archive Format"), selection: $form.format) {
+                            ForEach(ArchiveCompressionFormat.allCases, id: \.self) { format in
+                                Text(verbatim: format.rawValue).tag(format)
+                            }
                         }
+                        .labelsHidden()
+                        .frame(width: 130)
+                        .controlSize(.large)
+                        .disabled(model.isRunning)
                     }
-                    .labelsHidden()
-                    .frame(width: 130)
-                    .controlSize(.large)
-                    .disabled(model.isRunning)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
                 }
-            }
-            .padding(16)
 
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 14) {
-                    if model.isRunning {
-                        ArchiveActivityView(activity: model.activity)
-                    } else {
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 14) {
                         ForEach(model.rows) { row in
                             archiveRow(row)
                             if row.id != model.rows.last?.id {
@@ -359,37 +370,35 @@ private struct ArchiveView: View {
                             }
                         }
                     }
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 16)
                 }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 16)
-            }
-            .scrollBounceBehavior(.basedOnSize)
+                .scrollBounceBehavior(.basedOnSize)
 
-            Divider()
-            HStack(spacing: 12) {
-                Spacer()
-                if model.isRunning || pendingRow != nil {
-                    Button(AppLocalization.localized("Cancel"), action: close)
-                        .buttonStyle(.glass)
-                        .keyboardShortcut(.cancelAction)
+                Divider()
+                HStack(spacing: 12) {
+                    Spacer()
                     if pendingRow != nil {
+                        Button(AppLocalization.localized("Cancel"), action: close)
+                            .buttonStyle(.glass)
+                            .keyboardShortcut(.cancelAction)
                         Button(AppLocalization.localized(submitTitle), action: submit)
                             .buttonStyle(.glassProminent)
                             .keyboardShortcut(.defaultAction)
                             .disabled(!canSubmit)
+                    } else {
+                        Button(AppLocalization.localized("Done"), action: close)
+                            .buttonStyle(.glassProminent)
+                            .keyboardShortcut(.defaultAction)
                     }
-                } else {
-                    Button(AppLocalization.localized("Done"), action: close)
-                        .buttonStyle(.glassProminent)
-                        .keyboardShortcut(.defaultAction)
                 }
+                .controlSize(.large)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 14)
+                .background(.bar)
             }
-            .controlSize(.large)
-            .padding(.horizontal, 20)
-            .padding(.vertical, 14)
-            .background(.bar)
         }
-        .frame(minWidth: 500, minHeight: 280)
+        .frame(minWidth: 500, minHeight: model.isRunning ? 80 : 280)
         .onAppear { model.start() }
         .onChange(of: model.shouldCloseAutomatically) {
             if model.shouldCloseAutomatically { close() }
@@ -431,9 +440,8 @@ private struct ArchiveView: View {
                             ArchivePasswordForm(operation: row.request.operation, form: $form, submit: submit)
                         }
                     }
-                    .padding(18)
+                    .padding(.vertical, 8)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(.quinary, in: RoundedRectangle(cornerRadius: 14))
                     .disabled(model.isRunning)
                 } else if !row.isRunning && row.error == nil {
                     Text(appLocalized: "Waiting…").foregroundStyle(.secondary)
@@ -459,6 +467,7 @@ private struct ArchiveView: View {
 
 private struct ArchiveActivityView: View {
     @ObservedObject var activity: ArchiveViewModel.Activity
+    let cancel: () -> Void
 
     var body: some View {
         HStack(alignment: .center, spacing: 16) {
@@ -483,56 +492,29 @@ private struct ArchiveActivityView: View {
                     Text(appLocalized: "Overall Progress")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    ArchiveProgressBar(fraction: activity.state.overallFraction)
+                    OneClickProgressBar(
+                        fraction: activity.state.overallFraction,
+                        accessibilityLabel: AppLocalization.localized("Overall Progress")
+                    )
                 }
             }
+
+            Button(action: cancel) {
+                Image(systemName: "xmark")
+                    .font(.body.weight(.medium))
+                    .frame(width: 28, height: 28)
+            }
+            .buttonStyle(.glass)
+            .keyboardShortcut(.cancelAction)
+            .help(AppLocalization.localized("Cancel"))
+            .accessibilityLabel(AppLocalization.localized("Cancel"))
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 20)
         .frame(maxWidth: .infinity, alignment: .leading)
         .animation(.smooth(duration: 0.25), value: activity.state.overallFraction)
     }
 
     private var percentageText: String {
         activity.state.overallFraction.map { "\(Int(($0 * 100).rounded(.down)))%" } ?? "—"
-    }
-}
-
-private struct ArchiveProgressBar: View {
-    let fraction: Double?
-
-    private var normalizedFraction: Double {
-        min(1, max(0, fraction ?? 0))
-    }
-
-    var body: some View {
-        if fraction == nil {
-            ProgressView()
-                .progressViewStyle(.linear)
-                .controlSize(.small)
-                .accessibilityLabel(AppLocalization.localized("Overall Progress"))
-        } else {
-            GeometryReader { proxy in
-                ZStack(alignment: .leading) {
-                    Capsule()
-                        .fill(.primary.opacity(0.10))
-                    Capsule()
-                        .fill(
-                            LinearGradient(
-                                colors: [Color.accentColor.opacity(0.72), Color.accentColor],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                        .frame(width: proxy.size.width * normalizedFraction)
-                }
-            }
-            .frame(height: 8)
-            .animation(.smooth(duration: 0.25), value: normalizedFraction)
-            .accessibilityElement()
-            .accessibilityLabel(AppLocalization.localized("Overall Progress"))
-            .accessibilityValue("\(Int((normalizedFraction * 100).rounded(.down)))%")
-        }
     }
 }
 

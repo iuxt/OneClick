@@ -78,12 +78,14 @@ struct FolderPermissionsSheetView: View {
                 } label: {
                     Label(AppLocalization.localized("Add a Folder…"), systemImage: "plus")
                 }
+                .buttonStyle(.glass)
 
                 Spacer()
 
                 Button(AppLocalization.localized("Done")) {
                     dismiss()
                 }
+                .buttonStyle(.glassProminent)
                 .keyboardShortcut(.escape)
             }
             .padding()

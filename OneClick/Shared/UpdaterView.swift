@@ -11,7 +11,7 @@ struct UpdateView: View {
     @ObservedObject var updateManager: UpdateManager
     
     var body: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 16) {
             if updateManager.isChecking {
                 checkingView
             } else if let release = updateManager.availableUpdate {
@@ -23,13 +23,13 @@ struct UpdateView: View {
             }
         }
         .padding(20)
-        .frame(width: 400)
+        .frame(width: 420)
     }
     
     private var checkingView: some View {
-        VStack(spacing: 15) {
+        HStack(spacing: 14) {
             ProgressView()
-                .scaleEffect(1.5)
+                .controlSize(.small)
             Text(appLocalized: "Checking for updates...")
                 .font(.headline)
         }
@@ -37,10 +37,10 @@ struct UpdateView: View {
     
     private func updateAvailableView(_ release: GitHubRelease) -> some View {
         // 更新可用视图实现保持不变...
-        VStack(spacing: 15) {
+        VStack(spacing: 12) {
             Image(systemName: "arrow.down.circle.fill")
-                .font(.system(size: 50))
-                .foregroundColor(.blue)
+                .font(.system(size: 34))
+                .foregroundStyle(.tint)
             
             Text(appLocalized: "New Version Available")
                 .font(.title2)
@@ -53,37 +53,38 @@ struct UpdateView: View {
             ScrollView {
                 Text(release.body)
                     .font(.body)
-                    .padding(5)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
             .frame(maxHeight: 150)
-            .background(Color.secondary.opacity(0.1))
-            .cornerRadius(8)
             
             HStack {
                 Button(AppLocalization.localized("Ignore This Version")) {
                     updateManager.ignoreCurrentUpdate()
                     updateManager.dismissUpdateSheet()
                 }
+                .buttonStyle(.glass)
                 
                 Button(AppLocalization.localized("Download Manually")) {
                     updateManager.openReleasesPage()
                     updateManager.dismissUpdateSheet()
                 }
+                .buttonStyle(.glass)
                 
                 Button(AppLocalization.localized("Download and Install")) {
                     Task {
                         await updateManager.downloadAndInstallUpdate()
                     }
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.glassProminent)
             }
         }
     }
     
     private var noUpdateView: some View {
-        VStack(spacing: 15) {
+        VStack(spacing: 12) {
             Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 50))
+                .font(.system(size: 34))
                 .foregroundColor(.green)
             
             Text(appLocalized: "Up to Date")
@@ -96,14 +97,14 @@ struct UpdateView: View {
             Button(AppLocalization.localized("OK")) {
                 updateManager.dismissUpdateSheet()
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.glassProminent)
         }
     }
     
     private func errorView(_ error: String) -> some View {
-        VStack(spacing: 15) {
+        VStack(spacing: 12) {
             Image(systemName: "exclamationmark.triangle.fill")
-                .font(.system(size: 50))
+                .font(.system(size: 34))
                 .foregroundColor(.yellow)
             
             Text(appLocalized: "Failed to Check for Updates")
@@ -117,7 +118,7 @@ struct UpdateView: View {
             Button(AppLocalization.localized("OK")) {
                 updateManager.dismissUpdateSheet()
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(.glassProminent)
         }
     }
 }

@@ -272,6 +272,7 @@ private struct AddInputMethodRuleSheet: View {
             HStack {
                 Spacer()
                 Button(AppLocalization.localized("Cancel")) { dismiss() }
+                    .buttonStyle(.glass)
                     .keyboardShortcut(.cancelAction)
                 Button(AppLocalization.localized("Add")) {
                     guard canAdd, let applicationURL else { return }
@@ -281,6 +282,7 @@ private struct AddInputMethodRuleSheet: View {
                     if let serviceError = service.error { error = serviceError }
                     else { dismiss() }
                 }
+                .buttonStyle(.glassProminent)
                 .keyboardShortcut(.defaultAction)
                 .disabled(!canAdd)
             }

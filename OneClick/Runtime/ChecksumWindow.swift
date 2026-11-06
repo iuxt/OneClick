@@ -36,8 +36,9 @@ private final class ChecksumWindowController: NSWindowController, NSWindowDelega
         let window = NSWindow(contentViewController: NSHostingController(rootView: ChecksumView(model: model)))
         window.title = AppLocalization.localized("File Checksums")
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
-        window.setContentSize(NSSize(width: 780, height: 480))
-        window.minSize = NSSize(width: 650, height: 360)
+        window.applyOneClickChrome()
+        window.setContentSize(NSSize(width: 720, height: 440))
+        window.minSize = NSSize(width: 620, height: 320)
         window.center()
         super.init(window: window)
         window.delegate = self
@@ -162,35 +163,66 @@ private struct ChecksumView: View {
     @ObservedObject var model: ChecksumViewModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Label(AppLocalization.localized("File Checksums"), systemImage: "number.square")
-                    .font(.title2.bold())
-                Spacer()
-                if model.isRunning {
-                    Button(AppLocalization.localized("Cancel")) { model.cancel() }
-                }
-                Button(AppLocalization.localized("Copy All")) { model.copy(model.copyText) }
-                    .disabled(!model.hasResults)
-            }
+        VStack(alignment: .leading, spacing: 0) {
             if model.rows.isEmpty {
                 ContentUnavailableView(AppLocalization.localized("Select files in Finder to calculate checksums."), systemImage: "doc")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 if model.isRunning {
-                    ProgressView(value: model.progress)
-                    Text(appLocalized: "Calculating checksums…")
-                        .foregroundStyle(.secondary)
+                    HStack(spacing: 14) {
+                        Image(systemName: "number.square.fill")
+                            .font(.system(size: 22, weight: .semibold))
+                            .foregroundStyle(.tint)
+                            .frame(width: 42, height: 42)
+                            .background(.tint.opacity(0.12), in: Circle())
+                        VStack(alignment: .leading, spacing: 7) {
+                            HStack {
+                                Text(appLocalized: "Calculating checksums…")
+                                    .font(.headline)
+                                Spacer()
+                                Text("\(Int((model.progress * 100).rounded(.down)))%")
+                                    .font(.headline.monospacedDigit())
+                                    .contentTransition(.numericText())
+                            }
+                            OneClickProgressBar(
+                                fraction: model.progress,
+                                accessibilityLabel: AppLocalization.localized("Calculating checksums…")
+                            )
+                        }
+                        Button { model.cancel() } label: {
+                            Image(systemName: "xmark")
+                                .frame(width: 26, height: 26)
+                        }
+                        .buttonStyle(.glass)
+                        .keyboardShortcut(.cancelAction)
+                        .help(AppLocalization.localized("Cancel"))
+                        .accessibilityLabel(AppLocalization.localized("Cancel"))
+                    }
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 12)
+                } else {
+                    HStack {
+                        Spacer()
+                        Button(AppLocalization.localized("Copy All")) { model.copy(model.copyText) }
+                            .buttonStyle(.glassProminent)
+                            .disabled(!model.hasResults)
+                    }
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 10)
                 }
+                Divider()
                 ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 16) {
+                    LazyVStack(alignment: .leading, spacing: 0) {
                         ForEach(model.fileGroups) { file in
                             ChecksumFileView(file: file, copy: model.copy)
+                            if file.id != model.fileGroups.last?.id {
+                                Divider()
+                            }
                         }
                     }
                 }
             }
         }
-        .padding(20)
         .frame(minWidth: 610, minHeight: 320)
         .onAppear { model.start() }
     }
@@ -232,11 +264,6 @@ private struct ChecksumFileView: View {
                 }
             }
             .padding(14)
-        }
-        .background(.background, in: RoundedRectangle(cornerRadius: 10))
-        .overlay {
-            RoundedRectangle(cornerRadius: 10)
-                .strokeBorder(.quaternary, lineWidth: 1)
         }
     }
 }

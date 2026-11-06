@@ -202,11 +202,13 @@ struct EditFileTypeSheetView: View {
                 Button(AppLocalization.localized("Cancel")) {
                     dismiss()
                 }
+                .buttonStyle(.glass)
                 .keyboardShortcut(.escape)
 
                 Button(AppLocalization.localized(isAdding ? "Add" : "Save")) {
                     saveTask = Task { await saveChanges() }
                 }
+                .buttonStyle(.glassProminent)
                 .keyboardShortcut(.return)
                 .disabled(name.isEmpty || ext.isEmpty)
             }

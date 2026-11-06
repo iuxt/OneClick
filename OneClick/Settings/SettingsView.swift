@@ -84,7 +84,7 @@ struct SettingsView: View {
             }
         }
         .listStyle(.sidebar)
-        .navigationSplitViewColumnWidth(min: 205, ideal: 225, max: 280)
+        .navigationSplitViewColumnWidth(min: 185, ideal: 205, max: 240)
         .navigationTitle("OneClick")
     }
 
@@ -121,6 +121,7 @@ struct SettingsView: View {
         } detail: {
             SettingsPageStack(selection: selectedTab) { page(for: $0) }
                 .frame(minWidth: 450)
+                .buttonStyle(.glass)
                 .navigationTitle(AppLocalization.localized(selectedTab.titleKey))
         }
         .navigationSplitViewStyle(.balanced)

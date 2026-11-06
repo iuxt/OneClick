@@ -12,14 +12,18 @@ final class FileActionActivity {
             do { try await Task.sleep(for: .milliseconds(300)) } catch { return }
             guard let self else { return }
             let window = NSWindow(contentViewController: NSHostingController(rootView:
-                HStack(spacing: 16) {
+                HStack(spacing: 12) {
                     ProgressView().controlSize(.small)
                     Text(appLocalized: "Working on files…")
-                }.padding(24)
+                        .font(.callout.weight(.medium))
+                }
+                .padding(.horizontal, 18)
+                .padding(.vertical, 14)
             ))
             window.isReleasedWhenClosed = false
-            window.title = "OneClick"
+            window.title = AppLocalization.localized("Working on files…")
             window.styleMask = [.titled]
+            window.applyOneClickChrome()
             window.center()
             window.orderFront(nil)
             self.window = window

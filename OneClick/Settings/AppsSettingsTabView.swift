@@ -177,6 +177,7 @@ struct PresetAppsSheetView: View {
             HStack {
                 Spacer()
                 Button(AppLocalization.localized("Done")) { dismiss() }
+                    .buttonStyle(.glassProminent)
                     .keyboardShortcut(.defaultAction)
             }
             .padding(12)

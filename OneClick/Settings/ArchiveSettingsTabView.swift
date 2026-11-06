@@ -59,8 +59,7 @@ struct ArchiveSettingsTabView: View {
                         .scrollContentBackground(.hidden)
                         .padding(6)
                         .frame(height: 88)
-                        .background(.background, in: RoundedRectangle(cornerRadius: 6))
-                        .overlay(RoundedRectangle(cornerRadius: 6).stroke(.quaternary))
+                        .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 8))
                         .accessibilityLabel(AppLocalization.localized("Exclusion List"))
                 }
                 .disabled(!excludeFiles)

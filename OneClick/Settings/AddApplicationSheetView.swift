@@ -66,12 +66,15 @@ struct AddApplicationSheetView: View {
             Divider()
             HStack {
                 Button(AppLocalization.localized("Browse…")) { browsing = true }
+                    .buttonStyle(.glass)
                 Spacer()
                 Button(AppLocalization.localized("Cancel")) { dismiss() }
+                    .buttonStyle(.glass)
                     .keyboardShortcut(.cancelAction)
                 Button(AppLocalization.localized("Add")) {
                     if let selection { add(selection) }
                 }
+                .buttonStyle(.glassProminent)
                 .keyboardShortcut(.defaultAction)
                 .disabled(!canAddSelection)
             }

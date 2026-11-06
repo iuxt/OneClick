@@ -61,7 +61,8 @@ struct EditAppSheetView: View {
                     TextEditor(text: $environment)
                         .font(.system(.body, design: .monospaced))
                         .frame(height: 100)
-                        .border(Color.gray.opacity(0.2))
+                        .padding(6)
+                        .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 8))
                 } header: {
                     Text(appLocalized: "Environment Variables")
                 } footer: {
@@ -99,12 +100,14 @@ struct EditAppSheetView: View {
                 Button(AppLocalization.localized("Cancel")) {
                     dismiss()
                 }
+                .buttonStyle(.glass)
                 .keyboardShortcut(.escape)
 
                 Button(AppLocalization.localized("Save")) {
                     saveChanges()
                     dismiss()
                 }
+                .buttonStyle(.glassProminent)
                 .keyboardShortcut(.return)
             }
             .padding(.bottom, 20)
