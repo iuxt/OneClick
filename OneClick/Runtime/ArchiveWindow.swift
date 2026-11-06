@@ -487,12 +487,9 @@ private struct ArchiveActivityView: View {
                 }
             }
         }
-        .padding(20)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 20)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .glassEffect(
-            .regular.tint(Color.accentColor.opacity(0.08)),
-            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
-        )
         .animation(.smooth(duration: 0.25), value: activity.state.overallFraction)
     }
 
