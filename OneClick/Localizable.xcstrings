@@ -550,13 +550,13 @@
       "fr" : { "stringUnit" : { "state" : "translated", "value" : "Aucune donnée" } }
     }
   },
-  "Resource data stays on this Mac and is not sent to any server." : {
+  "Overview metrics are processed locally. Stats network checks may contact the configured host." : {
     "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "Resource data stays on this Mac and is not sent to any server." } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "资源数据仅保留在这台 Mac 上，不会发送到任何服务器。" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "リソースデータはこの Mac 内にのみ保存され、サーバーには送信されません。" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Los datos de recursos permanecen en este Mac y no se envían a ningún servidor." } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Les données de ressources restent sur ce Mac et ne sont envoyées à aucun serveur." } }
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Overview metrics are processed locally. Stats network checks may contact the configured host." } },
+      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "概览指标在本机处理；Stats 网络检查可能会连接到所配置的主机。" } },
+      "ja" : { "stringUnit" : { "state" : "translated", "value" : "概要メトリクスはローカルで処理されます。Stats のネットワーク確認は設定済みのホストに接続する場合があります。" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Las métricas generales se procesan localmente. Las comprobaciones de red de Stats pueden contactar al host configurado." } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Les métriques d’ensemble sont traitées localement. Les vérifications réseau de Stats peuvent contacter l’hôte configuré." } }
     }
   },
   "System Monitor" : {

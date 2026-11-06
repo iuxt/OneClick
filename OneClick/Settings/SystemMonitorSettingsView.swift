@@ -11,7 +11,6 @@ struct SystemMonitorSettingsView: View {
     @AppStorage(Key.systemMonitorDiskMenuBarItem, store: .group) private var diskMenuBarItem = false
     @AppStorage(Key.systemMonitorGPUMenuBarItem, store: .group) private var gpuMenuBarItem = false
     @AppStorage(Key.systemMonitorBatteryMenuBarItem, store: .group) private var batteryMenuBarItem = false
-    @AppStorage(Key.systemMonitorDiskMenuBarStyle, store: .group) private var diskStyle = DiskMenuBarStyle.percentage.rawValue
 
     var body: some View {
         Form {
@@ -24,7 +23,7 @@ struct SystemMonitorSettingsView: View {
             } header: {
                 Text(appLocalized: "System Monitor")
             } footer: {
-                Text(appLocalized: "Resource data stays on this Mac and is not sent to any server.")
+                Text(appLocalized: "Overview metrics are processed locally. Stats network checks may contact the configured host.")
                     .fixedSize(horizontal: false, vertical: true)
             }
 
@@ -32,13 +31,7 @@ struct SystemMonitorSettingsView: View {
                 simpleMenuBarItem("CPU", icon: "cpu", isOn: $cpuMenuBarItem)
                 simpleMenuBarItem("Memory", icon: "memorychip", isOn: $memoryMenuBarItem)
                 simpleMenuBarItem("Network", icon: "network", isOn: $networkMenuBarItem)
-                menuBarItem(
-                    "Disk",
-                    icon: "internaldrive",
-                    isOn: $diskMenuBarItem,
-                    style: $diskStyle,
-                    styles: DiskMenuBarStyle.allCases.map { ($0.rawValue, $0.title) }
-                )
+                simpleMenuBarItem("Disk", icon: "internaldrive", isOn: $diskMenuBarItem)
                 simpleMenuBarItem("GPU", icon: "display", isOn: $gpuMenuBarItem)
                 simpleMenuBarItem("Battery", icon: "battery.100percent", isOn: $batteryMenuBarItem)
             } header: {
@@ -53,6 +46,12 @@ struct SystemMonitorSettingsView: View {
         .onChange(of: refreshInterval) {
             monitor.configurationDidChange()
         }
+        .onChange(of: cpuMenuBarItem) { StatsMenuBarModules.shared.syncVisibility() }
+        .onChange(of: memoryMenuBarItem) { StatsMenuBarModules.shared.syncVisibility() }
+        .onChange(of: networkMenuBarItem) { StatsMenuBarModules.shared.syncVisibility() }
+        .onChange(of: diskMenuBarItem) { StatsMenuBarModules.shared.syncVisibility() }
+        .onChange(of: gpuMenuBarItem) { StatsMenuBarModules.shared.syncVisibility() }
+        .onChange(of: batteryMenuBarItem) { StatsMenuBarModules.shared.syncVisibility() }
     }
 
     private func simpleMenuBarItem(_ title: String, icon: String, isOn: Binding<Bool>) -> some View {
@@ -61,26 +60,6 @@ struct SystemMonitorSettingsView: View {
         }
     }
 
-    private func menuBarItem(
-        _ title: String,
-        icon: String,
-        isOn: Binding<Bool>,
-        style: Binding<Int>,
-        styles: [(Int, String)]
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Toggle(isOn: isOn) {
-                Label(AppLocalization.localized(title), systemImage: icon)
-            }
-            Picker(AppLocalization.localized("Display"), selection: style) {
-                ForEach(styles, id: \.0) { value, title in
-                    Text(AppLocalization.localized(title)).tag(value)
-                }
-            }
-            .controlSize(.small)
-            .disabled(!isOn.wrappedValue)
-        }
-    }
 }
 
 #Preview {

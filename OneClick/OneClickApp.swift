@@ -26,12 +26,6 @@ struct OneClickApp: App {
     @Environment(\.scenePhase) private var scenePhase
 
     @AppStorage(Key.showMenuBarExtra, store: .group) private var showMenuBarExtra = true
-    @AppStorage(Key.systemMonitorCPUMenuBarItem, store: .group) private var showCPUMonitor = true
-    @AppStorage(Key.systemMonitorMemoryMenuBarItem, store: .group) private var showMemoryMonitor = true
-    @AppStorage(Key.systemMonitorNetworkMenuBarItem, store: .group) private var showNetworkMonitor = true
-    @AppStorage(Key.systemMonitorDiskMenuBarItem, store: .group) private var showDiskMonitor = false
-    @AppStorage(Key.systemMonitorGPUMenuBarItem, store: .group) private var showGPUMonitor = false
-    @AppStorage(Key.systemMonitorBatteryMenuBarItem, store: .group) private var showBatteryMonitor = false
 
     @AppLog(category: "main")
     private var logger
@@ -58,57 +52,6 @@ struct OneClickApp: App {
             MenuBarView()
         } label: {
             OneClickMenuBarLabel()
-        }
-        .defaultAppStorage(.group)
-        .menuBarExtraStyle(.window)
-
-        // These are real, independent macOS status-bar items. Their labels are
-        // rendered directly in the system menu bar; the settings page only
-        // controls whether each item is inserted.
-        MenuBarExtra(isInserted: $showCPUMonitor) {
-            SystemMonitorModuleDetailView(module: .cpu)
-        } label: {
-            SystemMonitorStatusBarLabel(module: .cpu)
-        }
-        .defaultAppStorage(.group)
-        .menuBarExtraStyle(.window)
-
-        MenuBarExtra(isInserted: $showMemoryMonitor) {
-            SystemMonitorModuleDetailView(module: .memory)
-        } label: {
-            SystemMonitorStatusBarLabel(module: .memory)
-        }
-        .defaultAppStorage(.group)
-        .menuBarExtraStyle(.window)
-
-        MenuBarExtra(isInserted: $showNetworkMonitor) {
-            SystemMonitorModuleDetailView(module: .network)
-        } label: {
-            SystemMonitorStatusBarLabel(module: .network)
-        }
-        .defaultAppStorage(.group)
-        .menuBarExtraStyle(.window)
-
-        MenuBarExtra(isInserted: $showDiskMonitor) {
-            SystemMonitorModuleDetailView(module: .disk)
-        } label: {
-            SystemMonitorStatusBarLabel(module: .disk)
-        }
-        .defaultAppStorage(.group)
-        .menuBarExtraStyle(.window)
-
-        MenuBarExtra(isInserted: $showGPUMonitor) {
-            SystemMonitorModuleDetailView(module: .gpu)
-        } label: {
-            SystemMonitorStatusBarLabel(module: .gpu)
-        }
-        .defaultAppStorage(.group)
-        .menuBarExtraStyle(.window)
-
-        MenuBarExtra(isInserted: $showBatteryMonitor) {
-            SystemMonitorModuleDetailView(module: .battery)
-        } label: {
-            SystemMonitorStatusBarLabel(module: .battery)
         }
         .defaultAppStorage(.group)
         .menuBarExtraStyle(.window)
@@ -154,6 +97,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         logger.info("applicationDidFinishLaunching called")
         InputMethodService.shared.start()
         SystemMonitor.shared.start()
+        StatsMenuBarModules.shared.start()
 
         // 设置窗口打开策略。注意 OneClick 是 LSUIElement 应用，启动时系统不会
         // 激活它（NSApp.isActive 恒为 false），无法用激活状态区分启动来源，
@@ -276,6 +220,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        StatsMenuBarModules.shared.stop()
         InputMethodService.shared.stop()
         messager.sendQuitNotification()
         logger.info("applicationWillTerminate")

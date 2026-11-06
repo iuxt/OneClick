@@ -1,39 +1,38 @@
 # System Monitor
 
-OneClick includes a lightweight system monitor inspired by
+OneClick directly integrates the MIT-licensed framework targets from
 [Stats](https://github.com/exelban/stats). CPU, memory and network speed can be
 shown simultaneously as independent menu bar items; disk, GPU and battery
-items are optional. Clicking an item opens that module's history and ranking
-view. The System Monitor settings page controls each menu bar item, its display
-style, and the one-, two- or five-second sampling interval.
+items are optional. Each item uses Stats' original native status item, reader,
+widget and detail panel implementation.
 
 ## Architecture
 
-- `SystemMetricsSampler` is an actor that owns the previous CPU and network
-  counters. Keeping those counters actor-isolated makes rate calculations safe
-  while the UI requests automatic and manual refreshes.
-- `SystemMonitor` publishes the latest immutable snapshot and a bounded
-  60-sample history to SwiftUI on the main actor.
-- Disabled modules are not sampled, reducing the monitor's own energy impact.
-- CPU and memory use public Mach host statistics. Network totals come from
-  `getifaddrs`, disk capacity from volume resource values, battery data from
-  IOPowerSources, and GPU utilization from the public IOKit registry data that
-  the current hardware exposes.
-- Process rankings use `libproc` resource counters without launching shell
-  commands. CPU time is calculated between samples; memory uses physical
-  footprint. Network details rank active interfaces, and disk details rank
-  mounted local volumes by utilization.
-- Sampling is local. The monitor makes no network requests and stores no metric
-  history on disk.
+- `Vendor/Stats` contains the pinned upstream source and its original Xcode
+  project. `UPSTREAM.md` records the exact upstream commit and the small host
+  compatibility patch.
+- OneClick builds and embeds Stats' `Kit`, `CPU`, `RAM`, `Net`, `Disk`, `GPU`
+  and `Battery` dynamic frameworks.
+- `StatsMenuBarModules` owns the upstream module objects and maps OneClick's
+  existing visibility switches to Stats' `mount`, `enable`, `disable` and
+  `terminate` lifecycle.
+- Stats' `NSStatusItem` and `NSPanel` implementations own the independent menu
+  bar widgets and their click behavior. They are not recreated with SwiftUI
+  `MenuBarExtra` views.
+- OneClick's main overview window still uses `SystemMonitor` and
+  `SystemMetricsSampler` for its compact combined cards. Its refresh interval
+  is independent from the per-module settings exposed by Stats.
 
 ## Scope and limitations
 
-GPU and battery data is conditional because not every Mac exposes those values.
-Network-mounted and synthetic volumes are skipped so an unavailable remote host
-cannot stall the menu bar refresh.
+GPU, battery, temperature and other hardware data remain conditional because
+not every Mac exposes those values. OneClick embeds the six monitoring
+frameworks listed above, but does not embed Stats' Sensors module or privileged
+SMC helper, so fan control is not part of this integration.
 
-Stats also supports SMC temperature sensors and fan control. Those features
-need model-specific sensor tables and, for fan writes, a privileged helper.
-They are intentionally not part of this sandbox-compatible integration.
+Stats' network module may perform its configured connectivity check. Public-IP
+refresh remains disabled by the upstream default unless the user enables an
+interval in the module settings.
 
-The Stats MIT license is bundled as `Resources/Stats-LICENSE.txt`.
+The Stats MIT license is preserved in `Vendor/Stats/LICENSE` and bundled as
+`Resources/Stats-LICENSE.txt`.
