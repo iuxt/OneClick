@@ -13,6 +13,7 @@ enum Tabs: String, CaseIterable, Identifiable {
     case actions = "Actions"
     case archives = "Compression & Extraction"
     case inputMethods = "Input Method Switching"
+    case systemMonitor = "System Monitor"
     case newFile = "New File"
     case cdirs = "Common Dir"
     case about = "About"
@@ -25,6 +26,7 @@ enum Tabs: String, CaseIterable, Identifiable {
 
     var sidebarTitleKey: String {
         switch self {
+        case .systemMonitor: "System Monitor"
         case .archives: "Archive Settings"
         case .inputMethods: "Input Method Settings"
         default: titleKey
@@ -33,6 +35,7 @@ enum Tabs: String, CaseIterable, Identifiable {
 
     var icon: String {
         switch self {
+        case .systemMonitor: "gauge.with.dots.needle.50percent"
         case .inputMethods: "character.bubble"
         case .general: "gearshape"
         case .apps: "app.badge"
@@ -79,6 +82,11 @@ struct SettingsView: View {
                 Text(appLocalized: "Input Method Switching")
             }
             Section {
+                sidebarRow(.systemMonitor)
+            } header: {
+                Text(appLocalized: "System Monitor")
+            }
+            Section {
                 sidebarRow(.general)
                 sidebarRow(.about)
             }
@@ -96,6 +104,8 @@ struct SettingsView: View {
 
     @ViewBuilder private func page(for tab: Tabs) -> some View {
         switch tab {
+        case .systemMonitor:
+            SystemMonitorSettingsView()
         case .inputMethods:
             InputMethodSettingsView()
         case .general:
