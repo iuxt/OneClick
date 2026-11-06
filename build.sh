@@ -100,6 +100,13 @@ if [[ "$BUILD_MODE" == local ]]; then
         codesign --force --options runtime --timestamp=none --sign - \
             --entitlements "$ROOT_DIR/Vendor/7zip/7zz.entitlements" "$APP_PATH/Contents/Helpers/$helper"
     done
+    # Embedded frameworks must be signed before the extension and the outer app.
+    # Xcode leaves them unsigned when CODE_SIGNING_ALLOWED=NO, and signing only
+    # the app would otherwise fail with an invalid nested-code signature.
+    for framework in "$APP_PATH/Contents/Frameworks/"*.framework; do
+        [[ -d "$framework" ]] || continue
+        codesign --force --options runtime --timestamp=none --sign - "$framework"
+    done
     codesign --force --options runtime --timestamp=none --sign - \
         --entitlements "$BUILD_DIR/Signing/FinderSyncExt.entitlements" "$EXTENSION_PATH"
     codesign --force --options runtime --timestamp=none --sign - \

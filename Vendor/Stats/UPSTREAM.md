@@ -18,3 +18,11 @@ that widget extension or entitlement.
 asset namespace required by `SystemKit`. The support/donation images are not
 compiled into OneClick, which also avoids colliding with OneClick's own GitHub
 asset name.
+
+`Kit/module/window.swift` adds `setPreviewVisible(_:)` so the host can explicitly
+select settings or preview while reusing the module's existing view instance.
+
+`Kit/helpers.swift` looks up the host's `Stats.strings` table before falling back
+to the upstream `Localizable` table. OneClick copies the upstream translations
+for its five supported locales into its resources without mixing their keys
+with the host catalog.

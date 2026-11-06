@@ -1,8 +1,13 @@
+import Kit
 import SwiftUI
 
 @available(macOS 27, *)
 struct SystemMonitorSettingsView: View {
     @ObservedObject private var monitor = SystemMonitor.shared
+    @ObservedObject private var stats = StatsMenuBarModules.shared
+    @Environment(\.isSettingsPageActive) private var isPageActive
+    @State private var selectedModule: StatsModuleID?
+    @State private var previewModules: Set<StatsModuleID> = []
 
     @AppStorage(Key.systemMonitorRefreshInterval, store: .group) private var refreshInterval = 2.0
     @AppStorage(Key.systemMonitorCPUMenuBarItem, store: .group) private var cpuMenuBarItem = true
@@ -13,6 +18,70 @@ struct SystemMonitorSettingsView: View {
     @AppStorage(Key.systemMonitorBatteryMenuBarItem, store: .group) private var batteryMenuBarItem = false
 
     var body: some View {
+        VStack(spacing: 0) {
+            Picker(AppLocalization.localized("System Monitor"), selection: $selectedModule) {
+                Text(appLocalized: "Overview").tag(nil as StatsModuleID?)
+                ForEach(StatsModuleID.allCases) { id in
+                    Text(AppLocalization.localized(id.titleKey)).tag(Optional(id))
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .padding(.horizontal, 20)
+            .padding(.vertical, 16)
+
+            if let id = selectedModule {
+                moduleSettings(for: id)
+            } else {
+                overview
+            }
+        }
+        .onAppear {
+            monitor.start()
+            stats.start()
+        }
+    }
+
+    @ViewBuilder
+    private func moduleSettings(for id: StatsModuleID) -> some View {
+        if let module = stats.module(for: id), module.available {
+            HStack {
+                Toggle(AppLocalization.localized("Show in menu bar"), isOn: Binding(
+                    get: { module.enabled },
+                    set: { stats.setEnabled($0, for: id) }
+                ))
+                .toggleStyle(.switch)
+                Spacer()
+                if module.config.hasPreview {
+                    Toggle(AppLocalization.localized("Live Preview"), isOn: Binding(
+                        get: { previewModules.contains(id) },
+                        set: { visible in
+                            if visible { previewModules.insert(id) }
+                            else { previewModules.remove(id) }
+                        }
+                    ))
+                    .toggleStyle(.button)
+                }
+            }
+            .padding(.horizontal, 30)
+            .padding(.bottom, 12)
+
+            StatsModuleSettingsView(
+                module: module,
+                isActive: isPageActive,
+                showsPreview: previewModules.contains(id)
+            )
+            .padding(.horizontal, 10)
+        } else {
+            ContentUnavailableView {
+                Label(AppLocalization.localized(id.titleKey), systemImage: "gauge.with.dots.needle.50percent")
+            } description: {
+                Text(appLocalized: "This monitoring module is not available on this Mac.")
+            }
+        }
+    }
+
+    private var overview: some View {
         Form {
             Section {
                 Picker(AppLocalization.localized("Update interval"), selection: $refreshInterval) {
@@ -42,7 +111,6 @@ struct SystemMonitorSettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .onAppear { monitor.start() }
         .onChange(of: refreshInterval) {
             monitor.configurationDidChange()
         }

@@ -6,6 +6,16 @@ import Testing
 
 @MainActor
 struct SettingsNavigationTests {
+    @Test func settingsTabsAreGroupedByFeatureModule() {
+        let groupedTabs = SettingsModule.allCases.flatMap(\.tabs)
+
+        #expect(groupedTabs.count == Tabs.allCases.count)
+        #expect(Set(groupedTabs) == Set(Tabs.allCases))
+        #expect(SettingsModule.rightClickTools.tabs == [.actions, .apps, .newFile, .cdirs])
+        #expect(SettingsModule.general.tabs == [.general, .about])
+        #expect(SettingsModule.allCases.allSatisfy { $0.defaultTab.module == $0 })
+    }
+
     @Test func settingsRequestsAreDeliveredWithoutMountedViews() async throws {
         // No MenuBarExtra or settings content is mounted. The Scene's receiver
         // must still deliver every manual launch/reopen request.

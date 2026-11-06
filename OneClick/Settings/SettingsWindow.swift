@@ -24,14 +24,14 @@ struct SettingsWindow: Scene {
                 .onAppear {
                     onAppear()
                 }
-                .frame(minWidth: 820, minHeight: 560)
+                .frame(minWidth: 860, minHeight: 600)
                 .sheet(isPresented: $updateManager.showUpdateSheet) {
                     UpdateView(updateManager: updateManager)
                 }
         }
         .commandsRemoved()
         .windowResizability(.contentSize)
-        .defaultSize(width: 900, height: 640)
+        .defaultSize(width: 960, height: 680)
         .windowToolbarStyle(.unifiedCompact)
         // 压缩包打开事件由 AppDelegate 交给 ArchiveBrowserPresenter 处理。
         // 禁止 SwiftUI 同时为文件打开事件创建主窗口；启动抑制不覆盖这条路径。

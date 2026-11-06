@@ -1,6 +1,108 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+"This monitoring module is not available on this Mac." : {
+  "localizations": {
+    "en": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "This monitoring module is not available on this Mac."
+      }
+    },
+    "zh-Hans": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "此 Mac 不支持该监控模块。"
+      }
+    },
+    "ja": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "この Mac では、この監視モジュールを利用できません。"
+      }
+    },
+    "es": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Este módulo de monitorización no está disponible en este Mac."
+      }
+    },
+    "fr": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Ce module de surveillance n’est pas disponible sur ce Mac."
+      }
+    }
+  }
+},
+"Show in menu bar" : {
+  "localizations": {
+    "en": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Show in menu bar"
+      }
+    },
+    "zh-Hans": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "在菜单栏中显示"
+      }
+    },
+    "ja": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "メニューバーに表示"
+      }
+    },
+    "es": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Mostrar en la barra de menús"
+      }
+    },
+    "fr": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Afficher dans la barre des menus"
+      }
+    }
+  }
+},
+"Overview" : {
+  "localizations": {
+    "en": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Overview"
+      }
+    },
+    "zh-Hans": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "总览"
+      }
+    },
+    "ja": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "概要"
+      }
+    },
+    "es": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Resumen"
+      }
+    },
+    "fr": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Vue d’ensemble"
+      }
+    }
+  }
+},
   "1 minute" : {
     "localizations" : {
       "en" : { "stringUnit" : { "state" : "translated", "value" : "1 minute" } },

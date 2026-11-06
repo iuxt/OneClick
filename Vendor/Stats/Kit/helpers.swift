@@ -888,7 +888,10 @@ public class ColorView: NSView {
 }
 
 public func localizedString(_ key: String, _ params: String..., comment: String = "") -> String {
-    var string = NSLocalizedString(key, comment: comment)
+    // OneClick bundles upstream translations separately from its own catalog.
+    // Fall back to the original table when running inside the upstream app.
+    let fallback = NSLocalizedString(key, comment: comment)
+    var string = Bundle.main.localizedString(forKey: key, value: fallback, table: "Stats")
     if !params.isEmpty {
         for (index, param) in params.enumerated() {
             string = string.replacingOccurrences(of: "%\(index)", with: param)

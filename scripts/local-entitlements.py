@@ -8,6 +8,11 @@ import sys
 def local_entitlements(source, is_host, directory="/Library/Application Support/RClickLocal"):
     entitlements = dict(source)
     entitlements.pop("com.apple.security.application-groups", None)
+    if is_host:
+        # Ad-hoc signatures do not provide a stable Team ID. Hardened Runtime's
+        # library validation would therefore reject the separately signed Stats
+        # frameworks even though they are nested in, and sealed by, the app.
+        entitlements["com.apple.security.cs.disable-library-validation"] = True
     entitlements["com.apple.security.temporary-exception.files.home-relative-path.read-write"] = [directory + "/"]
     operations = "network-bind network-outbound" if is_host else "network-outbound"
     # home-literal is resolved by the application sandbox at launch, on the

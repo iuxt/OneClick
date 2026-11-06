@@ -23,6 +23,25 @@ widget and detail panel implementation.
   `SystemMetricsSampler` for its compact combined cards. Its refresh interval
   is independent from the per-module settings exposed by Stats.
 
+## Settings
+
+The System Monitor tab includes Overview, CPU, Memory, Network, Disk, GPU and
+Battery pages. Overview keeps OneClick's combined-window refresh interval and
+menu bar switches. Each module page embeds the running Stats module's original
+`Kit.Window`, including its widget selector and Module, Widgets, Popup and
+Notifications tabs where supported. Live Preview switches to the original Stats
+preview without opening a separate settings window.
+
+Changes use Stats' existing persistence and reader callbacks. Enabling a module
+from a widget or a disabled preview also updates OneClick's menu bar preference.
+Only the selected page in a visible settings window counts as a visible reader
+consumer; leaving the tab, covering, minimizing or closing the window releases
+preview readers. Unsupported hardware modules show an unavailable message.
+
+`Resources/<language>.lproj/Stats.strings` preserves upstream translations for
+OneClick's English, Simplified Chinese, Japanese, Spanish and French locales in
+a separate table. Keep these files in sync with the vendored Stats snapshot.
+
 ## Scope and limitations
 
 GPU, battery, temperature and other hardware data remain conditional because

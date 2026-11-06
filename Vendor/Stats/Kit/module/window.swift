@@ -137,6 +137,13 @@ open class Window: NSStackView {
         self.previewScrollView?.setAccessibilityHidden(!newState)
         self.disabledPreviewView?.isHidden = newState
     }
+
+    // Hosts embedding this view can choose settings or preview without relying
+    // on the upstream app's toolbar toggle and its implicit initial state.
+    public func setPreviewVisible(_ visible: Bool) {
+        self.previewView?.isHidden = !visible
+        self.settingsView?.isHidden = visible && self.previewView != nil
+    }
     
     private func preview() -> NSView? {
         guard let v = self.modulePreview else { return nil }
