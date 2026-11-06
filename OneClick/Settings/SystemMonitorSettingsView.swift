@@ -17,9 +17,6 @@ struct SystemMonitorSettingsView: View {
     @AppStorage(Key.systemMonitorDiskMenuBarItem, store: .group) private var diskMenuBarItem = false
     @AppStorage(Key.systemMonitorGPUMenuBarItem, store: .group) private var gpuMenuBarItem = false
     @AppStorage(Key.systemMonitorBatteryMenuBarItem, store: .group) private var batteryMenuBarItem = false
-    @AppStorage(Key.systemMonitorCPUMenuBarStyle, store: .group) private var cpuStyle = CPUMenuBarStyle.percentage.rawValue
-    @AppStorage(Key.systemMonitorMemoryMenuBarStyle, store: .group) private var memoryStyle = MemoryMenuBarStyle.percentage.rawValue
-    @AppStorage(Key.systemMonitorNetworkMenuBarStyle, store: .group) private var networkStyle = NetworkMenuBarStyle.both.rawValue
     @AppStorage(Key.systemMonitorDiskMenuBarStyle, store: .group) private var diskStyle = DiskMenuBarStyle.percentage.rawValue
 
     var body: some View {
@@ -38,27 +35,9 @@ struct SystemMonitorSettingsView: View {
             }
 
             Section {
-                menuBarItem(
-                    "CPU",
-                    icon: "cpu",
-                    isOn: $cpuMenuBarItem,
-                    style: $cpuStyle,
-                    styles: CPUMenuBarStyle.allCases.map { ($0.rawValue, $0.title) }
-                )
-                menuBarItem(
-                    "Memory",
-                    icon: "memorychip",
-                    isOn: $memoryMenuBarItem,
-                    style: $memoryStyle,
-                    styles: MemoryMenuBarStyle.allCases.map { ($0.rawValue, $0.title) }
-                )
-                menuBarItem(
-                    "Network",
-                    icon: "network",
-                    isOn: $networkMenuBarItem,
-                    style: $networkStyle,
-                    styles: NetworkMenuBarStyle.allCases.map { ($0.rawValue, $0.title) }
-                )
+                simpleMenuBarItem("CPU", icon: "cpu", isOn: $cpuMenuBarItem)
+                simpleMenuBarItem("Memory", icon: "memorychip", isOn: $memoryMenuBarItem)
+                simpleMenuBarItem("Network", icon: "network", isOn: $networkMenuBarItem)
                 menuBarItem(
                     "Disk",
                     icon: "internaldrive",
@@ -89,22 +68,26 @@ struct SystemMonitorSettingsView: View {
             }
             Section {
                 LabeledContent {
-                    Text(SystemMonitorFormatting.percent(monitor.snapshot.cpu.total))
-                        .monospacedDigit()
+                    CPUMenuBarGraph(
+                        values: monitor.history.cpu,
+                        currentValue: monitor.snapshot.cpu.total
+                    )
                 } label: {
                     Label(AppLocalization.localized("CPU"), systemImage: "cpu")
                 }
 
                 LabeledContent {
-                    Text("\(SystemMonitorFormatting.bytes(monitor.snapshot.memory.used)) / \(SystemMonitorFormatting.bytes(monitor.snapshot.memory.total))")
+                    Text(SystemMonitorFormatting.percent(monitor.snapshot.memory.fraction))
                         .monospacedDigit()
                 } label: {
                     Label(AppLocalization.localized("Memory"), systemImage: "memorychip")
                 }
 
                 LabeledContent {
-                    Text("↓ \(SystemMonitorFormatting.speed(monitor.snapshot.network.downloadBytesPerSecond))  ↑ \(SystemMonitorFormatting.speed(monitor.snapshot.network.uploadBytesPerSecond))")
-                        .monospacedDigit()
+                    NetworkMenuBarLabel(
+                        downloadBytesPerSecond: monitor.snapshot.network.downloadBytesPerSecond,
+                        uploadBytesPerSecond: monitor.snapshot.network.uploadBytesPerSecond
+                    )
                 } label: {
                     Label(AppLocalization.localized("Network"), systemImage: "network")
                 }

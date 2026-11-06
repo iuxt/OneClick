@@ -44,37 +44,6 @@ enum SystemMonitorModule: String, CaseIterable, Identifiable {
     }
 }
 
-enum CPUMenuBarStyle: Int, CaseIterable, Identifiable {
-    case percentage
-    case iconAndPercentage
-
-    var id: Int { rawValue }
-    var title: String { self == .percentage ? "Percentage" : "Icon and percentage" }
-}
-
-enum MemoryMenuBarStyle: Int, CaseIterable, Identifiable {
-    case percentage
-    case used
-
-    var id: Int { rawValue }
-    var title: String { self == .percentage ? "Percentage" : "Used memory" }
-}
-
-enum NetworkMenuBarStyle: Int, CaseIterable, Identifiable {
-    case both
-    case download
-    case upload
-
-    var id: Int { rawValue }
-    var title: String {
-        switch self {
-        case .both: "Download and upload"
-        case .download: "Download only"
-        case .upload: "Upload only"
-        }
-    }
-}
-
 enum DiskMenuBarStyle: Int, CaseIterable, Identifiable {
     case percentage
     case free
@@ -87,9 +56,6 @@ struct SystemMonitorModuleLabel: View {
     let module: SystemMonitorModule
 
     @ObservedObject private var monitor = SystemMonitor.shared
-    @AppStorage(Key.systemMonitorCPUMenuBarStyle, store: .group) private var cpuStyle = CPUMenuBarStyle.percentage.rawValue
-    @AppStorage(Key.systemMonitorMemoryMenuBarStyle, store: .group) private var memoryStyle = MemoryMenuBarStyle.percentage.rawValue
-    @AppStorage(Key.systemMonitorNetworkMenuBarStyle, store: .group) private var networkStyle = NetworkMenuBarStyle.both.rawValue
     @AppStorage(Key.systemMonitorDiskMenuBarStyle, store: .group) private var diskStyle = DiskMenuBarStyle.percentage.rawValue
 
     var body: some View {
@@ -119,37 +85,23 @@ struct SystemMonitorModuleLabel: View {
         .onAppear { monitor.start() }
     }
 
-    @ViewBuilder private var cpuLabel: some View {
-        let value = SystemMonitorFormatting.percent(monitor.snapshot.cpu.total)
-        if CPUMenuBarStyle(rawValue: cpuStyle) == .iconAndPercentage {
-            metricLabel(icon: "cpu", value: value)
-        } else {
-            Text(value)
-        }
+    private var cpuLabel: some View {
+        CPUMenuBarGraph(
+            values: monitor.history.cpu,
+            currentValue: monitor.snapshot.cpu.total
+        )
     }
 
-    @ViewBuilder private var memoryLabel: some View {
-        if MemoryMenuBarStyle(rawValue: memoryStyle) == .used {
-            Text(SystemMonitorFormatting.compactBytes(monitor.snapshot.memory.used))
-        } else {
-            Text(SystemMonitorFormatting.percent(monitor.snapshot.memory.fraction))
-        }
+    private var memoryLabel: some View {
+        Text(SystemMonitorFormatting.percent(monitor.snapshot.memory.fraction))
     }
 
-    @ViewBuilder private var networkLabel: some View {
+    private var networkLabel: some View {
         let network = monitor.snapshot.network
-        switch NetworkMenuBarStyle(rawValue: networkStyle) ?? .both {
-        case .both:
-            VStack(alignment: .trailing, spacing: -2) {
-                Text("↓\(SystemMonitorFormatting.compactSpeed(network.downloadBytesPerSecond))")
-                Text("↑\(SystemMonitorFormatting.compactSpeed(network.uploadBytesPerSecond))")
-            }
-            .font(.system(size: 9, weight: .medium))
-        case .download:
-            Text("↓\(SystemMonitorFormatting.compactSpeed(network.downloadBytesPerSecond))")
-        case .upload:
-            Text("↑\(SystemMonitorFormatting.compactSpeed(network.uploadBytesPerSecond))")
-        }
+        return NetworkMenuBarLabel(
+            downloadBytesPerSecond: network.downloadBytesPerSecond,
+            uploadBytesPerSecond: network.uploadBytesPerSecond
+        )
     }
 
     @ViewBuilder private var diskLabel: some View {
@@ -169,6 +121,66 @@ struct SystemMonitorModuleLabel: View {
             Image(systemName: icon)
             Text(value)
         }
+    }
+}
+
+struct CPUMenuBarGraph: View {
+    let values: [Double]
+    let currentValue: Double
+
+    private var plottedValues: [Double] {
+        values.isEmpty ? [currentValue] : values
+    }
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 3)
+                .fill(.primary.opacity(0.08))
+
+            GeometryReader { proxy in
+                Path { path in
+                    let values = plottedValues
+                    guard let first = values.first else { return }
+
+                    let firstY = proxy.size.height * CGFloat(1 - min(1, max(0, first)))
+                    path.move(to: CGPoint(x: 0, y: firstY))
+
+                    if values.count == 1 {
+                        path.addLine(to: CGPoint(x: proxy.size.width, y: firstY))
+                    } else {
+                        for (index, value) in values.dropFirst().enumerated() {
+                            let pointIndex = index + 1
+                            let x = proxy.size.width * CGFloat(pointIndex) / CGFloat(values.count - 1)
+                            let y = proxy.size.height * CGFloat(1 - min(1, max(0, value)))
+                            path.addLine(to: CGPoint(x: x, y: y))
+                        }
+                    }
+                }
+                .stroke(.primary, style: StrokeStyle(lineWidth: 1.25, lineCap: .round, lineJoin: .round))
+            }
+            .padding(2)
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 3)
+                .stroke(.primary.opacity(0.55), lineWidth: 1)
+        }
+        .frame(width: 38, height: 16)
+        .accessibilityElement()
+        .accessibilityValue(SystemMonitorFormatting.percent(currentValue))
+    }
+}
+
+struct NetworkMenuBarLabel: View {
+    let downloadBytesPerSecond: UInt64
+    let uploadBytesPerSecond: UInt64
+
+    var body: some View {
+        VStack(alignment: .trailing, spacing: -2) {
+            Text("↓\(SystemMonitorFormatting.compactSpeed(downloadBytesPerSecond))")
+            Text("↑\(SystemMonitorFormatting.compactSpeed(uploadBytesPerSecond))")
+        }
+        .font(.system(size: 9, weight: .medium))
+        .monospacedDigit()
     }
 }
 
