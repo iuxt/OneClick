@@ -39,6 +39,44 @@ struct ArchiveViewModelTests {
         withExtendedLifetime((batch, progress)) {}
     }
 
+    @Test func archiveWindowUsesCompactConfigurationAndProgressHeights() {
+        let model = ArchiveViewModel(requests: [
+            ArchiveRequest(operation: .compress, urls: [URL(fileURLWithPath: "/tmp/file")])
+        ])
+        #expect(model.preferredWindowHeight == 500)
+        #expect(ArchiveViewModel.windowHeight(rows: model.rows, isRunning: true) == 80)
+    }
+
+    @Test func successfulAutoCloseKeepsTheCompactProgressHeight() {
+        let request = ArchiveRequest(operation: .zip, urls: [URL(fileURLWithPath: "/tmp/file")])
+        let rows = [ArchiveViewModel.Row(
+            id: 0,
+            request: request,
+            output: URL(fileURLWithPath: "/tmp/file.zip")
+        )]
+
+        #expect(ArchiveViewModel.shouldCloseAutomatically(rows: rows, isRunning: false))
+        #expect(ArchiveViewModel.windowHeight(rows: rows, isRunning: false) == 80)
+    }
+
+    @Test func submittingCompressionSkipsTheIntermediateIdleLayout() {
+        let model = ArchiveViewModel(requests: [
+            ArchiveRequest(operation: .compress, urls: [URL(fileURLWithPath: "/tmp/file")])
+        ])
+        var observedHeights: [CGFloat] = []
+        let changes = model.$rows.combineLatest(model.$isRunning).dropFirst().sink { rows, isRunning in
+            observedHeights.append(ArchiveViewModel.windowHeight(rows: rows, isRunning: isRunning))
+        }
+
+        model.submitCompression(for: 0, format: .zip, level: .normal, password: nil)
+
+        #expect(model.isRunning)
+        #expect(!observedHeights.isEmpty)
+        #expect(observedHeights.allSatisfy { $0 == 80 })
+        model.cancel()
+        withExtendedLifetime(changes) {}
+    }
+
     @Test func activityCombinesBatchAndVerificationProgress() {
         let activity = ArchiveViewModel.Activity()
         activity.update(.init(fraction: 0.5), completedCount: 1, totalCount: 2)

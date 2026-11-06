@@ -28,6 +28,7 @@ private final class ArchiveWindowController: NSWindowController, NSWindowDelegat
     private let model: ArchiveViewModel
     private let onClose: () -> Void
     private var sizing: AnyCancellable?
+    private var automaticCloseScheduled = false
 
     init(requests: [ArchiveRequest], onClose: @escaping () -> Void) {
         model = ArchiveViewModel(requests: requests)
@@ -45,9 +46,19 @@ private final class ArchiveWindowController: NSWindowController, NSWindowDelegat
         super.init(window: window)
         window.delegate = self
         sizing = model.$rows.combineLatest(model.$isRunning)
-            .sink { [weak window] values in
-                guard let window else { return }
+            .sink { [weak self, weak window] values in
+                guard let self, let window else { return }
                 let (rows, running) = values
+                // Close successful operations directly from the same state
+                // transition. Restoring the result height first briefly shows
+                // a huge 100% progress view, while relying on a later SwiftUI
+                // update can leave the compact window stuck onscreen.
+                if ArchiveViewModel.shouldCloseAutomatically(rows: rows, isRunning: running) {
+                    guard !self.automaticCloseScheduled else { return }
+                    self.automaticCloseScheduled = true
+                    DispatchQueue.main.async { [weak window] in window?.performClose(nil) }
+                    return
+                }
                 let height = ArchiveViewModel.windowHeight(rows: rows, isRunning: running)
                 let operation = rows.first(where: { $0.isRunning })?.request.operation ?? rows.first?.request.operation
                 window.title = running
@@ -61,7 +72,10 @@ private final class ArchiveWindowController: NSWindowController, NSWindowDelegat
                 let size = NSSize(width: window.contentLayoutRect.width, height: height)
                 var frame = window.frameRect(forContentRect: NSRect(origin: .zero, size: size))
                 frame.origin = NSPoint(x: window.frame.minX, y: window.frame.maxY - frame.height)
-                window.setFrame(frame, display: true, animate: window.isVisible)
+                // The form disappears in the same update that progress appears.
+                // Animating that large height change exposes an empty intermediate
+                // frame, which reads as a flash when the user clicks Compress.
+                window.setFrame(frame, display: true, animate: window.isVisible && !running)
             }
     }
 
@@ -121,13 +135,17 @@ final class ArchiveViewModel: ObservableObject {
     var preferredWindowHeight: CGFloat { Self.windowHeight(rows: rows, isRunning: isRunning) }
 
     static func windowHeight(rows: [Row], isRunning: Bool) -> CGFloat {
-        if isRunning { return 80 }
-        if !isRunning, rows.contains(where: { $0.needsConfiguration }) { return 640 }
+        if isRunning || shouldCloseAutomatically(rows: rows, isRunning: isRunning) { return 80 }
+        if rows.contains(where: { $0.needsConfiguration }) { return 500 }
         if !isRunning, rows.contains(where: { $0.needsPassword }) { return 360 }
         return 340 + CGFloat(min(3, max(0, rows.count - 1))) * 72
     }
 
     var shouldCloseAutomatically: Bool {
+        Self.shouldCloseAutomatically(rows: rows, isRunning: isRunning)
+    }
+
+    static func shouldCloseAutomatically(rows: [Row], isRunning: Bool) -> Bool {
         !isRunning && !rows.isEmpty && rows.allSatisfy {
             $0.output != nil && $0.error == nil && !$0.isRunning && !$0.needsPassword && !$0.needsConfiguration
                 && !($0.request.verifyAfterCompression && !$0.request.operation.isExtraction)
@@ -175,26 +193,33 @@ final class ArchiveViewModel: ObservableObject {
             rows[index].error = ArchiveError.solidNotSupported.localizedDescription
             return
         }
-        rows[index].request = ArchiveRequest(operation: format.operation(encrypted: password != nil),
-                                             urls: rows[index].request.urls, compressionLevel: level,
-                                             volumeSize: volumeSize, solid: solid, verifyAfterCompression: verifyAfterCompression)
-        rows[index].error = nil
-        rows[index].needsConfiguration = false
-        refreshPendingRow()
-        run(indices: [index], password: password)
+        let request = ArchiveRequest(operation: format.operation(encrypted: password != nil),
+                                     urls: rows[index].request.urls, compressionLevel: level,
+                                     volumeSize: volumeSize, solid: solid, verifyAfterCompression: verifyAfterCompression)
+        run(indices: [index], password: password) {
+            // Enter the running state before removing the form. Window sizing
+            // then observes one direct configuration-to-progress transition
+            // instead of briefly expanding the intermediate result layout.
+            self.rows[index].request = request
+            self.rows[index].error = nil
+            self.rows[index].needsConfiguration = false
+            self.refreshPendingRow()
+        }
     }
 
     func submitPassword(for index: Int, password: String) {
         guard !isRunning, rows.indices.contains(index), rows[index].needsPassword else { return }
-        rows[index].error = nil
-        rows[index].needsPassword = false
-        refreshPendingRow()
-        run(indices: [index], password: password)
+        run(indices: [index], password: password) {
+            self.rows[index].error = nil
+            self.rows[index].needsPassword = false
+            self.refreshPendingRow()
+        }
     }
 
-    private func run(indices: [Int], password: String? = nil) {
+    private func run(indices: [Int], password: String? = nil, prepare: () -> Void = {}) {
         guard !indices.isEmpty, !isRunning else { return }
         isRunning = true
+        prepare()
         task = Task { [weak self] in
             guard let self else { return }
             for index in indices {
@@ -400,9 +425,6 @@ private struct ArchiveView: View {
         }
         .frame(minWidth: 500, minHeight: model.isRunning ? 80 : 280)
         .onAppear { model.start() }
-        .onChange(of: model.shouldCloseAutomatically) {
-            if model.shouldCloseAutomatically { close() }
-        }
         .onChange(of: pendingRow?.id) { form.clearPassword() }
         .onChange(of: form.format) {
             if form.format == .tarGzip {
