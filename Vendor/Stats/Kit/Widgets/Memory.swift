@@ -77,7 +77,12 @@ public class MemoryWidget: WidgetWrapper {
         
         let letterWidth: CGFloat = 8
         let rowHeight: CGFloat = self.frame.height / 2
-        var width: CGFloat = self.width
+        let valueFont = NSFont.systemFont(ofSize: 9, weight: .light)
+        let valueWidth = max(
+            (value.0 as NSString).size(withAttributes: [.font: valueFont]).width,
+            (value.1 as NSString).size(withAttributes: [.font: valueFont]).width
+        )
+        var width = max(self.width, ceil(valueWidth))
         var x: CGFloat = 0
         
         let freeY: CGFloat = !self.orderReversedState ? rowHeight+1 : 1
@@ -86,7 +91,7 @@ public class MemoryWidget: WidgetWrapper {
         let style = NSMutableParagraphStyle()
         style.alignment = .right
         var attributes = [
-            NSAttributedString.Key.font: NSFont.systemFont(ofSize: 9, weight: .light),
+            NSAttributedString.Key.font: valueFont,
             NSAttributedString.Key.foregroundColor: NSColor.textColor,
             NSAttributedString.Key.paragraphStyle: style
         ]

@@ -26,3 +26,10 @@ select settings or preview while reusing the module's existing view instance.
 to the upstream `Localizable` table. OneClick copies the upstream translations
 for its five supported locales into its resources without mixing their keys
 with the host catalog.
+
+`Kit/constants.swift` keeps the widgets' drawing canvas at 22 points.
+`Kit/module/widget.swift` centers that canvas in a padded, autoresizing status
+item container and updates combined widget positions and item widths together.
+This avoids edge collisions and height-dependent baselines on taller menu bars.
+Mini, Memory and Speed widgets measure their displayed strings so percentages,
+memory values and speed units can grow without clipping.

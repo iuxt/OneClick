@@ -45,6 +45,9 @@ final class SettingsWindowRequests: ObservableObject {
 struct OneClickMenuBarLabel: View {
     var body: some View {
         Image("MenuBar")
+            .resizable()
+            .scaledToFit()
+            .frame(width: 18, height: 18)
             .accessibilityLabel("OneClick")
     }
 }

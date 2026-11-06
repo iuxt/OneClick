@@ -30,12 +30,9 @@ public struct Settings_c_s {
 
 public struct Widget_c_s {
     public let width: CGFloat = 32
-    public var height: CGFloat {
-        get {
-            let systemHeight = NSApplication.shared.mainMenu?.menuBarHeight
-            return (systemHeight == 0 ? 22 : systemHeight) ?? 22
-        }
-    }
+    // Widgets use a 22-point drawing canvas, including hard-coded text baselines.
+    // The status-item container centers it in the actual menu bar button.
+    public let height: CGFloat = 22
     public var margin: CGPoint {
         get { CGPoint(x: 0, y: 2) }
     }

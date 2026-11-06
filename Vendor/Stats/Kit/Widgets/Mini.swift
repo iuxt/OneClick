@@ -106,6 +106,13 @@ public class Mini: WidgetWrapper {
         }
         
         let valueSize: CGFloat = self.labelState ? 12 : 14
+        let valueFont = NSFont.systemFont(ofSize: valueSize, weight: .regular)
+        let valueString = "\(Int(value.rounded(toPlaces: 2) * 100))\(suffix)"
+        let labelFont = NSFont.systemFont(ofSize: 7, weight: .light)
+        var width = max(self.width, ceil((valueString as NSString).size(withAttributes: [.font: valueFont]).width) + Constants.Widget.margin.x * 2)
+        if self.labelState {
+            width = max(width, ceil((label as NSString).size(withAttributes: [.font: labelFont]).width) + Constants.Widget.margin.x * 2)
+        }
         var origin: CGPoint = CGPoint(x: Constants.Widget.margin.x, y: (Constants.Widget.height-valueSize)/2)
         let style = NSMutableParagraphStyle()
         style.alignment = self.labelState ? self.alignment : .center
@@ -115,11 +122,11 @@ public class Mini: WidgetWrapper {
             style.alignment = self.alignment
             
             let stringAttributes = [
-                NSAttributedString.Key.font: NSFont.systemFont(ofSize: 7, weight: .light),
+                NSAttributedString.Key.font: labelFont,
                 NSAttributedString.Key.foregroundColor: isDarkMode ? NSColor.white : NSColor.textColor,
                 NSAttributedString.Key.paragraphStyle: style
             ]
-            let rect = CGRect(x: origin.x, y: 12, width: self.width - (Constants.Widget.margin.x*2), height: 7)
+            let rect = CGRect(x: origin.x, y: 12, width: width - (Constants.Widget.margin.x*2), height: 7)
             let str = NSAttributedString.init(string: label, attributes: stringAttributes)
             str.draw(with: rect)
             
@@ -136,12 +143,12 @@ public class Mini: WidgetWrapper {
         }
         
         let stringAttributes = [
-            NSAttributedString.Key.font: NSFont.systemFont(ofSize: valueSize, weight: .regular),
+            NSAttributedString.Key.font: valueFont,
             NSAttributedString.Key.foregroundColor: color,
             NSAttributedString.Key.paragraphStyle: style
         ]
-        let rect = CGRect(x: origin.x, y: origin.y, width: self.width - (Constants.Widget.margin.x*2), height: valueSize+1)
-        let str = NSAttributedString.init(string: "\(Int(value.rounded(toPlaces: 2) * 100))\(suffix)", attributes: stringAttributes)
+        let rect = CGRect(x: origin.x, y: origin.y, width: width - (Constants.Widget.margin.x*2), height: valueSize+1)
+        let str = NSAttributedString.init(string: valueString, attributes: stringAttributes)
         str.draw(with: rect)
         
         self.setWidth(width)

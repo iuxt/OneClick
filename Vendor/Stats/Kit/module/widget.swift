@@ -194,6 +194,7 @@ open class WidgetWrapper: NSView, widget_p {
         DispatchQueue.main.async {
             self.setFrameSize(NSSize(width: newWidth, height: self.frame.size.height))
             self.widthHandler?()
+            self.needsDisplay = true
         }
     }
     
@@ -233,6 +234,43 @@ open class WidgetWrapper: NSView, widget_p {
             return
         }
         super.mouseDown(with: event)
+    }
+}
+
+/// Keeps custom drawing away from adjacent status items without scaling it to
+/// the menu bar height (which can vary between displays and accessibility modes).
+final class StatusItemContentView: NSView {
+    private let content: NSView
+    private let horizontalPadding: CGFloat = 6
+
+    var preferredWidth: CGFloat { ceil(content.frame.width) + horizontalPadding * 2 }
+
+    init(content: NSView) {
+        self.content = content
+        super.init(frame: .zero)
+        self.autoresizingMask = [.width, .height]
+        self.setFrameSize(NSSize(width: preferredWidth, height: Constants.Widget.height))
+        self.addSubview(content)
+        self.layoutContent()
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    override func layout() {
+        super.layout()
+        self.layoutContent()
+    }
+
+    func fit(to button: NSStatusBarButton) {
+        self.frame = button.bounds
+        self.layoutContent()
+    }
+
+    private func layoutContent() {
+        self.content.setFrameOrigin(NSPoint(
+            x: (self.bounds.width - self.content.frame.width) / 2,
+            y: (self.bounds.height - self.content.frame.height) / 2
+        ))
     }
 }
 
@@ -278,7 +316,7 @@ public class SWidget {
     }
     
     private var menuBarItem: NSStatusItem? = nil
-    private var originX: CGFloat
+    private var statusContent: StatusItemContentView? = nil
     
     public init(_ type: widget_t, defaultWidget: widget_t, module: String, item: widget_p, image: NSImage) {
         self.type = type
@@ -286,13 +324,13 @@ public class SWidget {
         self.item = item
         self.defaultWidget = defaultWidget
         self.image = image
-        self.originX = item.frame.origin.x
         
         self.item.widthHandler = { [weak self] in
-            self?.sizeCallback?()
-            if let s = self, let item = s.menuBarItem, let width: CGFloat = self?.item.frame.width, item.length != width {
-                item.length = width
+            if let s = self, let item = s.menuBarItem, let content = s.statusContent {
+                item.length = content.preferredWidth
+                if let button = item.button { content.fit(to: button) }
             }
+            self?.sizeCallback?()
         }
         self.item.identifier = NSUserInterfaceItemIdentifier(self.type.rawValue)
     }
@@ -337,15 +375,16 @@ public class SWidget {
             DispatchQueue.main.async(execute: {
                 guard self.menuBarItem == nil else { return }
                 restoreNSStatusItemPosition(id: "\(self.module)_\(self.type.rawValue)")
-                self.menuBarItem = NSStatusBar.system.statusItem(withLength: self.item.frame.width)
+                let content = StatusItemContentView(content: self.item)
+                self.statusContent = content
+                self.menuBarItem = NSStatusBar.system.statusItem(withLength: content.preferredWidth)
                 DispatchQueue.main.async(execute: {
                     self.menuBarItem?.autosaveName = "\(self.module)_\(self.type.rawValue)"
                 })
-                if self.item.frame.origin.x != self.originX {
-                    self.item.setFrameOrigin(NSPoint(x: self.originX, y: self.item.frame.origin.y))
+                if let button = self.menuBarItem?.button {
+                    button.addSubview(content)
+                    content.fit(to: button)
                 }
-                self.menuBarItem?.button?.addSubview(self.item)
-                self.menuBarItem?.button?.image = NSImage()
                 self.menuBarItem?.button?.toolTip = "\(localizedString(self.module)): \(self.type.name())"
                 
                 if let item = self.menuBarItem, !item.isVisible {
@@ -365,6 +404,8 @@ public class SWidget {
                 }
                 NSStatusBar.system.removeStatusItem(item)
                 self.menuBarItem = nil
+                self.item.removeFromSuperview()
+                self.statusContent = nil
             })
         }
     }
@@ -387,6 +428,7 @@ public class MenuBar {
     
     private var moduleName: String
     private var menuBarItem: NSStatusItem? = nil
+    private var statusContent: StatusItemContentView? = nil
     private var queue: DispatchQueue
     
     private var combinedModules: Bool {
@@ -440,19 +482,13 @@ public class MenuBar {
             if let s = self, s.oneView {
                 if state, let w = s.activeWidgets.first(where: { $0.type == type }) {
                     DispatchQueue.main.async(execute: {
+                        s.view.addWidget(w.item)
                         s.recalculateWidth()
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                            s.view.addWidget(w.item)
-                            s.view.recalculate(s.sortedWidgets)
-                        }
                     })
                 } else {
                     DispatchQueue.main.async(execute: {
                         s.view.removeWidget(type: type)
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                            s.recalculateWidth()
-                            s.view.recalculate(s.sortedWidgets)
-                        }
+                        s.recalculateWidth()
                     })
                 }
             } else {
@@ -488,14 +524,18 @@ public class MenuBar {
             if state && self.active {
                 guard self.menuBarItem == nil else { return }
                 restoreNSStatusItemPosition(id: self.moduleName)
-                self.menuBarItem = NSStatusBar.system.statusItem(withLength: 0)
+                let content = StatusItemContentView(content: self.view)
+                self.statusContent = content
+                self.menuBarItem = NSStatusBar.system.statusItem(withLength: content.preferredWidth)
                 DispatchQueue.main.async(execute: {
                     self.menuBarItem?.autosaveName = self.moduleName
                 })
                 self.menuBarItem?.isVisible = true
                 
-                self.menuBarItem?.button?.addSubview(self.view)
-                self.menuBarItem?.button?.image = NSImage()
+                if let button = self.menuBarItem?.button {
+                    button.addSubview(content)
+                    content.fit(to: button)
+                }
                 self.menuBarItem?.button?.toolTip = "\(localizedString(self.moduleName))"
                 self.menuBarItem?.button?.target = self
                 self.menuBarItem?.button?.action = #selector(self.togglePopup)
@@ -506,6 +546,8 @@ public class MenuBar {
                 saveNSStatusItemPosition(id: self.moduleName)
                 NSStatusBar.system.removeStatusItem(item)
                 self.menuBarItem = nil
+                self.view.removeFromSuperview()
+                self.statusContent = nil
             }
         })
     }
@@ -516,11 +558,12 @@ public class MenuBar {
         let w = self.activeWidgets.isEmpty ? 0 : self.activeWidgets.map({ $0.item.frame.width }).reduce(0, +) +
             (CGFloat(self.activeWidgets.count - 1) * Constants.Widget.spacing) +
             Constants.Widget.spacing * 2
-        self.menuBarItem?.length = w
-        self.view.setFrameOrigin(NSPoint(x: 0, y: 0))
         self.view.setFrameSize(NSSize(width: w, height: Constants.Widget.height))
-        
         self.view.recalculate(self.sortedWidgets)
+        if let item = self.menuBarItem, let content = self.statusContent {
+            item.length = self.activeWidgets.isEmpty ? 0 : content.preferredWidth
+            if let button = item.button { content.fit(to: button) }
+        }
         self.callback?()
     }
     
@@ -593,7 +636,7 @@ public class MenuBarView: NSView {
         var x: CGFloat = Constants.Widget.spacing
         list.forEach { (type: widget_t) in
             if let view = self.subviews.first(where: { $0.identifier == NSUserInterfaceItemIdentifier(type.rawValue) }) {
-                view.setFrameOrigin(NSPoint(x: x, y: view.frame.origin.y))
+                view.setFrameOrigin(NSPoint(x: x, y: (self.bounds.height - view.frame.height) / 2))
                 x = view.frame.origin.x + view.frame.width + Constants.Widget.spacing
             }
         }
