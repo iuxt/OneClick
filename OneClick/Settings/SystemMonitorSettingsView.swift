@@ -66,34 +66,6 @@ struct SystemMonitorSettingsView: View {
                 Text(appLocalized: "GPU and battery cards appear only when the hardware exposes those metrics.")
                     .fixedSize(horizontal: false, vertical: true)
             }
-            Section {
-                LabeledContent {
-                    CPUMenuBarGraph(
-                        values: monitor.history.cpu,
-                        currentValue: monitor.snapshot.cpu.total
-                    )
-                } label: {
-                    Label(AppLocalization.localized("CPU"), systemImage: "cpu")
-                }
-
-                LabeledContent {
-                    Text(SystemMonitorFormatting.percent(monitor.snapshot.memory.fraction))
-                        .monospacedDigit()
-                } label: {
-                    Label(AppLocalization.localized("Memory"), systemImage: "memorychip")
-                }
-
-                LabeledContent {
-                    NetworkMenuBarLabel(
-                        downloadBytesPerSecond: monitor.snapshot.network.downloadBytesPerSecond,
-                        uploadBytesPerSecond: monitor.snapshot.network.uploadBytesPerSecond
-                    )
-                } label: {
-                    Label(AppLocalization.localized("Network"), systemImage: "network")
-                }
-            } header: {
-                Text(appLocalized: "Live Preview")
-            }
         }
         .formStyle(.grouped)
         .onAppear { monitor.start() }

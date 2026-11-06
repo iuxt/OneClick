@@ -1,6 +1,240 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+  "1 minute" : {
+    "localizations" : {
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "1 minute" } },
+      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "1 分钟" } },
+      "ja" : { "stringUnit" : { "state" : "translated", "value" : "1 分" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "1 minuto" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "1 minute" } }
+    }
+  },
+  "5 minutes" : {
+    "localizations" : {
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "5 minutes" } },
+      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "5 分钟" } },
+      "ja" : { "stringUnit" : { "state" : "translated", "value" : "5 分" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "5 minutos" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "5 minutes" } }
+    }
+  },
+  "15 minutes" : {
+    "localizations" : {
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "15 minutes" } },
+      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "15 分钟" } },
+      "ja" : { "stringUnit" : { "state" : "translated", "value" : "15 分" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "15 minutos" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "15 minutes" } }
+    }
+  },
+  "All Cores" : {
+    "localizations" : {
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "All Cores" } },
+      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "所有核心" } },
+      "ja" : { "stringUnit" : { "state" : "translated", "value" : "すべてのコア" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Todos los núcleos" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Tous les cœurs" } }
+    }
+  },
+  "App Memory" : {
+    "localizations" : {
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "App Memory" } },
+      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "App 内存" } },
+      "ja" : { "stringUnit" : { "state" : "translated", "value" : "App メモリ" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Memoria de apps" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Mémoire des apps" } }
+    }
+  },
+  "Available" : {
+    "localizations" : {
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Available" } },
+      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "可用" } },
+      "ja" : { "stringUnit" : { "state" : "translated", "value" : "使用可能" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Disponible" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Disponible" } }
+    }
+  },
+  "Average Load" : {
+    "localizations" : {
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Average Load" } },
+      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "平均负载" } },
+      "ja" : { "stringUnit" : { "state" : "translated", "value" : "平均負荷" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Carga media" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Charge moyenne" } }
+    }
+  },
+  "Compressed" : {
+    "localizations" : {
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Compressed" } },
+      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "压缩内存" } },
+      "ja" : { "stringUnit" : { "state" : "translated", "value" : "圧縮メモリ" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Comprimida" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Compressée" } }
+    }
+  },
+  "Connection History" : {
+    "localizations" : {
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Connection History" } },
+      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "连接历史" } },
+      "ja" : { "stringUnit" : { "state" : "translated", "value" : "接続履歴" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Historial de conexión" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Historique de connexion" } }
+    }
+  },
+  "Critical" : {
+    "localizations" : {
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Critical" } },
+      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "严重" } },
+      "ja" : { "stringUnit" : { "state" : "translated", "value" : "重大" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Crítico" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Critique" } }
+    }
+  },
+  "Details" : {
+    "localizations" : {
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Details" } },
+      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "详细信息" } },
+      "ja" : { "stringUnit" : { "state" : "translated", "value" : "詳細情報" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Detalles" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Détails" } }
+    }
+  },
+  "Frequency" : {
+    "localizations" : {
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Frequency" } },
+      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "频率" } },
+      "ja" : { "stringUnit" : { "state" : "translated", "value" : "周波数" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Frecuencia" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Fréquence" } }
+    }
+  },
+  "Idle" : {
+    "localizations" : {
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Idle" } },
+      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "闲置" } },
+      "ja" : { "stringUnit" : { "state" : "translated", "value" : "アイドル" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Inactivo" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Inactif" } }
+    }
+  },
+  "Interface" : {
+    "localizations" : {
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Interface" } },
+      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "接口" } },
+      "ja" : { "stringUnit" : { "state" : "translated", "value" : "インターフェース" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Interfaz" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Interface" } }
+    }
+  },
+  "Load History" : {
+    "localizations" : {
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Load History" } },
+      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "负载历史" } },
+      "ja" : { "stringUnit" : { "state" : "translated", "value" : "負荷履歴" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Historial de carga" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Historique de charge" } }
+    }
+  },
+  "Local IP" : {
+    "localizations" : {
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Local IP" } },
+      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "本地 IP" } },
+      "ja" : { "stringUnit" : { "state" : "translated", "value" : "ローカル IP" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "IP local" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "IP locale" } }
+    }
+  },
+  "Normal" : {
+    "localizations" : {
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Normal" } },
+      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "正常" } },
+      "ja" : { "stringUnit" : { "state" : "translated", "value" : "正常" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Normal" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Normal" } }
+    }
+  },
+  "Process" : {
+    "localizations" : {
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Process" } },
+      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "进程" } },
+      "ja" : { "stringUnit" : { "state" : "translated", "value" : "プロセス" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Proceso" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Processus" } }
+    }
+  },
+  "Status" : {
+    "localizations" : {
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Status" } },
+      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "状态" } },
+      "ja" : { "stringUnit" : { "state" : "translated", "value" : "状態" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Estado" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "État" } }
+    }
+  },
+  "Swap Used" : {
+    "localizations" : {
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Swap Used" } },
+      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "交换区" } },
+      "ja" : { "stringUnit" : { "state" : "translated", "value" : "スワップ使用量" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Intercambio usado" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Swap utilisé" } }
+    }
+  },
+  "Total Download" : {
+    "localizations" : {
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Total Download" } },
+      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "总下载" } },
+      "ja" : { "stringUnit" : { "state" : "translated", "value" : "総ダウンロード" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Descarga total" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Téléchargement total" } }
+    }
+  },
+  "Total Upload" : {
+    "localizations" : {
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Total Upload" } },
+      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "总上传" } },
+      "ja" : { "stringUnit" : { "state" : "translated", "value" : "総アップロード" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Subida total" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Envoi total" } }
+    }
+  },
+  "Uptime" : {
+    "localizations" : {
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Uptime" } },
+      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "启动时间" } },
+      "ja" : { "stringUnit" : { "state" : "translated", "value" : "稼働時間" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Tiempo activo" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Durée de fonctionnement" } }
+    }
+  },
+  "Usage" : {
+    "localizations" : {
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Usage" } },
+      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "用量" } },
+      "ja" : { "stringUnit" : { "state" : "translated", "value" : "使用量" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Uso" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Utilisation" } }
+    }
+  },
+  "Used" : {
+    "localizations" : {
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Used" } },
+      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "已用" } },
+      "ja" : { "stringUnit" : { "state" : "translated", "value" : "使用済み" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Usada" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Utilisée" } }
+    }
+  },
+  "Wired Memory" : {
+    "localizations" : {
+      "en" : { "stringUnit" : { "state" : "translated", "value" : "Wired Memory" } },
+      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "联动内存" } },
+      "ja" : { "stringUnit" : { "state" : "translated", "value" : "ワイヤードメモリ" } },
+      "es" : { "stringUnit" : { "state" : "translated", "value" : "Memoria cableada" } },
+      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Mémoire résidente" } }
+    }
+  },
   "Charging" : {
     "localizations" : {
       "en" : { "stringUnit" : { "state" : "translated", "value" : "Charging" } },

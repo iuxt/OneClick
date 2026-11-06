@@ -62,10 +62,13 @@ struct OneClickApp: App {
         .defaultAppStorage(.group)
         .menuBarExtraStyle(.window)
 
+        // These are real, independent macOS status-bar items. Their labels are
+        // rendered directly in the system menu bar; the settings page only
+        // controls whether each item is inserted.
         MenuBarExtra(isInserted: $showCPUMonitor) {
             SystemMonitorModuleDetailView(module: .cpu)
         } label: {
-            SystemMonitorModuleLabel(module: .cpu)
+            SystemMonitorStatusBarLabel(module: .cpu)
         }
         .defaultAppStorage(.group)
         .menuBarExtraStyle(.window)
@@ -73,7 +76,7 @@ struct OneClickApp: App {
         MenuBarExtra(isInserted: $showMemoryMonitor) {
             SystemMonitorModuleDetailView(module: .memory)
         } label: {
-            SystemMonitorModuleLabel(module: .memory)
+            SystemMonitorStatusBarLabel(module: .memory)
         }
         .defaultAppStorage(.group)
         .menuBarExtraStyle(.window)
@@ -81,7 +84,7 @@ struct OneClickApp: App {
         MenuBarExtra(isInserted: $showNetworkMonitor) {
             SystemMonitorModuleDetailView(module: .network)
         } label: {
-            SystemMonitorModuleLabel(module: .network)
+            SystemMonitorStatusBarLabel(module: .network)
         }
         .defaultAppStorage(.group)
         .menuBarExtraStyle(.window)
@@ -89,7 +92,7 @@ struct OneClickApp: App {
         MenuBarExtra(isInserted: $showDiskMonitor) {
             SystemMonitorModuleDetailView(module: .disk)
         } label: {
-            SystemMonitorModuleLabel(module: .disk)
+            SystemMonitorStatusBarLabel(module: .disk)
         }
         .defaultAppStorage(.group)
         .menuBarExtraStyle(.window)
@@ -97,7 +100,7 @@ struct OneClickApp: App {
         MenuBarExtra(isInserted: $showGPUMonitor) {
             SystemMonitorModuleDetailView(module: .gpu)
         } label: {
-            SystemMonitorModuleLabel(module: .gpu)
+            SystemMonitorStatusBarLabel(module: .gpu)
         }
         .defaultAppStorage(.group)
         .menuBarExtraStyle(.window)
@@ -105,7 +108,7 @@ struct OneClickApp: App {
         MenuBarExtra(isInserted: $showBatteryMonitor) {
             SystemMonitorModuleDetailView(module: .battery)
         } label: {
-            SystemMonitorModuleLabel(module: .battery)
+            SystemMonitorStatusBarLabel(module: .battery)
         }
         .defaultAppStorage(.group)
         .menuBarExtraStyle(.window)

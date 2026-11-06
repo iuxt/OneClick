@@ -19,13 +19,28 @@ nonisolated struct SystemMonitorSnapshot: Equatable, Sendable {
         let total: Double
         let user: Double
         let system: Double
+        let perCore: [Double]
+        let loadAverage: [Double]
+        let frequencyMHz: UInt64?
 
-        nonisolated static let zero = CPU(total: 0, user: 0, system: 0)
+        nonisolated static let zero = CPU(
+            total: 0,
+            user: 0,
+            system: 0,
+            perCore: [],
+            loadAverage: [0, 0, 0],
+            frequencyMHz: nil
+        )
     }
 
     struct Memory: Equatable, Sendable {
         let used: UInt64
         let total: UInt64
+        let app: UInt64
+        let wired: UInt64
+        let compressed: UInt64
+        let available: UInt64
+        let swapUsed: UInt64
         let pressure: Pressure
 
         enum Pressure: String, Equatable, Sendable {
@@ -39,7 +54,16 @@ nonisolated struct SystemMonitorSnapshot: Equatable, Sendable {
             return min(1, max(0, Double(used) / Double(total)))
         }
 
-        nonisolated static let zero = Memory(used: 0, total: 0, pressure: .normal)
+        nonisolated static let zero = Memory(
+            used: 0,
+            total: 0,
+            app: 0,
+            wired: 0,
+            compressed: 0,
+            available: 0,
+            swapUsed: 0,
+            pressure: .normal
+        )
     }
 
     struct Disk: Equatable, Identifiable, Sendable {
@@ -63,6 +87,7 @@ nonisolated struct SystemMonitorSnapshot: Equatable, Sendable {
             let totalDownloaded: UInt64
             let totalUploaded: UInt64
             let isPrimary: Bool
+            let localAddress: String?
         }
 
         let downloadBytesPerSecond: UInt64
@@ -186,12 +211,16 @@ actor SystemMetricsSampler {
     }
 
     private var previousCPU: CPUTicks?
+    private var previousCoreCPU: [CPUTicks]?
     private var previousNetwork: NetworkCounters?
     private var previousProcesses: [Int32: ProcessCounters] = [:]
     private var previousProcessSampleAt: ContinuousClock.Instant?
 
     func sample(modules: SystemMonitorModules = .all) -> SystemMonitorSnapshot {
-        if !modules.cpu { previousCPU = nil }
+        if !modules.cpu {
+            previousCPU = nil
+            previousCoreCPU = nil
+        }
         if !modules.network { previousNetwork = nil }
         let processes = modules.cpu || modules.memory
             ? sampleProcesses()
@@ -232,14 +261,37 @@ actor SystemMetricsSampler {
             idle: UInt64(info.cpu_ticks.2)
         )
         defer { previousCPU = current }
-        guard let previousCPU else { return .zero }
+        let perCore = sampleCoreUsage()
+        let loadAverage = Self.loadAverage()
+        let frequencyMHz = Self.sysctlUInt64("hw.cpufrequency")
+            .map { $0 / 1_000_000 }
+            ?? Self.sysctlUInt64("hw.cpufrequency_max").map { $0 / 1_000_000 }
+        guard let previousCPU else {
+            return .init(
+                total: 0,
+                user: 0,
+                system: 0,
+                perCore: perCore,
+                loadAverage: loadAverage,
+                frequencyMHz: frequencyMHz
+            )
+        }
 
         let user = current.user &- previousCPU.user
         let system = current.system &- previousCPU.system
         let nice = current.nice &- previousCPU.nice
         let idle = current.idle &- previousCPU.idle
         let total = user + system + nice + idle
-        guard total > 0 else { return .zero }
+        guard total > 0 else {
+            return .init(
+                total: 0,
+                user: 0,
+                system: 0,
+                perCore: perCore,
+                loadAverage: loadAverage,
+                frequencyMHz: frequencyMHz
+            )
+        }
 
         let totalDouble = Double(total)
         let userFraction = Double(user + nice) / totalDouble
@@ -247,8 +299,65 @@ actor SystemMetricsSampler {
         return .init(
             total: min(1, userFraction + systemFraction),
             user: userFraction,
-            system: systemFraction
+            system: systemFraction,
+            perCore: perCore,
+            loadAverage: loadAverage,
+            frequencyMHz: frequencyMHz
         )
+    }
+
+    private func sampleCoreUsage() -> [Double] {
+        var processorCount: natural_t = 0
+        var cpuInfo: processor_info_array_t?
+        var cpuInfoCount: mach_msg_type_number_t = 0
+        let result = host_processor_info(
+            mach_host_self(),
+            PROCESSOR_CPU_LOAD_INFO,
+            &processorCount,
+            &cpuInfo,
+            &cpuInfoCount
+        )
+        guard result == KERN_SUCCESS, let cpuInfo else { return [] }
+        defer {
+            vm_deallocate(
+                mach_task_self_,
+                vm_address_t(UInt(bitPattern: cpuInfo)),
+                vm_size_t(cpuInfoCount) * vm_size_t(MemoryLayout<integer_t>.stride)
+            )
+        }
+
+        let values = UnsafeBufferPointer(start: cpuInfo, count: Int(cpuInfoCount))
+        let current = (0..<Int(processorCount)).map { index in
+            let offset = index * Int(CPU_STATE_MAX)
+            return CPUTicks(
+                user: UInt64(values[offset + Int(CPU_STATE_USER)]),
+                system: UInt64(values[offset + Int(CPU_STATE_SYSTEM)]),
+                nice: UInt64(values[offset + Int(CPU_STATE_NICE)]),
+                idle: UInt64(values[offset + Int(CPU_STATE_IDLE)])
+            )
+        }
+        defer { previousCoreCPU = current }
+        guard let previousCoreCPU, previousCoreCPU.count == current.count else {
+            return Array(repeating: 0, count: current.count)
+        }
+
+        return zip(current, previousCoreCPU).map { current, previous in
+            let user = current.user &- previous.user
+            let system = current.system &- previous.system
+            let nice = current.nice &- previous.nice
+            let idle = current.idle &- previous.idle
+            let total = user + system + nice + idle
+            guard total > 0 else { return 0 }
+            return min(1, max(0, Double(user + system + nice) / Double(total)))
+        }
+    }
+
+    private static func loadAverage() -> [Double] {
+        var values = [Double](repeating: 0, count: 3)
+        let count = values.withUnsafeMutableBufferPointer { buffer in
+            getloadavg(buffer.baseAddress, Int32(buffer.count))
+        }
+        return count == 3 ? values : [0, 0, 0]
     }
 
     private func sampleMemory() -> SystemMonitorSnapshot.Memory {
@@ -285,11 +394,28 @@ actor SystemMetricsSampler {
         default: .normal
         }
 
+        let total = ProcessInfo.processInfo.physicalMemory
+        let boundedUsed = min(used, total)
+        let fixed = min(boundedUsed, wired + compressed)
+        let app = boundedUsed - fixed
+
         return .init(
-            used: min(used, ProcessInfo.processInfo.physicalMemory),
-            total: ProcessInfo.processInfo.physicalMemory,
+            used: boundedUsed,
+            total: total,
+            app: app,
+            wired: min(wired, boundedUsed),
+            compressed: min(compressed, boundedUsed - min(wired, boundedUsed)),
+            available: total - boundedUsed,
+            swapUsed: Self.swapUsed(),
             pressure: pressure
         )
+    }
+
+    private static func swapUsed() -> UInt64 {
+        var usage = xsw_usage()
+        var size = MemoryLayout<xsw_usage>.size
+        guard sysctlbyname("vm.swapusage", &usage, &size, nil, 0) == 0 else { return 0 }
+        return usage.xsu_used
     }
 
     private func sampleDisks() -> [SystemMonitorSnapshot.Disk] {
@@ -336,17 +462,34 @@ actor SystemMetricsSampler {
 
         let primaryInterface = Self.primaryInterfaceName()
         var counters: [String: InterfaceCounters] = [:]
+        var localAddresses: [String: String] = [:]
         var pointer: UnsafeMutablePointer<ifaddrs>? = first
         while let current = pointer {
             defer { pointer = current.pointee.ifa_next }
             let flags = Int32(current.pointee.ifa_flags)
             guard flags & IFF_UP != 0,
                   flags & IFF_LOOPBACK == 0,
-                  let address = current.pointee.ifa_addr,
-                  address.pointee.sa_family == UInt8(AF_LINK),
-                  let dataPointer = current.pointee.ifa_data else { continue }
+                  let address = current.pointee.ifa_addr else { continue }
 
             let name = String(cString: current.pointee.ifa_name)
+            if address.pointee.sa_family == UInt8(AF_INET) {
+                var host = [CChar](repeating: 0, count: Int(NI_MAXHOST))
+                if getnameinfo(
+                    address,
+                    socklen_t(address.pointee.sa_len),
+                    &host,
+                    socklen_t(host.count),
+                    nil,
+                    0,
+                    NI_NUMERICHOST
+                ) == 0 {
+                    let bytes = host.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) }
+                    localAddresses[name] = String(decoding: bytes, as: UTF8.self)
+                }
+                continue
+            }
+            guard address.pointee.sa_family == UInt8(AF_LINK),
+                  let dataPointer = current.pointee.ifa_data else { continue }
             let data = dataPointer.assumingMemoryBound(to: if_data.self).pointee
             counters[name] = InterfaceCounters(
                 received: UInt64(data.ifi_ibytes),
@@ -369,7 +512,8 @@ actor SystemMetricsSampler {
                 uploadBytesPerSecond: Self.rate(current: counter.sent, previous: previous?.sent ?? counter.sent, seconds: seconds),
                 totalDownloaded: counter.received,
                 totalUploaded: counter.sent,
-                isPrimary: name == primaryInterface
+                isPrimary: name == primaryInterface,
+                localAddress: localAddresses[name]
             )
         }
         .sorted {
@@ -409,6 +553,13 @@ actor SystemMetricsSampler {
         guard let value = SCDynamicStoreCopyValue(nil, "State:/Network/Global/IPv4" as CFString)
             as? [String: Any] else { return nil }
         return value["PrimaryInterface"] as? String
+    }
+
+    private static func sysctlUInt64(_ name: String) -> UInt64? {
+        var value: UInt64 = 0
+        var size = MemoryLayout<UInt64>.size
+        guard sysctlbyname(name, &value, &size, nil, 0) == 0 else { return nil }
+        return value
     }
 
     private func sampleProcesses() -> (
@@ -661,5 +812,48 @@ nonisolated enum SystemMonitorFormatting {
 
     nonisolated static func compactSpeed(_ value: UInt64) -> String {
         "\(compactBytes(value))/s"
+    }
+
+    nonisolated static func menuBarSpeed(_ value: UInt64) -> String {
+        let units = ["B/s", "KB/s", "MB/s", "GB/s", "TB/s"]
+        var amount = Double(value)
+        var unit = 0
+        while amount >= 1_000, unit < units.count - 1 {
+            amount /= 1_000
+            unit += 1
+        }
+
+        let formatted: String
+        if unit == 0 || amount >= 100 {
+            formatted = String(format: "%.0f", amount)
+        } else {
+            formatted = String(format: "%.1f", amount)
+                .replacingOccurrences(of: ".0", with: "")
+        }
+        return "\(formatted) \(units[unit])"
+    }
+
+    nonisolated static func rateParts(_ value: UInt64) -> (value: String, unit: String) {
+        let units = ["B/s", "KB/s", "MB/s", "GB/s", "TB/s"]
+        var amount = Double(value)
+        var unit = 0
+        while amount >= 1_000, unit < units.count - 1 {
+            amount /= 1_000
+            unit += 1
+        }
+        let formatted = amount >= 100 || unit == 0
+            ? String(format: "%.0f", amount)
+            : String(format: "%.1f", amount).replacingOccurrences(of: ".0", with: "")
+        return (formatted, units[unit])
+    }
+
+    nonisolated static func uptime(_ interval: TimeInterval) -> String {
+        let totalMinutes = max(0, Int(interval) / 60)
+        let days = totalMinutes / (24 * 60)
+        let hours = totalMinutes / 60 % 24
+        let minutes = totalMinutes % 60
+        if days > 0 { return "\(days)d \(hours)h" }
+        if hours > 0 { return "\(hours)h \(minutes)m" }
+        return "\(minutes)m"
     }
 }
