@@ -82,7 +82,13 @@ final class ConfigService {
 
         // Append newly introduced actions once, preserving saved ordering and
         // disabled choices on subsequent loads.
-        let newActions: [RCAction] = [.checksum, .compressZip, .compressTarGzip, .extract, .compress, .compressZipSeparately, .extractAndDelete]
+        let newActions: [RCAction] = [
+            .checksum, .compressZip, .compressSevenZip, .compressTarGzip, .extract, .compress,
+            .compressZipSeparately, .compressSevenZipSeparately,
+            .compressZipAndDelete, .compressSevenZipAndDelete,
+            .compressZipSeparatelyAndDelete, .compressSevenZipSeparatelyAndDelete,
+            .extractAndDelete,
+        ]
         for var action in newActions where !data.actions.isEmpty && !data.actions.contains(where: { $0.id == action.id }) {
             action.idx = (data.actions.map(\.idx).max() ?? -1) + 1
             data.actions.append(action)

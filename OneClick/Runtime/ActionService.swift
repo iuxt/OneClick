@@ -134,10 +134,20 @@ final class ActionService {
             await showAirDrop(target, trigger)
         case "checksum":
             await showChecksums(target)
-        case "compress-zip-separately":
+        case "compress-zip-separately", "compress-7z-separately":
             guard trigger == "ctx-items" else { return }
-            await showArchives(target, operation: .zip, separately: true)
-        case "compress", "compress-zip", "compress-targz", "compress-zip-encrypted", "compress-7z-encrypted", "extract", "extract-and-delete":
+            await showArchives(target, operation: rcitem.id == "compress-zip-separately" ? .zip : .sevenZip,
+                               separately: true)
+        case "compress-zip-and-delete", "compress-7z-and-delete":
+            guard trigger == "ctx-items" else { return }
+            await showArchives(target, operation: rcitem.id == "compress-zip-and-delete" ? .zip : .sevenZip,
+                               deletesSourcesAfterSuccess: true)
+        case "compress-zip-separately-and-delete", "compress-7z-separately-and-delete":
+            guard trigger == "ctx-items" else { return }
+            await showArchives(target,
+                               operation: rcitem.id == "compress-zip-separately-and-delete" ? .zip : .sevenZip,
+                               separately: true, deletesSourcesAfterSuccess: true)
+        case "compress", "compress-zip", "compress-7z", "compress-targz", "compress-zip-encrypted", "compress-7z-encrypted", "extract", "extract-and-delete":
             guard trigger == "ctx-items", let operation = ArchiveOperation(rawValue: rcitem.id) else { return }
             await showArchives(target, operation: operation)
         default:
@@ -145,7 +155,8 @@ final class ActionService {
         }
     }
 
-    func showArchives(_ target: [String], operation: ArchiveOperation, separately: Bool = false) async {
+    func showArchives(_ target: [String], operation: ArchiveOperation, separately: Bool = false,
+                      deletesSourcesAfterSuccess: Bool = false) async {
         let targets = await FileActionWorker.inspect(target)
         let urls = targets.map(\.url)
         guard !urls.isEmpty else { return }
@@ -158,12 +169,15 @@ final class ActionService {
         if operation.isExtraction || separately {
             archives.show(requests: targets.map { target in
                 ArchiveRequest(operation: operation, urls: [target.url],
-                               error: denied.contains(target.directory) ? accessError : nil)
+                               error: denied.contains(target.directory) ? accessError : nil,
+                               deletesSourcesAfterSuccess: deletesSourcesAfterSuccess)
             })
         } else {
             // A compression request is all-or-nothing: never silently omit a
             // selected item when authorization for one of its folders is denied.
-            archives.show(requests: [ArchiveRequest(operation: operation, urls: urls, error: denied.isEmpty ? nil : accessError)])
+            archives.show(requests: [ArchiveRequest(operation: operation, urls: urls,
+                                                     error: denied.isEmpty ? nil : accessError,
+                                                     deletesSourcesAfterSuccess: deletesSourcesAfterSuccess)])
         }
     }
 

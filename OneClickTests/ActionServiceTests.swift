@@ -270,6 +270,46 @@ final class ActionServiceTests {
         #expect(archives.requests[2].error == nil)
     }
 
+    @Test func fastZipCompatibleCompressionShortcutsDispatchFormatSeparationAndDeletion() async throws {
+        let permission = MockPermission()
+        permission.hasAccessResult = true
+        let archives = MockArchives()
+        let state = MockState()
+        state.actions = [
+            .compressSevenZip, .compressSevenZipSeparately,
+            .compressZipAndDelete, .compressSevenZipAndDelete,
+            .compressZipSeparatelyAndDelete, .compressSevenZipSeparatelyAndDelete,
+        ]
+        let service = ActionService(state: state, permission: permission,
+                                    confirmation: MockConfirmation(), archives: archives)
+        let targets = ["/tmp/first.txt", "/tmp/second.txt"]
+
+        await service.actionHandler(rid: "compress-7z", target: targets, trigger: "ctx-items")
+        #expect(archives.requests.count == 1)
+        #expect(archives.requests[0].operation == .sevenZip)
+        #expect(archives.requests[0].urls.count == 2)
+        #expect(!archives.requests[0].deletesSourcesAfterSuccess)
+
+        await service.actionHandler(rid: "compress-7z-separately", target: targets, trigger: "ctx-items")
+        #expect(archives.requests.count == 2)
+        #expect(archives.requests.allSatisfy { $0.operation == .sevenZip && $0.urls.count == 1 })
+
+        let deleteActions: [(String, ArchiveOperation, Bool)] = [
+            ("compress-zip-and-delete", .zip, false),
+            ("compress-7z-and-delete", .sevenZip, false),
+            ("compress-zip-separately-and-delete", .zip, true),
+            ("compress-7z-separately-and-delete", .sevenZip, true),
+        ]
+        for (id, operation, separately) in deleteActions {
+            await service.actionHandler(rid: id, target: targets, trigger: "ctx-items")
+            #expect(archives.requests.count == (separately ? 2 : 1))
+            #expect(archives.requests.allSatisfy {
+                $0.operation == operation && $0.deletesSourcesAfterSuccess
+                    && $0.urls.count == (separately ? 1 : 2)
+            })
+        }
+    }
+
     @Test func cancelledArchiveAuthorizationPromptsOnceAndFailsWholeCompression() async {
         let permission = MockPermission()
         let archives = MockArchives()

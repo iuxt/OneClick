@@ -30,7 +30,7 @@ struct ArchiveViewModelTests {
         var progressChanges = 0
         let batch = model.objectWillChange.sink { batchChanges += 1 }
         let progress = model.activity.objectWillChange.sink { progressChanges += 1 }
-        for _ in 0..<20 { model.activity.update(.init(fileName: "processing")) }
+        for _ in 0..<20 { model.activity.update(.init(fraction: 0.25)) }
         #expect(batchChanges == 0)
         #expect(progressChanges == 1)
         model.cancel()

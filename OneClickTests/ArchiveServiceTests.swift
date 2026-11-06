@@ -49,45 +49,24 @@ struct ArchiveServiceTests {
 
     @Test func progressParsesPipeChunksAndTerminalRedrawsWithoutLeakingPrompts() throws {
         let progress = ArchiveProgress()
-        progress.configure(entries: [
-            ArchiveEntry(path: "中文 first.bin", size: 200, isDirectory: false),
-            ArchiveEntry(path: "second.bin", size: 800, isDirectory: false)
-        ])
-        // Feed single bytes to exercise split UTF-8 names and split percentages.
+        // Feed single bytes to exercise split prompts and split percentages.
         for byte in Data("Enter password:\n+ 中文 first.bin\n 10%".utf8) { progress.append(Data([byte])) }
         #expect(progress.passwordFailure)
-        #expect(progress.snapshot.fileName == "中文 first.bin")
         #expect(progress.snapshot.fraction == 0.1)
-        #expect(progress.snapshot.fileFraction == 0.5)
         progress.append(Data("\u{8}\u{8}\u{8}   \u{8}\u{8}\u{8}+ second.bin\n 60% 1".utf8))
-        #expect(progress.snapshot.fileName == "second.bin")
         #expect(progress.snapshot.fraction == 0.6)
-        #expect(progress.snapshot.fileFraction == 0.5)
         progress.append(Data("\r 55%\r 101%\nWrong password\n".utf8))
         #expect(progress.snapshot.fraction == 0.6)
-        #expect(progress.snapshot.fileName == "second.bin")
-        #expect(progress.snapshot.fileFraction == 0.5)
         progress.complete()
         #expect(progress.snapshot.fraction == 1)
-        #expect(progress.snapshot.fileFraction == 1)
     }
 
-    @Test func eagerSevenZipFileAnnouncementsDoNotPinCurrentFileProgressToZero() {
+    @Test func eagerSevenZipFileAnnouncementsDoNotAffectOverallProgress() {
         let progress = ArchiveProgress()
-        progress.configure(entries: [
-            ArchiveEntry(path: "first.bin", size: 200, isDirectory: false),
-            ArchiveEntry(path: "second.bin", size: 800, isDirectory: false)
-        ])
-        // Parallel ZIP workers announce both files at 0% before reading their
-        // contents. These are announcements, not completed-file boundaries.
         progress.append(Data("  0%\u{8}+ first.bin\n  0%\u{8}+ second.bin\n 10%".utf8))
-        #expect(progress.snapshot.fileName == "first.bin")
         #expect(progress.snapshot.fraction == 0.1)
-        #expect(progress.snapshot.fileFraction == 0.5)
         progress.append(Data("\u{8} 60% 2".utf8))
-        #expect(progress.snapshot.fileName == "second.bin")
         #expect(progress.snapshot.fraction == 0.6)
-        #expect(progress.snapshot.fileFraction == 0.5)
     }
 
     @Test func tarProgressUsesFileBoundariesAndLeavesUnknownFileBytesIndeterminate() {
@@ -95,12 +74,9 @@ struct ArchiveServiceTests {
         progress.configure(entries: [ArchiveEntry(path: "a", size: 100, isDirectory: false),
                                      ArchiveEntry(path: "b", size: 300, isDirectory: false)])
         progress.append(Data("a ./a\na ./b\n".utf8))
-        #expect(progress.snapshot.fileName == "b")
         #expect(progress.snapshot.fraction == 0.25)
-        #expect(progress.snapshot.fileFraction == nil)
         // TAR and filenames can contain '%'; only numeric progress records count.
         progress.append(Data("a ./100% real file\n".utf8))
-        #expect(progress.snapshot.fileName == "100% real file")
         #expect(progress.snapshot.fraction == 1)
     }
 
@@ -132,14 +108,12 @@ struct ArchiveServiceTests {
         let archive = try await ArchiveService.perform(ArchiveRequest(operation: operation, urls: [source]), password: password,
                                                        progress: compressionProgress)
         #expect(compressionProgress.snapshot.fraction == 1)
-        #expect(compressionProgress.snapshot.fileName == source.lastPathComponent)
         let unrelated = root.appendingPathComponent("unrelated.zip")
         try Data("keep original".utf8).write(to: unrelated)
         let extractionProgress = ArchiveProgress()
         let output = try await ArchiveService.perform(ArchiveRequest(operation: .extractAndDelete, urls: [archive]), password: password,
                                                       progress: extractionProgress)
         #expect(extractionProgress.snapshot.fraction == 1)
-        #expect(extractionProgress.snapshot.fileName == source.lastPathComponent)
         #expect(try Data(contentsOf: output.appendingPathComponent(source.lastPathComponent)) == contents)
         #expect(!FileManager.default.fileExists(atPath: archive.path))
         #expect(try Data(contentsOf: source) == contents)
@@ -163,6 +137,30 @@ struct ArchiveServiceTests {
         }
         #expect(try Data(contentsOf: archive) == contents)
         #expect(try FileManager.default.contentsOfDirectory(atPath: root.path) == ["broken.zip"])
+    }
+
+    @Test(arguments: [ArchiveOperation.zip, .sevenZip])
+    func compressionAndDeleteVerifiesOutputBeforeRemovingEverySource(operation: ArchiveOperation) async throws {
+        let root = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let first = root.appendingPathComponent("first.txt")
+        let second = root.appendingPathComponent("folder")
+        let firstContents = Data("first contents".utf8)
+        let secondContents = Data("nested contents".utf8)
+        try firstContents.write(to: first)
+        try FileManager.default.createDirectory(at: second, withIntermediateDirectories: false)
+        try secondContents.write(to: second.appendingPathComponent("second.txt"))
+
+        let request = ArchiveRequest(operation: operation, urls: [first, second],
+                                     deletesSourcesAfterSuccess: true)
+        let archive = try await ArchiveService.perform(request)
+
+        #expect(!FileManager.default.fileExists(atPath: first.path))
+        #expect(!FileManager.default.fileExists(atPath: second.path))
+        #expect(FileManager.default.fileExists(atPath: archive.path))
+        let output = try await ArchiveService.perform(ArchiveRequest(operation: .extract, urls: [archive]))
+        #expect(try Data(contentsOf: output.appendingPathComponent("first.txt")) == firstContents)
+        #expect(try Data(contentsOf: output.appendingPathComponent("folder/second.txt")) == secondContents)
     }
 
     @Test(arguments: [ArchiveOperation.zip, .sevenZip, .encryptedZip, .encryptedSevenZip])

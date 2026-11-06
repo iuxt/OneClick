@@ -5,11 +5,14 @@ choose ZIP, 7Z or TAR.GZ, a compression level (Fastest, Fast, Normal or Maximum)
 and optional password protection for ZIP and 7Z. Compression starts only when you
 click **Compress**. Higher levels generally trade processing time for smaller
 archives; the actual result depends on the input. Multiple selections are stored
-together in one archive. Choose **Compress to Separate ZIPs** to create one ZIP
-per selected file or folder beside its source, using the source's full name
+together in one archive. Direct Finder shortcuts can create either ZIP or 7Z.
+Choose **Compress to Separate ZIPs** or **Compress to Separate 7Zs** to create one
+archive per selected file or folder beside its source, using the source's full name
 (for example, `notes.txt.zip`). Existing names gain a numbered suffix. Each item
 has its own progress result, so a failed item does not stop the rest of the batch.
-This shortcut uses the same compression exclusions and CPU thread setting.
+The matching **and Delete Originals** shortcuts test the finished archive before
+publishing it, then remove the selected sources only after verification succeeds.
+These shortcuts use the same compression exclusions and CPU thread setting.
 Select archives
 and choose **Extract Here** to extract each into its own folder beside the archive.
 Choose **Extract and Delete Archive** to delete each selected archive after its
@@ -20,7 +23,7 @@ the window displays the deletion error.
 These actions can be toggled and reordered in Settings → Compression & Extraction,
 which also provides default format and compression level settings, a compression
 CPU thread limit, an exclusion list, and an independent menu-collapse switch.
-The direct ZIP/TAR.GZ compression shortcuts remain available there. Password
+The direct ZIP/7Z/TAR.GZ compression shortcuts remain available there. Password
 protection is configured through **Compress…**. Existing enabled/disabled choices
 are preserved when the new Compress… action is added.
 They require selected items; Finder's empty-space and toolbar menus disable them.

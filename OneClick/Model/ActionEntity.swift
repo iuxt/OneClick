@@ -54,11 +54,17 @@ final class ActionEntity {
             ActionEntity(id: "airdrop", name: "AirDrop", icon: "paperplane", isEnabled: false, sortOrder: 4),
             ActionEntity(id: "checksum", name: "File Checksums", icon: "number.square", isEnabled: true, sortOrder: 5),
             ActionEntity(id: "compress-zip", name: "Compress to ZIP", icon: "archivebox", isEnabled: true, sortOrder: 6),
-            ActionEntity(id: "compress-targz", name: "Compress to TAR.GZ", icon: "archivebox", isEnabled: true, sortOrder: 7),
-            ActionEntity(id: "extract", name: "Extract Here", icon: "shippingbox", isEnabled: true, sortOrder: 8),
-            ActionEntity(id: "compress", name: "Compress…", icon: "archivebox", isEnabled: true, sortOrder: 9),
-            ActionEntity(id: "compress-zip-separately", name: "Compress to Separate ZIPs", icon: "archivebox", isEnabled: true, sortOrder: 10),
-            ActionEntity(id: "extract-and-delete", name: "Extract and Delete Archive", icon: "shippingbox", isEnabled: true, sortOrder: 11),
+            ActionEntity(id: "compress-7z", name: "Compress to 7Z", icon: "archivebox", isEnabled: true, sortOrder: 7),
+            ActionEntity(id: "compress-targz", name: "Compress to TAR.GZ", icon: "archivebox", isEnabled: true, sortOrder: 8),
+            ActionEntity(id: "extract", name: "Extract Here", icon: "shippingbox", isEnabled: true, sortOrder: 9),
+            ActionEntity(id: "compress", name: "Compress…", icon: "archivebox", isEnabled: true, sortOrder: 10),
+            ActionEntity(id: "compress-zip-separately", name: "Compress to Separate ZIPs", icon: "archivebox", isEnabled: true, sortOrder: 11),
+            ActionEntity(id: "compress-7z-separately", name: "Compress to Separate 7Zs", icon: "archivebox", isEnabled: true, sortOrder: 12),
+            ActionEntity(id: "compress-zip-and-delete", name: "Compress to ZIP and Delete Originals", icon: "archivebox", isEnabled: true, sortOrder: 13),
+            ActionEntity(id: "compress-7z-and-delete", name: "Compress to 7Z and Delete Originals", icon: "archivebox", isEnabled: true, sortOrder: 14),
+            ActionEntity(id: "compress-zip-separately-and-delete", name: "Compress to Separate ZIPs and Delete Originals", icon: "archivebox", isEnabled: true, sortOrder: 15),
+            ActionEntity(id: "compress-7z-separately-and-delete", name: "Compress to Separate 7Zs and Delete Originals", icon: "archivebox", isEnabled: true, sortOrder: 16),
+            ActionEntity(id: "extract-and-delete", name: "Extract and Delete Archive", icon: "shippingbox", isEnabled: true, sortOrder: 17),
         ]
     }
 }

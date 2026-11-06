@@ -160,6 +160,9 @@ nonisolated struct ArchiveRequest: Sendable {
     /// nil retains the tool's default for direct compression shortcuts.
     var solid: Bool? = nil
     var verifyAfterCompression = false
+    /// Destructive compression shortcuts remove inputs only after the staged
+    /// archive has passed verification and the finished output is published.
+    var deletesSourcesAfterSuccess = false
 }
 
 nonisolated enum ArchiveError: LocalizedError, Equatable {
@@ -172,7 +175,7 @@ nonisolated enum ArchiveError: LocalizedError, Equatable {
         case .verificationFailed(let detail):
             AppLocalization.localized("Archive verification failed. No archive was saved.") + "\n" + detail
         case .sourceDeletionFailed(_, let detail):
-            AppLocalization.localized("Extraction completed, but the archive could not be deleted.") + "\n" + detail
+            AppLocalization.localized("The output was created, but the source files could not be deleted.") + "\n" + detail
         case .configurationRequired:
             AppLocalization.localized("Choose compression options before creating the archive.")
         case .invalidSelection:
@@ -208,8 +211,6 @@ nonisolated enum ArchiveError: LocalizedError, Equatable {
 nonisolated final class ArchiveProgress: @unchecked Sendable {
     struct Snapshot: Equatable, Sendable {
         var fraction: Double?
-        var fileFraction: Double?
-        var fileName = ""
         var isVerifying = false
     }
 
@@ -224,7 +225,7 @@ nonisolated final class ArchiveProgress: @unchecked Sendable {
     private var record = Data()
     private var passwordScanTail = Data()
     private var fileSizes: [String: Double] = [:]
-    private var orderedFiles: [(path: String, size: Double, upperBound: Double)] = []
+    private var currentFileName = ""
     private var totalSize = 0.0
     private var completedSize = 0.0
     private var visitedFiles = Set<String>()
@@ -235,32 +236,24 @@ nonisolated final class ArchiveProgress: @unchecked Sendable {
     func configure(entries: [ArchiveEntry]) {
         lock.withLock {
             fileSizes = [:]
-            orderedFiles = []
-            var upperBound = 0.0
             for entry in entries where !entry.isDirectory && !entry.isLink {
                 let path = entry.normalizedPath
                 let size = Double(entry.size)
                 fileSizes[path] = size
-                if size > 0 {
-                    upperBound += size
-                    orderedFiles.append((path, size, upperBound))
-                }
             }
-            totalSize = upperBound
+            totalSize = fileSizes.values.reduce(0, +)
         }
     }
 
     func complete() {
         lock.withLock {
             state.fraction = 1
-            state.fileFraction = 1
         }
     }
 
-    func setCurrentFile(_ name: String) {
+    func reportFraction(_ fraction: Double) {
         lock.withLock {
-            state.fileName = name
-            state.fileFraction = nil
+            state.fraction = max(state.fraction ?? 0, min(1, max(0, fraction)))
         }
     }
 
@@ -304,6 +297,7 @@ nonisolated final class ArchiveProgress: @unchecked Sendable {
             passwordScanTail = Data()
             state = Snapshot(isVerifying: verifying)
             completedSize = 0
+            currentFileName = ""
             visitedFiles = []
             nativeFraction = nil
             askedForPassword = false
@@ -344,7 +338,7 @@ nonisolated final class ArchiveProgress: @unchecked Sendable {
                     record.append(byte)
                 }
             }
-            // Percentages need not end in a newline. File names, however, are
+            // Percentages need not end in a newline. TAR boundary records are
             // consumed only after their complete record arrives.
             consumePercentage(String(decoding: record, as: UTF8.self))
         }
@@ -354,24 +348,16 @@ nonisolated final class ArchiveProgress: @unchecked Sendable {
         let text = String(decoding: record, as: UTF8.self)
         guard !text.isEmpty else { return }
         consumePercentage(text)
-        // Only file-operation records reach the UI. Banners, diagnostics and
-        // stdin password prompts remain available to error handling via detail.
-        for prefix in ["+ ", "- ", "T ", "a ", "x "] where text.hasPrefix(prefix) {
+        // bsdtar has no byte percentage, so use its file-boundary records only
+        // to advance the aggregate total. Other output remains diagnostic.
+        for prefix in ["a ", "x "] where text.hasPrefix(prefix) {
             var name = String(text.dropFirst(prefix.count))
             while name.hasPrefix("./") { name.removeFirst(2) }
-            guard !name.hasSuffix("/"), name != state.fileName else { return }
-            if nativeFraction == nil {
-                if let size = fileSizes[state.fileName], visitedFiles.insert(state.fileName).inserted {
-                    completedSize += size
-                }
-                state.fileName = name
-                state.fileFraction = nil
-            } else if orderedFiles.isEmpty {
-                // Without size metadata, retain the tool's current filename but
-                // do not pretend that a per-file percentage is available.
-                state.fileName = name
-                state.fileFraction = nil
+            guard !name.hasSuffix("/"), name != currentFileName else { return }
+            if let size = fileSizes[currentFileName], visitedFiles.insert(currentFileName).inserted {
+                completedSize += size
             }
+            currentFileName = name
             updateFractions()
             return
         }
@@ -391,30 +377,6 @@ nonisolated final class ArchiveProgress: @unchecked Sendable {
     private func updateFractions() {
         if let nativeFraction {
             state.fraction = nativeFraction
-            if totalSize > 0, !orderedFiles.isEmpty {
-                // 7-Zip reports aggregate input bytes and can announce many "+"
-                // filenames before parallel workers actually read them. Locate
-                // the estimated current file from the aggregate byte position
-                // instead of treating those announcements as file boundaries.
-                let position = nativeFraction * totalSize
-                var low = 0
-                var high = orderedFiles.count
-                while low < high {
-                    let middle = low + (high - low) / 2
-                    if position < orderedFiles[middle].upperBound {
-                        high = middle
-                    } else {
-                        low = middle + 1
-                    }
-                }
-                let index = min(low, orderedFiles.count - 1)
-                let selected = orderedFiles[index]
-                let lowerBound = index == 0 ? 0 : orderedFiles[index - 1].upperBound
-                state.fileName = selected.path
-                state.fileFraction = selected.size > 0
-                    ? min(1, max(0, (position - lowerBound) / selected.size))
-                    : nil
-            }
         } else if totalSize > 0 {
             // bsdtar reports file boundaries but no byte percentages. Never
             // invent a timed percentage for a file that is still being read.
@@ -476,18 +438,7 @@ nonisolated enum ArchiveService {
                 }
             }
 
-            if request.operation.isExtraction {
-                // Directory listing is optional progress metadata. Unsupported,
-                // damaged or locked archives still use the existing worker's
-                // validation and password retry flow.
-                if usesSevenZip(for: first) {
-                    do {
-                        progress.configure(entries: try await ArchiveBrowserService.list(first, password: password))
-                    } catch is CancellationError {
-                        throw CancellationError()
-                    } catch { }
-                }
-            } else if request.operation == .tarGzip {
+            if !request.operation.isExtraction && request.operation == .tarGzip {
                 // bsdtar has no native byte percentage, so it still needs size
                 // metadata. 7-Zip already scans ZIP/7Z inputs and reports an
                 // aggregate percentage; enumerating those trees here would read
@@ -515,7 +466,7 @@ nonisolated enum ArchiveService {
                     // No -p on extraction: 7-Zip prompts on stdin only when the
                     // archive is encrypted. An empty -p would force an empty
                     // password on some versions. snld0 rejects unsafe symlinks.
-                    arguments = ["x", "-y", "-bsp1", "-bb1", "-sccUTF-8", "-snld0", "-o" + result.path, "--", first.path]
+                    arguments = ["x", "-y", "-bsp1", "-bb0", "-sccUTF-8", "-snld0", "-o" + result.path, "--", first.path]
                 } else {
                     arguments = ["-xvf", first.path, "-C", result.path, "--safe-writes",
                                  "--no-same-owner", "--no-same-permissions", "--no-acls", "--no-xattrs", "--no-fflags"]
@@ -537,7 +488,7 @@ nonisolated enum ArchiveService {
                     let exclusions = settings.exclusionPatterns.map { "-xr!" + $0 }
                     let volumes = request.volumeSize.map { ["-v\($0)b"] } ?? []
                     let solid = request.solid.map { [$0 ? "-ms=on" : "-ms=off"] } ?? []
-                    arguments = ["a"] + formatOptions + encryption + level + exclusions + volumes + solid + ["-snl", "-y", "-bsp1", "-bb1", "-sccUTF-8", result.path, "--"]
+                    arguments = ["a"] + formatOptions + encryption + level + exclusions + volumes + solid + ["-snl", "-y", "-bsp1", "-bb0", "-sccUTF-8", result.path, "--"]
                         + request.urls.map { "./" + $0.lastPathComponent }
                 } else {
                     let level = request.compressionLevel.map { ["--options", "gzip:compression-level=\($0.rawValue)"] } ?? []
@@ -548,16 +499,16 @@ nonisolated enum ArchiveService {
             }
             if shouldUseParallelZIP(request, settings: settings) {
                 let level = request.compressionLevel?.rawValue ?? ArchiveCompressionLevel.normal.rawValue
-                try runParallelZIP(arguments: ["-K", "-c", "-p", String(settings.effectiveThreadCount), "-\(level)", "--",
-                                                   "./" + first.lastPathComponent],
-                                   output: result, directory: parent, fileName: first.lastPathComponent, progress: progress)
+                try runParallelZIP(arguments: ["-K", "-c", "-A", first.lastPathComponent,
+                                               "-p", String(settings.effectiveThreadCount), "-\(level)"],
+                                   input: first, output: result, directory: parent, progress: progress)
             } else {
                 let executable = useSevenZip ? try sevenZipURL() : URL(fileURLWithPath: "/usr/bin/tar")
                 try run(executable: executable, arguments: arguments, directory: parent,
                         password: useSevenZip ? password : nil, progress: progress)
             }
             try Task.checkCancellation()
-            if !request.operation.isExtraction && request.verifyAfterCompression {
+            if !request.operation.isExtraction && (request.verifyAfterCompression || request.deletesSourcesAfterSuccess) {
                 let archive = request.volumeSize == nil ? result : result.appendingPathExtension("001")
                 try verifyArchive(at: archive, operation: request.operation, password: password, progress: progress)
                 try Task.checkCancellation()
@@ -584,12 +535,14 @@ nonisolated enum ArchiveService {
             }
             guard let published else { throw CocoaError(.fileWriteFileExists) }
             progress.complete()
-            if request.operation == .extractAndDelete {
+            if request.operation == .extractAndDelete || request.deletesSourcesAfterSuccess {
                 do {
                     try Task.checkCancellation()
-                    try fm.removeItem(at: first)
+                    let sources = request.operation == .extractAndDelete ? [first] : request.urls
+                    for source in sources { try fm.removeItem(at: source) }
                 } catch is CancellationError {
-                    // Published contents remain available; cancellation preserves the archive.
+                    // Published output remains available; cancellation preserves
+                    // every source not already removed.
                     return published
                 } catch {
                     throw ArchiveError.sourceDeletionFailed(output: published, detail: error.localizedDescription)
@@ -654,7 +607,7 @@ nonisolated enum ArchiveService {
                 try run(executable: URL(fileURLWithPath: "/usr/bin/tar"), arguments: ["-tf", archive.path],
                         directory: directory, password: nil, progress: progress)
             } else {
-                try run(executable: sevenZipURL(), arguments: ["t", "-y", "-bsp1", "-bb1", "-sccUTF-8", "--", archive.path],
+                try run(executable: sevenZipURL(), arguments: ["t", "-y", "-bsp1", "-bb0", "-sccUTF-8", "--", archive.path],
                         directory: directory, password: password, progress: progress)
             }
         } catch is CancellationError {
@@ -751,28 +704,41 @@ nonisolated enum ArchiveService {
         return size >= 8 * 1_048_576 && size < UInt64(UInt32.max) - 1_048_576
     }
 
-    private static func runParallelZIP(arguments: [String], output: URL, directory: URL,
-                                       fileName: String, progress: ArchiveProgress) throws {
+    private static func runParallelZIP(arguments: [String], input: URL, output: URL, directory: URL,
+                                       progress: ArchiveProgress) throws {
         guard FileManager.default.createFile(atPath: output.path, contents: nil,
                                              attributes: [.posixPermissions: 0o600]) else {
             throw ArchiveError.failed("Could not create the staged ZIP archive.")
         }
         let destination = try FileHandle(forWritingTo: output)
         defer { try? destination.close() }
+        let source = try FileHandle(forReadingFrom: input)
+        defer { try? source.close() }
+        let inputSize = Double(try input.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0)
         let process = Process()
         process.executableURL = try pigzURL()
         process.arguments = arguments
         process.currentDirectoryURL = directory
         process.environment = ["PATH": "/usr/bin:/bin", "LANG": "en_US.UTF-8"]
-        process.standardInput = FileHandle.nullDevice
+        // The child and parent share the same open-file description. Polling
+        // its offset provides total input progress without copying bytes through
+        // another pipe, while fstat() in pigz still sees the source modification time.
+        process.standardInput = source
         process.standardOutput = destination
         let pipe = Pipe()
         process.standardError = pipe
         try progress.launch(process)
-        progress.setCurrentFile(fileName)
         try? pipe.fileHandleForWriting.close()
         defer { try? pipe.fileHandleForReading.close() }
         do {
+            while process.isRunning {
+                if inputSize > 0, let offset = try? source.offset() {
+                    // Reading can finish slightly before the compression queue
+                    // drains, so reserve the final 5% for flushing and publish.
+                    progress.reportFraction(min(0.95, Double(offset) / inputSize * 0.95))
+                }
+                Thread.sleep(forTimeInterval: 0.05)
+            }
             var buffer = [UInt8](repeating: 0, count: 8_192)
             while true {
                 let count = Darwin.read(pipe.fileHandleForReading.fileDescriptor, &buffer, buffer.count)

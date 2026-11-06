@@ -4575,9 +4575,9 @@ local int option(char *arg) {
             g.zopts.numiterations = (int)num(arg);  // optimize iterations
         else if (get == 5)
             g.zopts.blocksplittingmax = (int)num(arg);  // max block splits
+#endif
         else if (get == 6)
             g.alias = arg;                      // zip name for stdin
-#endif
         else if (get == 7)
             g.comment = arg;                    // header comment
         get = 0;

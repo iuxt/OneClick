@@ -1,6 +1,66 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+  "The output was created, but the source files could not be deleted.": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": { "stringUnit": { "state": "translated", "value": "The output was created, but the source files could not be deleted." } },
+      "zh-Hans": { "stringUnit": { "state": "translated", "value": "输出已创建，但无法删除源文件。" } },
+      "ja": { "stringUnit": { "state": "translated", "value": "出力は作成されましたが、元のファイルを削除できませんでした。" } },
+      "es": { "stringUnit": { "state": "translated", "value": "Se creó el resultado, pero no se pudieron eliminar los archivos originales." } },
+      "fr": { "stringUnit": { "state": "translated", "value": "La sortie a été créée, mais les fichiers sources n’ont pas pu être supprimés." } }
+    }
+  },
+  "Compress to 7Z and Delete Originals": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": { "stringUnit": { "state": "translated", "value": "Compress to 7Z and Delete Originals" } },
+      "zh-Hans": { "stringUnit": { "state": "translated", "value": "压缩为 7Z 并删除原文件" } },
+      "ja": { "stringUnit": { "state": "translated", "value": "7Z に圧縮して元のファイルを削除" } },
+      "es": { "stringUnit": { "state": "translated", "value": "Comprimir en 7Z y eliminar los originales" } },
+      "fr": { "stringUnit": { "state": "translated", "value": "Compresser en 7Z et supprimer les originaux" } }
+    }
+  },
+  "Compress to Separate 7Zs": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": { "stringUnit": { "state": "translated", "value": "Compress to Separate 7Zs" } },
+      "zh-Hans": { "stringUnit": { "state": "translated", "value": "压缩到单独的 7Z" } },
+      "ja": { "stringUnit": { "state": "translated", "value": "個別の 7Z に圧縮" } },
+      "es": { "stringUnit": { "state": "translated", "value": "Comprimir en archivos 7Z separados" } },
+      "fr": { "stringUnit": { "state": "translated", "value": "Compresser en fichiers 7Z séparés" } }
+    }
+  },
+  "Compress to Separate 7Zs and Delete Originals": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": { "stringUnit": { "state": "translated", "value": "Compress to Separate 7Zs and Delete Originals" } },
+      "zh-Hans": { "stringUnit": { "state": "translated", "value": "压缩到单独的 7Z 并删除原文件" } },
+      "ja": { "stringUnit": { "state": "translated", "value": "個別の 7Z に圧縮して元のファイルを削除" } },
+      "es": { "stringUnit": { "state": "translated", "value": "Comprimir en archivos 7Z separados y eliminar los originales" } },
+      "fr": { "stringUnit": { "state": "translated", "value": "Compresser en fichiers 7Z séparés et supprimer les originaux" } }
+    }
+  },
+  "Compress to Separate ZIPs and Delete Originals": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": { "stringUnit": { "state": "translated", "value": "Compress to Separate ZIPs and Delete Originals" } },
+      "zh-Hans": { "stringUnit": { "state": "translated", "value": "压缩到单独的 ZIP 并删除原文件" } },
+      "ja": { "stringUnit": { "state": "translated", "value": "個別の ZIP に圧縮して元のファイルを削除" } },
+      "es": { "stringUnit": { "state": "translated", "value": "Comprimir en archivos ZIP separados y eliminar los originales" } },
+      "fr": { "stringUnit": { "state": "translated", "value": "Compresser en fichiers ZIP séparés et supprimer les originaux" } }
+    }
+  },
+  "Compress to ZIP and Delete Originals": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": { "stringUnit": { "state": "translated", "value": "Compress to ZIP and Delete Originals" } },
+      "zh-Hans": { "stringUnit": { "state": "translated", "value": "压缩为 ZIP 并删除原文件" } },
+      "ja": { "stringUnit": { "state": "translated", "value": "ZIP に圧縮して元のファイルを削除" } },
+      "es": { "stringUnit": { "state": "translated", "value": "Comprimir en ZIP y eliminar los originales" } },
+      "fr": { "stringUnit": { "state": "translated", "value": "Compresser en ZIP et supprimer les originaux" } }
+    }
+  },
   "A built-in blank document is used by default. Custom templates are optional.": {
     "extractionState": "manual",
     "localizations": {

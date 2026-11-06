@@ -370,15 +370,17 @@ private struct ArchiveView: View {
                 Spacer()
                 if model.isRunning || pendingRow != nil {
                     Button(AppLocalization.localized("Cancel"), action: close)
+                        .buttonStyle(.glass)
                         .keyboardShortcut(.cancelAction)
                     if pendingRow != nil {
                         Button(AppLocalization.localized(submitTitle), action: submit)
-                            .buttonStyle(.borderedProminent)
+                            .buttonStyle(.glassProminent)
                             .keyboardShortcut(.defaultAction)
                             .disabled(!canSubmit)
                     }
                 } else {
                     Button(AppLocalization.localized("Done"), action: close)
+                        .buttonStyle(.glassProminent)
                         .keyboardShortcut(.defaultAction)
                 }
             }
@@ -459,37 +461,80 @@ private struct ArchiveActivityView: View {
     @ObservedObject var activity: ArchiveViewModel.Activity
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(appLocalized: activity.isVerifying ? "Verifying archive…" : "Processing archive…")
-                .font(.subheadline.weight(.medium))
-            progressBar(title: "Overall Progress", fraction: activity.state.overallFraction)
-            VStack(alignment: .leading, spacing: 6) {
-                Text(activity.state.progress.fileName.isEmpty
-                     ? AppLocalization.localized("Preparing files…") : activity.state.progress.fileName)
-                    .font(.caption).foregroundStyle(.secondary)
-                    .lineLimit(1).truncationMode(.middle)
-                    .help(activity.state.progress.fileName)
-                progressBar(title: activity.isVerifying ? "Verification Progress" : "Current File Progress",
-                            fraction: activity.isVerifying ? activity.state.progress.fraction : activity.state.progress.fileFraction)
+        HStack(alignment: .center, spacing: 16) {
+            Image(systemName: activity.isVerifying ? "checkmark.shield.fill" : "archivebox.fill")
+                .font(.system(size: 24, weight: .semibold))
+                .foregroundStyle(.tint)
+                .frame(width: 48, height: 48)
+                .background(.tint.opacity(0.12), in: Circle())
+
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .firstTextBaseline, spacing: 12) {
+                    Text(appLocalized: activity.isVerifying ? "Verifying archive…" : "Processing archive…")
+                        .font(.headline)
+                    Spacer(minLength: 8)
+                    Text(percentageText)
+                        .font(.title3.weight(.semibold))
+                        .monospacedDigit()
+                        .contentTransition(.numericText())
+                }
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(appLocalized: "Overall Progress")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    ArchiveProgressBar(fraction: activity.state.overallFraction)
+                }
             }
         }
-        .padding(14)
+        .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.quinary, in: RoundedRectangle(cornerRadius: 10))
+        .glassEffect(
+            .regular.tint(Color.accentColor.opacity(0.08)),
+            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+        )
+        .animation(.smooth(duration: 0.25), value: activity.state.overallFraction)
     }
 
-    private func progressBar(title: String, fraction: Double?) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
-            HStack {
-                Text(appLocalized: title)
-                Spacer()
-                Text(fraction.map { "\(Int(($0 * 100).rounded(.down)))%" } ?? "—")
-                    .monospacedDigit().foregroundStyle(.secondary)
-            }
-            .font(.caption)
-            ProgressView(value: fraction, total: 1)
+    private var percentageText: String {
+        activity.state.overallFraction.map { "\(Int(($0 * 100).rounded(.down)))%" } ?? "—"
+    }
+}
+
+private struct ArchiveProgressBar: View {
+    let fraction: Double?
+
+    private var normalizedFraction: Double {
+        min(1, max(0, fraction ?? 0))
+    }
+
+    var body: some View {
+        if fraction == nil {
+            ProgressView()
                 .progressViewStyle(.linear)
-                .accessibilityLabel(AppLocalization.localized(title))
+                .controlSize(.small)
+                .accessibilityLabel(AppLocalization.localized("Overall Progress"))
+        } else {
+            GeometryReader { proxy in
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(.primary.opacity(0.10))
+                    Capsule()
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.accentColor.opacity(0.72), Color.accentColor],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .frame(width: proxy.size.width * normalizedFraction)
+                }
+            }
+            .frame(height: 8)
+            .animation(.smooth(duration: 0.25), value: normalizedFraction)
+            .accessibilityElement()
+            .accessibilityLabel(AppLocalization.localized("Overall Progress"))
+            .accessibilityValue("\(Int((normalizedFraction * 100).rounded(.down)))%")
         }
     }
 }
