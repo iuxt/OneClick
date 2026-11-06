@@ -31,7 +31,7 @@ struct ArchiveSettingsTabView: View {
                     }
                 }
                 Picker(AppLocalization.localized("Compression Level"), selection: $level) {
-                    ForEach(ArchiveCompressionLevel.allCases, id: \.self) { level in
+                    ForEach(ArchiveCompressionLevel.defaultCases, id: \.self) { level in
                         Text(level.title).tag(level)
                     }
                 }

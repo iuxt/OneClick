@@ -52,10 +52,23 @@ nonisolated enum ArchiveCompressionFormat: String, CaseIterable, Sendable {
 }
 
 nonisolated enum ArchiveCompressionLevel: Int, CaseIterable, Sendable {
-    case fastest = 1, fast = 3, normal = 5, maximum = 9
+    case store = 0, fastest = 1, fast = 3, normal = 5, maximum = 9
+
+    /// Store mode is deliberately available only from the configurable
+    /// compression window. Direct Finder actions keep using a real compression
+    /// level so their existing size/speed behaviour does not change.
+    static let defaultCases: [Self] = [.fastest, .fast, .normal, .maximum]
+
+    static func loadDefault(from defaults: UserDefaults) -> Self {
+        guard defaults.object(forKey: "archiveCompressionLevel") != nil,
+              let level = Self(rawValue: defaults.integer(forKey: "archiveCompressionLevel")),
+              defaultCases.contains(level) else { return .normal }
+        return level
+    }
 
     var title: String {
         let key = switch self {
+        case .store: "Store Only"
         case .fastest: "Fastest"
         case .fast: "Fast"
         case .normal: "Normal"
@@ -209,7 +222,9 @@ nonisolated final class ArchiveProgress: @unchecked Sendable {
     private var verifying = false
     private var state = Snapshot()
     private var record = Data()
+    private var passwordScanTail = Data()
     private var fileSizes: [String: Double] = [:]
+    private var orderedFiles: [(path: String, size: Double, upperBound: Double)] = []
     private var totalSize = 0.0
     private var completedSize = 0.0
     private var visitedFiles = Set<String>()
@@ -220,10 +235,18 @@ nonisolated final class ArchiveProgress: @unchecked Sendable {
     func configure(entries: [ArchiveEntry]) {
         lock.withLock {
             fileSizes = [:]
+            orderedFiles = []
+            var upperBound = 0.0
             for entry in entries where !entry.isDirectory && !entry.isLink {
-                fileSizes[entry.normalizedPath] = Double(entry.size)
+                let path = entry.normalizedPath
+                let size = Double(entry.size)
+                fileSizes[path] = size
+                if size > 0 {
+                    upperBound += size
+                    orderedFiles.append((path, size, upperBound))
+                }
             }
-            totalSize = fileSizes.values.reduce(0, +)
+            totalSize = upperBound
         }
     }
 
@@ -231,6 +254,13 @@ nonisolated final class ArchiveProgress: @unchecked Sendable {
         lock.withLock {
             state.fraction = 1
             state.fileFraction = 1
+        }
+    }
+
+    func setCurrentFile(_ name: String) {
+        lock.withLock {
+            state.fileName = name
+            state.fileFraction = nil
         }
     }
 
@@ -271,6 +301,7 @@ nonisolated final class ArchiveProgress: @unchecked Sendable {
             if cancelled { throw CancellationError() }
             output = Data()
             record = Data()
+            passwordScanTail = Data()
             state = Snapshot(isVerifying: verifying)
             completedSize = 0
             visitedFiles = []
@@ -294,10 +325,15 @@ nonisolated final class ArchiveProgress: @unchecked Sendable {
     func append(_ data: Data) {
         lock.withLock {
             output.append(data)
-            let text = String(decoding: output, as: UTF8.self)
-            askedForPassword = askedForPassword || text.contains("Enter password")
-            reportedWrongPassword = reportedWrongPassword || text.contains("Wrong password")
             if output.count > 16_384 { output = Data(output.suffix(16_384)) }
+            // Search only the new bytes plus a short overlap. Decoding the
+            // complete diagnostic buffer for every pipe read becomes quadratic
+            // when a tool emits output one byte at a time.
+            passwordScanTail.append(data)
+            let passwordText = String(decoding: passwordScanTail, as: UTF8.self)
+            askedForPassword = askedForPassword || passwordText.contains("Enter password")
+            reportedWrongPassword = reportedWrongPassword || passwordText.contains("Wrong password")
+            if passwordScanTail.count > 32 { passwordScanTail = Data(passwordScanTail.suffix(32)) }
             // 7-Zip redraws percentages using backspaces on macOS. Keep the
             // incomplete UTF-8 record between reads; pipe reads can split anywhere.
             for byte in data {
@@ -324,11 +360,18 @@ nonisolated final class ArchiveProgress: @unchecked Sendable {
             var name = String(text.dropFirst(prefix.count))
             while name.hasPrefix("./") { name.removeFirst(2) }
             guard !name.hasSuffix("/"), name != state.fileName else { return }
-            if let size = fileSizes[state.fileName], visitedFiles.insert(state.fileName).inserted {
-                completedSize += size
+            if nativeFraction == nil {
+                if let size = fileSizes[state.fileName], visitedFiles.insert(state.fileName).inserted {
+                    completedSize += size
+                }
+                state.fileName = name
+                state.fileFraction = nil
+            } else if orderedFiles.isEmpty {
+                // Without size metadata, retain the tool's current filename but
+                // do not pretend that a per-file percentage is available.
+                state.fileName = name
+                state.fileFraction = nil
             }
-            state.fileName = name
-            state.fileFraction = nil
             updateFractions()
             return
         }
@@ -339,17 +382,38 @@ nonisolated final class ArchiveProgress: @unchecked Sendable {
         let digits = text.prefix(while: { $0.isASCII && $0.isNumber })
         guard !digits.isEmpty, text.dropFirst(digits.count).first == "%",
               let percent = Double(digits), percent <= 100 else { return }
-        nativeFraction = max(nativeFraction ?? 0, percent / 100)
+        let fraction = percent / 100
+        if let nativeFraction, fraction <= nativeFraction { return }
+        nativeFraction = fraction
         updateFractions()
     }
 
     private func updateFractions() {
         if let nativeFraction {
             state.fraction = nativeFraction
-            if let size = fileSizes[state.fileName], size > 0, totalSize > 0 {
-                // CLI progress is rounded, aggregate input bytes. This estimate
-                // can be coarse for tiny files, solid blocks and parallel ZIP.
-                state.fileFraction = min(1, max(0, (nativeFraction * totalSize - completedSize) / size))
+            if totalSize > 0, !orderedFiles.isEmpty {
+                // 7-Zip reports aggregate input bytes and can announce many "+"
+                // filenames before parallel workers actually read them. Locate
+                // the estimated current file from the aggregate byte position
+                // instead of treating those announcements as file boundaries.
+                let position = nativeFraction * totalSize
+                var low = 0
+                var high = orderedFiles.count
+                while low < high {
+                    let middle = low + (high - low) / 2
+                    if position < orderedFiles[middle].upperBound {
+                        high = middle
+                    } else {
+                        low = middle + 1
+                    }
+                }
+                let index = min(low, orderedFiles.count - 1)
+                let selected = orderedFiles[index]
+                let lowerBound = index == 0 ? 0 : orderedFiles[index - 1].upperBound
+                state.fileName = selected.path
+                state.fileFraction = selected.size > 0
+                    ? min(1, max(0, (position - lowerBound) / selected.size))
+                    : nil
             }
         } else if totalSize > 0 {
             // bsdtar reports file boundaries but no byte percentages. Never
@@ -423,7 +487,11 @@ nonisolated enum ArchiveService {
                         throw CancellationError()
                     } catch { }
                 }
-            } else {
+            } else if request.operation == .tarGzip {
+                // bsdtar has no native byte percentage, so it still needs size
+                // metadata. 7-Zip already scans ZIP/7Z inputs and reports an
+                // aggregate percentage; enumerating those trees here would read
+                // all metadata twice before useful compression work begins.
                 progress.configure(entries: try compressionEntries(request.urls, settings: settings))
             }
             try Task.checkCancellation()
@@ -478,9 +546,16 @@ nonisolated enum ArchiveService {
                         + request.urls.map { "./" + $0.lastPathComponent }
                 }
             }
-            let executable = useSevenZip ? try sevenZipURL() : URL(fileURLWithPath: "/usr/bin/tar")
-            try run(executable: executable, arguments: arguments, directory: parent,
-                    password: useSevenZip ? password : nil, progress: progress)
+            if shouldUseParallelZIP(request, settings: settings) {
+                let level = request.compressionLevel?.rawValue ?? ArchiveCompressionLevel.normal.rawValue
+                try runParallelZIP(arguments: ["-K", "-c", "-p", String(settings.effectiveThreadCount), "-\(level)", "--",
+                                                   "./" + first.lastPathComponent],
+                                   output: result, directory: parent, fileName: first.lastPathComponent, progress: progress)
+            } else {
+                let executable = useSevenZip ? try sevenZipURL() : URL(fileURLWithPath: "/usr/bin/tar")
+                try run(executable: executable, arguments: arguments, directory: parent,
+                        password: useSevenZip ? password : nil, progress: progress)
+            }
             try Task.checkCancellation()
             if !request.operation.isExtraction && request.verifyAfterCompression {
                 let archive = request.volumeSize == nil ? result : result.appendingPathExtension("001")
@@ -652,6 +727,70 @@ nonisolated enum ArchiveService {
         let url = Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/7zz")
         guard FileManager.default.isExecutableFile(atPath: url.path) else { throw ArchiveError.toolUnavailable }
         return url
+    }
+
+    static func pigzURL() throws -> URL {
+        let url = Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/pigz")
+        guard FileManager.default.isExecutableFile(atPath: url.path) else { throw ArchiveError.toolUnavailable }
+        return url
+    }
+
+    /// pigz 2.8 writes a standard single-entry DEFLATE ZIP, but not ZIP64 or
+    /// Unix mode metadata. Keep the parallel path deliberately narrow and use
+    /// 7-Zip for every input whose behaviour could differ.
+    static func shouldUseParallelZIP(_ request: ArchiveRequest, settings: ArchiveCompressionSettings) -> Bool {
+        guard request.operation == .zip, request.urls.count == 1,
+              request.compressionLevel != .store, request.volumeSize == nil,
+              settings.exclusionPatterns.isEmpty, (try? pigzURL()) != nil,
+              let source = request.urls.first else { return false }
+        var info = stat()
+        guard lstat(source.path, &info) == 0,
+              info.st_mode & S_IFMT == S_IFREG,
+              info.st_mode & (S_IXUSR | S_IXGRP | S_IXOTH) == 0 else { return false }
+        let size = UInt64(max(0, info.st_size))
+        return size >= 8 * 1_048_576 && size < UInt64(UInt32.max) - 1_048_576
+    }
+
+    private static func runParallelZIP(arguments: [String], output: URL, directory: URL,
+                                       fileName: String, progress: ArchiveProgress) throws {
+        guard FileManager.default.createFile(atPath: output.path, contents: nil,
+                                             attributes: [.posixPermissions: 0o600]) else {
+            throw ArchiveError.failed("Could not create the staged ZIP archive.")
+        }
+        let destination = try FileHandle(forWritingTo: output)
+        defer { try? destination.close() }
+        let process = Process()
+        process.executableURL = try pigzURL()
+        process.arguments = arguments
+        process.currentDirectoryURL = directory
+        process.environment = ["PATH": "/usr/bin:/bin", "LANG": "en_US.UTF-8"]
+        process.standardInput = FileHandle.nullDevice
+        process.standardOutput = destination
+        let pipe = Pipe()
+        process.standardError = pipe
+        try progress.launch(process)
+        progress.setCurrentFile(fileName)
+        try? pipe.fileHandleForWriting.close()
+        defer { try? pipe.fileHandleForReading.close() }
+        do {
+            var buffer = [UInt8](repeating: 0, count: 8_192)
+            while true {
+                let count = Darwin.read(pipe.fileHandleForReading.fileDescriptor, &buffer, buffer.count)
+                if count == 0 { break }
+                if count < 0 {
+                    if errno == EINTR { continue }
+                    throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
+                }
+                progress.append(Data(buffer.prefix(count)))
+            }
+        } catch {
+            progress.cancel()
+            process.waitUntilExit()
+            throw error
+        }
+        process.waitUntilExit()
+        try progress.finish()
+        guard process.terminationStatus == 0 else { throw ArchiveError.failed(progress.detail) }
     }
 
     private static func run(executable: URL, arguments: [String], directory: URL,

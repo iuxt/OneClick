@@ -3,6 +3,50 @@ import Testing
 @testable import OneClick
 
 struct ArchiveServiceTests {
+    @Test func parallelZIPFastPathIsNarrowAndRoundTrips() async throws {
+        let root = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = root.appendingPathComponent("large.txt")
+        let contents = Data(repeating: 0x61, count: 8 * 1_048_576)
+        try contents.write(to: source)
+        let request = ArchiveRequest(operation: .zip, urls: [source], compressionLevel: .normal,
+                                     verifyAfterCompression: true)
+        #expect(ArchiveService.shouldUseParallelZIP(request, settings: ArchiveCompressionSettings()))
+        #expect(!ArchiveService.shouldUseParallelZIP(
+            ArchiveRequest(operation: .zip, urls: [source], compressionLevel: .store),
+            settings: ArchiveCompressionSettings()))
+        #expect(!ArchiveService.shouldUseParallelZIP(request,
+                                                     settings: ArchiveCompressionSettings(excludeFiles: true)))
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: source.path)
+        #expect(!ArchiveService.shouldUseParallelZIP(request, settings: ArchiveCompressionSettings()))
+        try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: source.path)
+
+        let archive = try await ArchiveService.perform(request)
+        let output = try await ArchiveService.perform(ArchiveRequest(operation: .extract, urls: [archive]))
+        #expect(try Data(contentsOf: output.appendingPathComponent(source.lastPathComponent)) == contents)
+    }
+
+    @Test(arguments: ArchiveCompressionFormat.allCases)
+    func storeOnlyCreatesRoundTripArchivesWithoutCompression(format: ArchiveCompressionFormat) async throws {
+        let root = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = root.appendingPathComponent("repeated.txt")
+        let contents = Data(String(repeating: "highly compressible contents\n", count: 4_096).utf8)
+        try contents.write(to: source)
+
+        let operation = format.operation(encrypted: false)
+        let stored = try await ArchiveService.perform(ArchiveRequest(operation: operation, urls: [source],
+                                                                     compressionLevel: .store))
+        let compressed = try await ArchiveService.perform(ArchiveRequest(operation: operation, urls: [source],
+                                                                         compressionLevel: .normal))
+        let storedSize = try #require(stored.resourceValues(forKeys: [.fileSizeKey]).fileSize)
+        let compressedSize = try #require(compressed.resourceValues(forKeys: [.fileSizeKey]).fileSize)
+        #expect(storedSize > compressedSize * 10)
+
+        let output = try await ArchiveService.perform(ArchiveRequest(operation: .extract, urls: [stored]))
+        #expect(try Data(contentsOf: output.appendingPathComponent(source.lastPathComponent)) == contents)
+    }
+
     @Test func progressParsesPipeChunksAndTerminalRedrawsWithoutLeakingPrompts() throws {
         let progress = ArchiveProgress()
         progress.configure(entries: [
@@ -26,6 +70,24 @@ struct ArchiveServiceTests {
         progress.complete()
         #expect(progress.snapshot.fraction == 1)
         #expect(progress.snapshot.fileFraction == 1)
+    }
+
+    @Test func eagerSevenZipFileAnnouncementsDoNotPinCurrentFileProgressToZero() {
+        let progress = ArchiveProgress()
+        progress.configure(entries: [
+            ArchiveEntry(path: "first.bin", size: 200, isDirectory: false),
+            ArchiveEntry(path: "second.bin", size: 800, isDirectory: false)
+        ])
+        // Parallel ZIP workers announce both files at 0% before reading their
+        // contents. These are announcements, not completed-file boundaries.
+        progress.append(Data("  0%\u{8}+ first.bin\n  0%\u{8}+ second.bin\n 10%".utf8))
+        #expect(progress.snapshot.fileName == "first.bin")
+        #expect(progress.snapshot.fraction == 0.1)
+        #expect(progress.snapshot.fileFraction == 0.5)
+        progress.append(Data("\u{8} 60% 2".utf8))
+        #expect(progress.snapshot.fileName == "second.bin")
+        #expect(progress.snapshot.fraction == 0.6)
+        #expect(progress.snapshot.fileFraction == 0.5)
     }
 
     @Test func tarProgressUsesFileBoundariesAndLeavesUnknownFileBytesIndeterminate() {

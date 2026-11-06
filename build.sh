@@ -96,8 +96,10 @@ if [[ "$BUILD_MODE" == local ]]; then
     log '本地签名（无需开发者账号，保留沙盒）'
     python3 "$ROOT_DIR/scripts/local-entitlements.py" "$ROOT_DIR" "$BUILD_DIR/Signing"
     rm -f "$APP_PATH/Contents/embedded.provisionprofile" "$EXTENSION_PATH/Contents/embedded.provisionprofile"
-    codesign --force --options runtime --timestamp=none --sign - \
-        --entitlements "$ROOT_DIR/Vendor/7zip/7zz.entitlements" "$APP_PATH/Contents/Helpers/7zz"
+    for helper in 7zz pigz; do
+        codesign --force --options runtime --timestamp=none --sign - \
+            --entitlements "$ROOT_DIR/Vendor/7zip/7zz.entitlements" "$APP_PATH/Contents/Helpers/$helper"
+    done
     codesign --force --options runtime --timestamp=none --sign - \
         --entitlements "$BUILD_DIR/Signing/FinderSyncExt.entitlements" "$EXTENSION_PATH"
     codesign --force --options runtime --timestamp=none --sign - \

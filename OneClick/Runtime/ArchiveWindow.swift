@@ -111,6 +111,7 @@ final class ArchiveViewModel: ObservableObject {
     var preferredWindowHeight: CGFloat { Self.windowHeight(rows: rows, isRunning: isRunning) }
 
     static func windowHeight(rows: [Row], isRunning: Bool) -> CGFloat {
+        if isRunning { return 340 }
         if !isRunning, rows.contains(where: { $0.needsConfiguration }) { return 640 }
         if !isRunning, rows.contains(where: { $0.needsPassword }) { return 360 }
         return 340 + CGFloat(min(3, max(0, rows.count - 1))) * 72
@@ -251,7 +252,7 @@ final class ArchiveViewModel: ObservableObject {
 /// Credentials remain in view state and are cleared whenever an attempt is submitted.
 struct ArchiveFormState {
     var format = ArchiveCompressionFormat(rawValue: UserDefaults.group.string(forKey: "archiveCompressionFormat") ?? "") ?? .zip
-    var level = ArchiveCompressionLevel(rawValue: UserDefaults.group.integer(forKey: "archiveCompressionLevel")) ?? .normal
+    var level = ArchiveCompressionLevel.loadDefault(from: .group)
     var encrypted = false
     var password = ""
     var confirmation = ""
@@ -350,11 +351,12 @@ private struct ArchiveView: View {
                 LazyVStack(alignment: .leading, spacing: 14) {
                     if model.isRunning {
                         ArchiveActivityView(activity: model.activity)
-                    }
-                    ForEach(model.rows) { row in
-                        archiveRow(row)
-                        if row.id != model.rows.last?.id {
-                            Divider()
+                    } else {
+                        ForEach(model.rows) { row in
+                            archiveRow(row)
+                            if row.id != model.rows.last?.id {
+                                Divider()
+                            }
                         }
                     }
                 }
@@ -404,18 +406,8 @@ private struct ArchiveView: View {
 
     private func archiveRow(_ row: ArchiveViewModel.Row) -> some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .top, spacing: 10) {
-                Image(systemName: row.request.operation.isExtraction ? "archivebox" : "doc.on.doc")
-                    .font(.title2)
-                    .foregroundStyle(.secondary)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(row.request.urls.map(\.lastPathComponent).joined(separator: ", "))
-                        .font(.headline).lineLimit(2).textSelection(.enabled)
-                    Text(row.request.operation.title)
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-                Spacer(minLength: 0)
-            }
+            Text(row.request.urls.map(\.lastPathComponent).joined(separator: ", "))
+                .font(.headline).lineLimit(2).textSelection(.enabled)
             if let error = row.error {
                 Text(error).foregroundStyle(.secondary).textSelection(.enabled)
             }
@@ -477,8 +469,7 @@ private struct ArchiveActivityView: View {
                     .font(.caption).foregroundStyle(.secondary)
                     .lineLimit(1).truncationMode(.middle)
                     .help(activity.state.progress.fileName)
-                progressBar(title: activity.isVerifying ? "Verification Progress" :
-                                (activity.state.progress.fileFraction == nil ? "Current File Progress" : "Current File Progress (Estimated)"),
+                progressBar(title: activity.isVerifying ? "Verification Progress" : "Current File Progress",
                             fraction: activity.isVerifying ? activity.state.progress.fraction : activity.state.progress.fileFraction)
             }
         }

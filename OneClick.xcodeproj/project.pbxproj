@@ -331,6 +331,13 @@
 				"$(SRCROOT)/Vendor/7zip/COPYING.LESSER",
 				"$(SRCROOT)/Vendor/7zip/README.md",
 				"$(SRCROOT)/Vendor/7zip/7zip-26.05-src.tar.xz",
+				"$(SRCROOT)/Vendor/pigz/pigz.c",
+				"$(SRCROOT)/Vendor/pigz/yarn.c",
+				"$(SRCROOT)/Vendor/pigz/yarn.h",
+				"$(SRCROOT)/Vendor/pigz/try.c",
+				"$(SRCROOT)/Vendor/pigz/try.h",
+				"$(SRCROOT)/Vendor/pigz/LICENSE.txt",
+				"$(SRCROOT)/Vendor/pigz/README.md",
 			);
 			name = "Embed Archive Tool";
 			outputPaths = (

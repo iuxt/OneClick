@@ -5,6 +5,22 @@ import Testing
 
 @MainActor
 struct ArchiveViewModelTests {
+    @Test func storeOnlyIsCustomCompressionLevel() {
+        #expect(ArchiveCompressionLevel.allCases.first == .store)
+        #expect(!ArchiveCompressionLevel.defaultCases.contains(.store))
+        let suite = "ArchiveViewModelTests.storeOnly.\(UUID())"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        #expect(ArchiveCompressionLevel.loadDefault(from: defaults) == .normal)
+        defaults.set(ArchiveCompressionLevel.fast.rawValue, forKey: "archiveCompressionLevel")
+        #expect(ArchiveCompressionLevel.loadDefault(from: defaults) == .fast)
+        defaults.set(ArchiveCompressionLevel.store.rawValue, forKey: "archiveCompressionLevel")
+        #expect(ArchiveCompressionLevel.loadDefault(from: defaults) == .normal)
+        var form = ArchiveFormState()
+        form.level = .store
+        #expect(form.level == .store)
+    }
+
     @Test func progressDoesNotInvalidateBatchAndPendingPromptTracksCancellation() {
         let model = ArchiveViewModel(requests: (0..<1000).map { _ in
             ArchiveRequest(operation: .compress, urls: [URL(fileURLWithPath: "/tmp/file")])

@@ -118,7 +118,10 @@ final class SettingsManagementService {
             _ = try JSONDecoder().decode(InputMethodConfiguration.self, from: data)
         }
         if let value = backup.integers["appIconStyle"], RCAppIconStyle(rawValue: value) == nil { throw SettingsBackupError.invalidBackup }
-        if let value = backup.integers["archiveCompressionLevel"], ArchiveCompressionLevel(rawValue: value) == nil { throw SettingsBackupError.invalidBackup }
+        if let value = backup.integers["archiveCompressionLevel"],
+           !ArchiveCompressionLevel.defaultCases.contains(where: { $0.rawValue == value }) {
+            throw SettingsBackupError.invalidBackup
+        }
         if let value = backup.integers["archiveCompressionThreads"], value < 0 { throw SettingsBackupError.invalidBackup }
         if let value = backup.strings["archiveCompressionFormat"], ArchiveCompressionFormat(rawValue: value) == nil { throw SettingsBackupError.invalidBackup }
     }
