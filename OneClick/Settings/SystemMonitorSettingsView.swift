@@ -5,12 +5,6 @@ struct SystemMonitorSettingsView: View {
     @ObservedObject private var monitor = SystemMonitor.shared
 
     @AppStorage(Key.systemMonitorRefreshInterval, store: .group) private var refreshInterval = 2.0
-    @AppStorage(Key.systemMonitorShowCPU, store: .group) private var showCPU = true
-    @AppStorage(Key.systemMonitorShowGPU, store: .group) private var showGPU = true
-    @AppStorage(Key.systemMonitorShowMemory, store: .group) private var showMemory = true
-    @AppStorage(Key.systemMonitorShowDisk, store: .group) private var showDisk = true
-    @AppStorage(Key.systemMonitorShowNetwork, store: .group) private var showNetwork = true
-    @AppStorage(Key.systemMonitorShowBattery, store: .group) private var showBattery = true
     @AppStorage(Key.systemMonitorCPUMenuBarItem, store: .group) private var cpuMenuBarItem = true
     @AppStorage(Key.systemMonitorMemoryMenuBarItem, store: .group) private var memoryMenuBarItem = true
     @AppStorage(Key.systemMonitorNetworkMenuBarItem, store: .group) private var networkMenuBarItem = true
@@ -53,30 +47,11 @@ struct SystemMonitorSettingsView: View {
                 Text(appLocalized: "Each enabled item appears separately in the menu bar. Click an item to see its history and rankings.")
                     .fixedSize(horizontal: false, vertical: true)
             }
-            Section {
-                moduleToggle("CPU", icon: "cpu", isOn: $showCPU)
-                moduleToggle("GPU", icon: "display", isOn: $showGPU)
-                moduleToggle("Memory", icon: "memorychip", isOn: $showMemory)
-                moduleToggle("Disk", icon: "internaldrive", isOn: $showDisk)
-                moduleToggle("Network", icon: "network", isOn: $showNetwork)
-                moduleToggle("Battery", icon: "battery.100percent", isOn: $showBattery)
-            } header: {
-                Text(appLocalized: "Overview Panel")
-            } footer: {
-                Text(appLocalized: "GPU and battery cards appear only when the hardware exposes those metrics.")
-                    .fixedSize(horizontal: false, vertical: true)
-            }
         }
         .formStyle(.grouped)
         .onAppear { monitor.start() }
         .onChange(of: refreshInterval) {
             monitor.configurationDidChange()
-        }
-    }
-
-    private func moduleToggle(_ title: String, icon: String, isOn: Binding<Bool>) -> some View {
-        Toggle(isOn: isOn) {
-            Label(AppLocalization.localized(title), systemImage: icon)
         }
     }
 

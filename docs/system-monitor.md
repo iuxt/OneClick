@@ -5,7 +5,7 @@ OneClick includes a lightweight system monitor inspired by
 shown simultaneously as independent menu bar items; disk, GPU and battery
 items are optional. Clicking an item opens that module's history and ranking
 view. The System Monitor settings page controls each menu bar item, its display
-style, the overview cards, and the one-, two- or five-second sampling interval.
+style, and the one-, two- or five-second sampling interval.
 
 ## Architecture
 
@@ -28,9 +28,9 @@ style, the overview cards, and the one-, two- or five-second sampling interval.
 
 ## Scope and limitations
 
-GPU and battery cards are conditional because not every Mac exposes those
-values. Network-mounted and synthetic volumes are skipped so an unavailable
-remote host cannot stall the menu bar refresh.
+GPU and battery data is conditional because not every Mac exposes those values.
+Network-mounted and synthetic volumes are skipped so an unavailable remote host
+cannot stall the menu bar refresh.
 
 Stats also supports SMC temperature sensors and fan control. Those features
 need model-specific sensor tables and, for fan writes, a privileged helper.

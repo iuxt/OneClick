@@ -57,7 +57,7 @@ struct OneClickApp: App {
         ) {
             MenuBarView()
         } label: {
-            SystemMonitorMenuBarLabel()
+            OneClickMenuBarLabel()
         }
         .defaultAppStorage(.group)
         .menuBarExtraStyle(.window)

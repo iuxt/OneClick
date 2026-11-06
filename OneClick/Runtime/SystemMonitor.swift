@@ -753,18 +753,12 @@ final class SystemMonitor: ObservableObject {
         isRefreshing = true
         let defaults = UserDefaults.group
         let modules = SystemMonitorModules(
-            cpu: Self.enabled(defaults, Key.systemMonitorShowCPU, fallback: true)
-                || Self.enabled(defaults, Key.systemMonitorCPUMenuBarItem, fallback: true),
-            gpu: Self.enabled(defaults, Key.systemMonitorShowGPU, fallback: true)
-                || Self.enabled(defaults, Key.systemMonitorGPUMenuBarItem, fallback: false),
-            memory: Self.enabled(defaults, Key.systemMonitorShowMemory, fallback: true)
-                || Self.enabled(defaults, Key.systemMonitorMemoryMenuBarItem, fallback: true),
-            disk: Self.enabled(defaults, Key.systemMonitorShowDisk, fallback: true)
-                || Self.enabled(defaults, Key.systemMonitorDiskMenuBarItem, fallback: false),
-            network: Self.enabled(defaults, Key.systemMonitorShowNetwork, fallback: true)
-                || Self.enabled(defaults, Key.systemMonitorNetworkMenuBarItem, fallback: true),
-            battery: Self.enabled(defaults, Key.systemMonitorShowBattery, fallback: true)
-                || Self.enabled(defaults, Key.systemMonitorBatteryMenuBarItem, fallback: false)
+            cpu: Self.enabled(defaults, Key.systemMonitorCPUMenuBarItem, fallback: true),
+            gpu: Self.enabled(defaults, Key.systemMonitorGPUMenuBarItem, fallback: false),
+            memory: Self.enabled(defaults, Key.systemMonitorMemoryMenuBarItem, fallback: true),
+            disk: Self.enabled(defaults, Key.systemMonitorDiskMenuBarItem, fallback: false),
+            network: Self.enabled(defaults, Key.systemMonitorNetworkMenuBarItem, fallback: true),
+            battery: Self.enabled(defaults, Key.systemMonitorBatteryMenuBarItem, fallback: false)
         )
         let newSnapshot = await sampler.sample(modules: modules)
         guard !Task.isCancelled else {

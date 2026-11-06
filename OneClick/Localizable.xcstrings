@@ -352,15 +352,6 @@
       "fr" : { "stringUnit" : { "state" : "translated", "value" : "Sur batterie" } }
     }
   },
-  "Overview Panel" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "Overview Panel" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "总览面板" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "概要パネル" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Panel general" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Panneau d’ensemble" } }
-    }
-  },
   "Percentage" : {
     "localizations" : {
       "en" : { "stringUnit" : { "state" : "translated", "value" : "Percentage" } },
@@ -451,24 +442,6 @@
       "fr" : { "stringUnit" : { "state" : "translated", "value" : "Utilisation des volumes" } }
     }
   },
-  "%@ remaining" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "%@ remaining" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "剩余 %@" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "残り %@" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "%@ restantes" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "%@ restantes" } }
-    }
-  },
-  "%@ until full" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "%@ until full" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "距离充满还有 %@" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "フル充電まで %@" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "%@ hasta la carga completa" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "%@ avant la charge complète" } }
-    }
-  },
   "Battery" : {
     "localizations" : {
       "en" : { "stringUnit" : { "state" : "translated", "value" : "Battery" } },
@@ -532,15 +505,6 @@
       "fr" : { "stringUnit" : { "state" : "translated", "value" : "GPU" } }
     }
   },
-  "GPU and battery cards appear only when the hardware exposes those metrics." : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "GPU and battery cards appear only when the hardware exposes those metrics." } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "仅当硬件提供相应指标时，才会显示 GPU 和电池卡片。" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "GPU とバッテリーのカードは、ハードウェアが情報を提供する場合にのみ表示されます。" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Las tarjetas de GPU y batería solo aparecen cuando el hardware proporciona esas métricas." } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Les cartes GPU et batterie n’apparaissent que si le matériel fournit ces mesures." } }
-    }
-  },
   "Live Preview" : {
     "localizations" : {
       "en" : { "stringUnit" : { "state" : "translated", "value" : "Live Preview" } },
@@ -584,24 +548,6 @@
       "ja" : { "stringUnit" : { "state" : "translated", "value" : "データなし" } },
       "es" : { "stringUnit" : { "state" : "translated", "value" : "Sin datos" } },
       "fr" : { "stringUnit" : { "state" : "translated", "value" : "Aucune donnée" } }
-    }
-  },
-  "OneClick System Monitor" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "OneClick System Monitor" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "OneClick 系统监控" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "OneClick システムモニタ" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Monitor del sistema de OneClick" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Moniteur système OneClick" } }
-    }
-  },
-  "Refresh" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "Refresh" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "刷新" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "更新" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Actualizar" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Actualiser" } }
     }
   },
   "Resource data stays on this Mac and is not sent to any server." : {
