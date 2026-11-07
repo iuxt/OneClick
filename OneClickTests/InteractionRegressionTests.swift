@@ -5,6 +5,33 @@ import Testing
 
 @MainActor
 struct InteractionRegressionTests {
+    @Test func openingAppsUsesContainerForEmptySpaceAndPreservesToolbarSelection() {
+        let folder = URL(fileURLWithPath: "/tmp/current folder")
+        let selected = URL(fileURLWithPath: "/tmp/stale/file.txt")
+        #expect(FinderActionTargets.openApp(trigger: .contextualContainer, selected: [selected], container: folder) == [folder.path])
+        #expect(FinderActionTargets.openApp(trigger: .contextualContainer, selected: [selected], container: nil).isEmpty)
+        #expect(FinderActionTargets.openApp(trigger: .toolbar, selected: [], container: folder) == [folder.path])
+        #expect(FinderActionTargets.openApp(trigger: .toolbar, selected: [selected], container: folder) == [selected.path])
+        #expect(FinderActionTargets.openApp(trigger: .contextualItems, selected: [], container: folder).isEmpty)
+    }
+
+    @Test func renamedBuiltInFileTypesKeepCustomNamesAndApplicationInMenuPayload() throws {
+        for var file in NewFile.all {
+            let original = file.displayName
+            file.name = "Custom \(file.id)"
+            #expect(file.displayName == file.name)
+            file.name = try #require(NewFile.all.first { $0.id == file.id }).name
+            #expect(file.displayName == original)
+        }
+        let configured = NewFileMenuItem(id: "txt", name: "工作日志", ext: ".txt", icon: "doc",
+                                          appURL: "/Applications/Editor.app")
+        let decoded = try JSONDecoder().decode(NewFileMenuItem.self, from: JSONEncoder().encode(configured))
+        #expect(decoded.name == "工作日志")
+        #expect(decoded.appURL == configured.appURL)
+        let legacy = Data(#"{"id":"txt","name":"TXT","ext":".txt","icon":"doc"}"#.utf8)
+        #expect(try JSONDecoder().decode(NewFileMenuItem.self, from: legacy).appURL == nil)
+    }
+
     @Test func emptySpaceActionsUseTheClickedFolderInsteadOfStaleSelection() {
         let folder = URL(fileURLWithPath: "/tmp/folder%20name")
         let selected = URL(fileURLWithPath: "/tmp/another/file.txt")

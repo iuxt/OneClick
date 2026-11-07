@@ -21,15 +21,21 @@ final class ActionService {
     private let confirmation: DeleteConfirmationProviding
     private let checksums: ChecksumPresenting
     private let archives: ArchivePresenting
+    private let openCreatedFile: @MainActor (URL, URL) async throws -> Void
 
     init(state: ActionStateProviding, permission: PermissionProviding, confirmation: DeleteConfirmationProviding,
          checksums: ChecksumPresenting = ChecksumWindowPresenter.shared,
-         archives: ArchivePresenting = ArchiveWindowPresenter.shared) {
+         archives: ArchivePresenting = ArchiveWindowPresenter.shared,
+         openCreatedFile: @escaping @MainActor (URL, URL) async throws -> Void = { file, application in
+             _ = try await NSWorkspace.shared.open([file], withApplicationAt: application,
+                                                  configuration: NSWorkspace.OpenConfiguration())
+         }) {
         self.state = state
         self.permission = permission
         self.confirmation = confirmation
         self.checksums = checksums
         self.archives = archives
+        self.openCreatedFile = openCreatedFile
     }
 
     // MARK: - SystemActions
@@ -336,20 +342,27 @@ final class ActionService {
 
         let ext: String
         let template: URL?
+        let openApp: URL?
         if rid == NewFileMenuItem.customFileId {
             ext = ""
             template = nil
+            openApp = nil
         } else {
             guard let item = state.getFileType(rid: rid) else { return }
             ext = item.ext
             template = item.template
+            openApp = item.openApp
         }
         let activity = FileActionActivity()
         do {
             let fileURL = try await FileActionWorker.create(in: dirURL, extension: ext, template: template,
                                                           baseName: AppLocalization.localized("Untitled"))
             activity.finish()
-            NSWorkspace.shared.activateFileViewerSelecting([fileURL])
+            if let openApp {
+                try await openCreatedFile(fileURL, openApp)
+            } else {
+                NSWorkspace.shared.activateFileViewerSelecting([fileURL])
+            }
         } catch {
             activity.finish()
             showFileFailures([FileActionWorker.Failure(url: dirURL, message: error.localizedDescription)])

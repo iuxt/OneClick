@@ -13,6 +13,12 @@ has its own progress result, so a failed item does not stop the rest of the batc
 The matching **and Delete Originals** shortcuts test the finished archive before
 publishing it, then remove the selected sources only after verification succeeds.
 These shortcuts use the same compression exclusions and CPU thread setting.
+Before deleting, OneClick checks that every selected source is present in the
+archive and that the source tree has not changed since compression began. If
+exclusions omit any source, or coverage cannot be confirmed, the archive is kept
+and the entire original selection is retained with an explanation. Changed
+sources also stop deletion. Source directories are removed only when empty, so
+new files appearing during deletion are not recursively removed.
 Select archives
 and choose **Extract Here** to extract each into its own folder beside the archive.
 Choose **Extract and Delete Archive** to delete each selected archive after its
@@ -20,6 +26,9 @@ contents have been extracted successfully. Failed or cancelled extraction keeps
 the original archive. Password prompts and batch processing work the same way as
 **Extract Here**. If deletion fails, the extracted folder remains available and
 the window displays the deletion error.
+For `.zip.001` and `.7z.001`, successful deletion removes the complete set of
+volumes reported by the archive reader. Orphaned numbered files outside that set
+are left alone; changed volumes stop deletion.
 These actions can be toggled and reordered in Settings → Compression & Extraction,
 which also provides default format and compression level settings, a compression
 CPU thread limit, an exclusion list, and an independent menu-collapse switch.
@@ -157,7 +166,8 @@ complete corresponding source archive under `Contents/Resources/7zip/`.
 Output is staged in a randomly named, mode-0700 directory beside the source and
 moved into place only on success. Existing output is never replaced: names gain
 ` (2)`, ` (3)`, etc. Failed and cancelled jobs remove their staging directories.
-Original files are retained. Extraction keeps bsdtar's default protections against
+Ordinary compression and extraction retain original files. The explicit deletion
+shortcuts use the source checks described above. Extraction keeps bsdtar's default protections against
 `..` traversal and writing through symlinks; `-P` is never used. 7-Zip runs with
 `-snld0` to reject dangerous symlinks and without `-spf` (absolute paths). Path
 traversal fixtures exercise both backends. TAR extraction does not restore

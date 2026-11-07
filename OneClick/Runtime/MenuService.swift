@@ -21,7 +21,7 @@ final class MenuService {
             actions: state.actions.filter(\.enabled).map { $0.toActionMenuItem() },
             apps: state.apps.map { $0.toAppMenuItem() },
             newFiles: state.newFiles.filter(\.enabled).map {
-                NewFileMenuItem(id: $0.id, name: $0.displayName, ext: $0.ext, icon: $0.icon)
+                NewFileMenuItem(id: $0.id, name: $0.displayName, ext: $0.ext, icon: $0.icon, appURL: $0.openApp?.path)
             },
             commonDirs: state.showCommonDirs ? state.cdirs.map {
                 CommonDirMenuItem(id: $0.id, name: $0.displayName, icon: $0.icon, url: $0.url.path)

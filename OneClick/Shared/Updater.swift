@@ -225,6 +225,7 @@ class UpdateManager: ObservableObject {
     /// 存下来只为拼仓库/Issues 地址，别处不再硬编码 URL。
     private let owner: String
     private let repo: String
+    private var installedApplicationURL: URL?
 
     /// 是否来自 Mac App Store（通过 `Contents/_MASReceipt/receipt` 是否存在判断）。
     /// App Store 构建禁止自更新（MAS 审核要求），改为引导用户去 App Store 更新。
@@ -287,7 +288,9 @@ class UpdateManager: ObservableObject {
       
     // 检查更新
     func checkForUpdates(force: Bool = false) async {
+        guard !isChecking, !isDownloading else { return }
         isChecking = true
+        availableUpdate = nil
         updateError = nil
         isUpToDate = false
         showUpdateSheet = true
@@ -317,6 +320,7 @@ class UpdateManager: ObservableObject {
     // MARK: - 下载和安装方法
 
     func downloadAndInstallUpdate() async {
+        guard !isDownloading else { return }
         print("start downloadAndInstallUpdate")
 
         // App Store 构建：禁止自更新，引导用户去 Mac App Store
@@ -340,20 +344,20 @@ class UpdateManager: ObservableObject {
         
         isDownloading = true
         downloadProgress = 0
+        updateError = nil
+        defer { isDownloading = false }
         
         do {
             // 1. 下载 ZIP 文件
             let downloadedURL = try await downloadAsset(asset: appZipAsset)
+            defer { try? FileManager.default.removeItem(at: downloadedURL) }
             
             // 2. 解压到临时目录
             let appURL = try await UpdateArchiveExtractor.extract(zipURL: downloadedURL)
+            defer { try? FileManager.default.removeItem(at: appURL.deletingLastPathComponent()) }
             
             // 3. 安装应用到应用程序目录
-            try await installApplication(appURL: appURL)
-            
-            // 4. 清理临时文件
-            try? FileManager.default.removeItem(at: downloadedURL)
-            try? FileManager.default.removeItem(at: appURL.deletingLastPathComponent())
+            installedApplicationURL = try await installApplication(appURL: appURL)
             
             // 5. 提示用户安装完成
             showInstallationCompleteAlert()
@@ -362,13 +366,12 @@ class UpdateManager: ObservableObject {
             updateError = String(format: AppLocalization.localized("Installation failed: %@"), error.localizedDescription)
         }
         
-        isDownloading = false
     }
 
     func downloadAsset(asset: GitHubRelease.Asset) async throws -> URL {
         print("start downloadAsset:\(asset.browserDownloadUrl)")
         let tempDir = FileManager.default.temporaryDirectory
-        let downloadURL = tempDir.appendingPathComponent(asset.name)
+        let downloadURL = tempDir.appendingPathComponent("oneclick-download-\(UUID()).app.zip")
         
         var request = URLRequest(url: URL(string: asset.browserDownloadUrl)!)
         request.setValue("application/octet-stream", forHTTPHeaderField: "Accept")
@@ -412,60 +415,12 @@ class UpdateManager: ObservableObject {
         }
     }
 
-    // MARK: - 请求文件夹权限
-    @MainActor
-    private func requestApplicationsFolderAccess() async throws {
-        let openPanel = NSOpenPanel()
-        openPanel.message = AppLocalization.localized("OneClick needs permission to install the update into your Applications folder.")
-        openPanel.prompt = AppLocalization.localized("Grant Permission")
-        openPanel.canChooseFiles = false
-        openPanel.canChooseDirectories = true
-        openPanel.allowsMultipleSelection = false
-        openPanel.directoryURL = FileManager.default.urls(for: .applicationDirectory, in: .localDomainMask).first
-
-        let response = await openPanel.begin()
-        
-        guard response == .OK, let selectedURL = openPanel.url else {
-            throw InstallationError.permissionDenied(AppLocalization.localized("The user cancelled authorization."))
-        }
-
-        // 验证用户是否选择了正确的文件夹
-        let applicationsURL = FileManager.default.urls(for: .applicationDirectory, in: .localDomainMask).first!
-        guard selectedURL.path == applicationsURL.path else {
-            throw InstallationError.permissionDenied(AppLocalization.localized("Please select the correct Applications folder."))
-        }
-    }
     // MARK: - 安装应用到应用程序目录
-    private func installApplication(appURL: URL) async throws {
-        let fileManager = FileManager.default
-        let applicationsURL = fileManager.urls(for: .applicationDirectory, in: .localDomainMask).first!
-        let destinationAppURL = applicationsURL.appendingPathComponent(appURL.lastPathComponent)
-        print("start install \(appURL.path) --- \(destinationAppURL.path)")
-        // 安装之前，先检查一下destinationAppURL 是否有权限读写，如果没有权限，请求权限
-         // 检查对应用程序文件夹的写入权限
-        if !fileManager.isWritableFile(atPath: applicationsURL.path) {
-            print("没有应用程序文件夹的写入权限，正在请求权限...")
-            try await requestApplicationsFolderAccess()
-        }
-        do {
-            // 检查目标位置是否已存在应用
-            if fileManager.fileExists(atPath: destinationAppURL.path) {
-                // 先尝试移动到废纸篓而不是直接删除
-                try fileManager.trashItem(at: destinationAppURL, resultingItemURL: nil)
-            }
-            
-            // 复制应用到应用程序目录
-            try fileManager.copyItem(at: appURL, to: destinationAppURL)
-            
-            // 验证应用程序是否有效
-            guard Bundle(url: destinationAppURL) != nil else {
-//                try fileManager.removeItem(at: destinationAppURL)
-                throw InstallationError.invalidAppBundle(AppLocalization.localized("The application bundle is invalid or damaged."))
-            }
-        } catch {
-            print("❌ 安装失败: \(error)")
-        }
-        
+    private func installApplication(appURL: URL) async throws -> URL {
+        // Preserve the user's installation location, including ~/Applications.
+        let destination = Bundle.main.bundleURL
+        return try await UpdateInstaller.install(appURL, to: destination,
+                                                 bundleIdentifier: Bundle.main.bundleIdentifier ?? "cn.wflixu.RClick")
     }
 
     // MARK: - App Store 更新引导
@@ -501,20 +456,13 @@ class UpdateManager: ObservableObject {
     // MARK: - 启动新应用并退出
 
     private func launchNewApplicationAndExit() {
-        let fileManager = FileManager.default
-        let applicationsURL = fileManager.urls(for: .applicationDirectory, in: .localDomainMask).first!
-        let currentAppName = Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String ?? "OneClick"
-        let newAppURL = applicationsURL.appendingPathComponent("\(currentAppName).app")
-        
-        let configuration = NSWorkspace.OpenConfiguration()
-        NSWorkspace.shared.openApplication(at: newAppURL, configuration: configuration) { _, error in
-            if error != nil {
-                print("启动新应用失败，可能需要手动启动")
-            }
-            // 无论如何都退出当前应用（切回主线程）
-            Task { @MainActor in
-                NSApp.terminate(nil)
-            }
+        guard let installedApplicationURL else { return }
+        do {
+            try UpdateRelauncher.schedule(application: installedApplicationURL,
+                                         processID: ProcessInfo.processInfo.processIdentifier)
+            NSApp.terminate(nil)
+        } catch {
+            updateError = String(format: AppLocalization.localized("Installation failed: %@"), error.localizedDescription)
         }
     }
 

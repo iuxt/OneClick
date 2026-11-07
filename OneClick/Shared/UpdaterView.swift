@@ -14,10 +14,10 @@ struct UpdateView: View {
         VStack(spacing: 16) {
             if updateManager.isChecking {
                 checkingView
-            } else if let release = updateManager.availableUpdate {
-                updateAvailableView(release)
             } else if let error = updateManager.updateError {
                 errorView(error)
+            } else if let release = updateManager.availableUpdate {
+                updateAvailableView(release)
             } else {
                 noUpdateView
             }
@@ -38,6 +38,7 @@ struct UpdateView: View {
     private func updateAvailableView(_ release: GitHubRelease) -> some View {
         // 更新可用视图实现保持不变...
         VStack(spacing: 12) {
+            if updateManager.isDownloading { ProgressView().controlSize(.small) }
             Image(systemName: "arrow.down.circle.fill")
                 .font(.system(size: 34))
                 .foregroundStyle(.tint)
@@ -78,6 +79,7 @@ struct UpdateView: View {
                 }
                 .buttonStyle(.glassProminent)
             }
+            .disabled(updateManager.isDownloading)
         }
     }
     
@@ -107,7 +109,7 @@ struct UpdateView: View {
                 .font(.system(size: 34))
                 .foregroundColor(.yellow)
             
-            Text(appLocalized: "Failed to Check for Updates")
+            Text(appLocalized: "Update Failed")
                 .font(.title2)
                 .bold()
             

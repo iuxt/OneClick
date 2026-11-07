@@ -307,6 +307,7 @@ extension NewFile {
     /// 格式缩写和 Apple 产品名，各语言都不翻译，`localized` 查不到就回落到 key 本身，
     /// 正好是想要的显示文本。只有三个 Office 格式有各语言通用的描述性叫法。
     var displayName: String {
+        if let original = Self.all.first(where: { $0.id == id }), name != original.name { return name }
         switch id {
         case "json": return AppLocalization.localized("JSON")
         case "txt": return AppLocalization.localized("TXT")
@@ -401,12 +402,14 @@ struct NewFileMenuItem: Codable {
     let name: String
     let ext: String
     let icon: String
+    let appURL: String?
 
-    init(id: String, name: String, ext: String, icon: String) {
+    init(id: String, name: String, ext: String, icon: String, appURL: String? = nil) {
         self.id = id
         self.name = name
         self.ext = ext
         self.icon = icon
+        self.appURL = appURL
     }
 }
 

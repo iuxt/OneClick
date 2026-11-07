@@ -255,8 +255,7 @@ class FinderSyncExt: FIFinderSync, @unchecked Sendable {
         let newFiles = config.newFiles
         DispatchQueue.global(qos: .utility).async { [weak self] in
             var warmed: [String: NSImage] = [:]
-            for app in apps {
-                guard let url = app.appURL else { continue }
+            for url in apps.compactMap(\.appURL) + newFiles.compactMap(\.appURL) {
                 let key = "app:\(url)"
                 let icon = NSWorkspace.shared.icon(forFile: url)
                 if icon.size.width > 0 { warmed[key] = icon }
@@ -656,7 +655,12 @@ class FinderSyncExt: FIFinderSync, @unchecked Sendable {
         let item = NSMenuItem(title: newFile.name, action: #selector(handleNewFileClick(_:)), keyEquivalent: "")
         item.tag = hashForNewFile(newFile)
         item.target = self
-        item.image = iconProvider.icon(for: newFile.ext, fallbackSymbol: newFile.icon)
+        if let appURL = newFile.appURL {
+            item.image = cachedOriginalAppIcon(app: AppMenuItem(id: newFile.id, name: newFile.name,
+                                                               icon: newFile.icon, tag: 0, appURL: appURL))
+        } else {
+            item.image = iconProvider.icon(for: newFile.ext, fallbackSymbol: newFile.icon)
+        }
         item.image?.accessibilityDescription = newFile.name
         // 新建文件需要往目标目录写入，必须由主程序执行，离线置灰
         if !isHostAppRunning {
@@ -757,13 +761,11 @@ class FinderSyncExt: FIFinderSync, @unchecked Sendable {
         logger.debug("App clicked: \(app.name) (id: \(app.id))")
 
         let selectedItems = FIFinderSyncController.default().selectedItemURLs() ?? []
-        var itemPaths = selectedItems.map { $0.path }
+        let itemPaths = FinderActionTargets.openApp(
+            trigger: getTriggerForMenuKind(), selected: selectedItems,
+            container: FIFinderSyncController.default().targetedURL()
+        )
         logger.info("[App] selectedItemURLs 返回 \(selectedItems.count) 个文件: \(itemPaths)")
-
-        // 工具栏触发没有选中项：用当前 Finder 窗口目录作为打开目标
-        if itemPaths.isEmpty, let targetURL = FIFinderSyncController.default().targetedURL() {
-            itemPaths = [targetURL.path]
-        }
 
         // 打开动作统一由主程序处理 bookmark 授权与失败重试。
         // 主程序离线时，makeAppItem 会将应用菜单项置灰。

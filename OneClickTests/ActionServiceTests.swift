@@ -67,7 +67,7 @@ final class ActionServiceTests {
 
         func getAppItem(rid: String) -> OpenWithApp? { nil }
         func getActionItem(rid: String) -> RCAction? { actions.first { $0.id == rid } }
-        func getFileType(rid: String) -> NewFile? { nil }
+        func getFileType(rid: String) -> NewFile? { newFiles.first { $0.id == rid } }
     }
 
     @MainActor
@@ -80,6 +80,30 @@ final class ActionServiceTests {
     private final class MockArchives: ArchivePresenting {
         var requests: [ArchiveRequest] = []
         func show(requests: [ArchiveRequest]) { self.requests = requests }
+    }
+
+    @Test func newFileOpensWithItsConfiguredApplication() async throws {
+        let fm = FileManager.default
+        let root = fm.temporaryDirectory.appendingPathComponent("oneclick-created-open-\(UUID())")
+        try fm.createDirectory(at: root, withIntermediateDirectories: false)
+        defer { try? fm.removeItem(at: root) }
+        let state = MockState()
+        var file = NewFile(ext: ".txt", name: "Notes", idx: 0)
+        let app = root.appendingPathComponent("Editor.app")
+        file.openApp = app
+        state.newFiles = [file]
+        let permission = MockPermission()
+        permission.hasAccessResult = true
+        var opened: [(URL, URL)] = []
+        let service = ActionService(state: state, permission: permission, confirmation: MockConfirmation(),
+                                    openCreatedFile: { opened.append(($0, $1)) })
+        await service.createFile(rid: file.id, target: [root.path])
+        let result = try #require(opened.first)
+        #expect(opened.count == 1)
+        #expect(result.1 == app)
+        #expect(result.0.deletingLastPathComponent().path == root.path)
+        #expect(fm.fileExists(atPath: result.0.path))
+        #expect(result.0.pathExtension == "txt")
     }
 
     @Test func batchAuthorizationChecksSharedDirectoryOnceAndDoesNotCacheAcrossActions() async {

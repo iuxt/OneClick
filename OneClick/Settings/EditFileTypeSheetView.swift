@@ -191,7 +191,9 @@ struct EditFileTypeSheetView: View {
                         }
                     }
                 } header: {
-                    Text(appLocalized: "Default Open App")
+                    Text(appLocalized: "Open New Files With")
+                } footer: {
+                    Text(appLocalized: "New files open with the selected application. Without a selection, they are revealed in Finder.")
                 }
             }
             .formStyle(.grouped)

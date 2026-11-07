@@ -1,6 +1,176 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+      "Open New Files With": {
+        "localizations": {
+          "en": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Open New Files With"
+            }
+          },
+          "zh-Hans": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "新建文件后使用此应用打开"
+            }
+          },
+          "ja": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "新規ファイルを開くアプリ"
+            }
+          },
+          "es": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Abrir archivos nuevos con"
+            }
+          },
+          "fr": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Ouvrir les nouveaux fichiers avec"
+            }
+          }
+        }
+      },
+      "New files open with the selected application. Without a selection, they are revealed in Finder.": {
+        "localizations": {
+          "en": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "New files open with the selected application. Without a selection, they are revealed in Finder."
+            }
+          },
+          "zh-Hans": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "新建文件后使用所选应用打开。未选择应用时，会在访达中显示文件。"
+            }
+          },
+          "ja": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "新規ファイルは選択したアプリで開きます。未選択の場合は Finder に表示します。"
+            }
+          },
+          "es": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Los archivos nuevos se abren con la aplicación seleccionada. Si no selecciona ninguna, se muestran en Finder."
+            }
+          },
+          "fr": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Les nouveaux fichiers s’ouvrent avec l’application sélectionnée. Sans sélection, ils sont affichés dans le Finder."
+            }
+          }
+        }
+      },
+      "Update Failed": {
+        "localizations": {
+          "en": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Update Failed"
+            }
+          },
+          "zh-Hans": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "更新失败"
+            }
+          },
+          "ja": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "アップデートに失敗しました"
+            }
+          },
+          "es": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Error de actualización"
+            }
+          },
+          "fr": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Échec de la mise à jour"
+            }
+          }
+        }
+      },
+      "The source files changed during the operation. Deletion was stopped to protect the remaining originals.": {
+        "localizations": {
+          "en": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "The source files changed during the operation. Deletion was stopped to protect the remaining originals."
+            }
+          },
+          "zh-Hans": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "操作期间源文件发生了变化，已停止删除以保护剩余原文件。"
+            }
+          },
+          "ja": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "操作中に元のファイルが変更されました。残りの元ファイルを保護するため、削除を停止しました。"
+            }
+          },
+          "es": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Los archivos de origen cambiaron durante la operación. Se detuvo la eliminación para proteger los originales restantes."
+            }
+          },
+          "fr": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Les fichiers source ont été modifiés pendant l’opération. La suppression a été arrêtée pour protéger les originaux restants."
+            }
+          }
+        }
+      },
+      "Some source files were excluded or could not be confirmed in the archive. Originals were kept.": {
+        "localizations": {
+          "en": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Some source files were excluded or could not be confirmed in the archive. Originals were kept."
+            }
+          },
+          "zh-Hans": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "部分源文件被排除或无法确认已完整归档，已保留原文件。"
+            }
+          },
+          "ja": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "一部の元のファイルが除外されたか、アーカイブへの格納を確認できませんでした。元のファイルは保持されました。"
+            }
+          },
+          "es": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Algunos archivos de origen se excluyeron o no se pudo confirmar su presencia en el archivo. Se conservaron los originales."
+            }
+          },
+          "fr": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Certains fichiers source ont été exclus ou leur présence dans l’archive n’a pas pu être confirmée. Les originaux ont été conservés."
+            }
+          }
+        }
+      },
     "Feature Modules" : {
       "localizations": {
         "en": {

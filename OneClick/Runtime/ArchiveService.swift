@@ -438,6 +438,16 @@ nonisolated enum ArchiveService {
                 }
             }
 
+            let sourceSnapshot: ArchiveSourceSnapshot?
+            if request.operation == .extractAndDelete {
+                let sources = try await ArchiveBrowserService.sourceVolumes(first, password: password)
+                sourceSnapshot = try ArchiveSourceSnapshot(sources)
+            } else if request.deletesSourcesAfterSuccess {
+                sourceSnapshot = try ArchiveSourceSnapshot(request.urls)
+            } else {
+                sourceSnapshot = nil
+            }
+
             if !request.operation.isExtraction && request.operation == .tarGzip {
                 // bsdtar has no native byte percentage, so it still needs size
                 // metadata. 7-Zip already scans ZIP/7Z inputs and reports an
@@ -513,24 +523,38 @@ nonisolated enum ArchiveService {
                 try verifyArchive(at: archive, operation: request.operation, password: password, progress: progress)
                 try Task.checkCancellation()
             }
-            if request.volumeSize != nil {
-                let published = try publishVolumes(of: result, to: parent, name: name, extension: ext)
-                progress.complete()
-                return published
+            var deletionError: Error?
+            if let sourceSnapshot, !request.operation.isExtraction {
+                do {
+                    let archive = request.volumeSize == nil ? result : result.appendingPathExtension("001")
+                    let entries = try await ArchiveBrowserService.list(archive, password: password)
+                    try sourceSnapshot.requireCoverage(in: entries, relativeTo: parent)
+                } catch is CancellationError {
+                    throw CancellationError()
+                } catch {
+                    // A usable archive is still published, but uncertain coverage
+                    // must never authorize deleting the originals.
+                    deletionError = error
+                }
             }
             // Reserve each destination with an exclusive rename. A separate
             // existence check followed by rename can overwrite a concurrent job.
             var published: URL?
-            for index in 0...10_000 {
-                try Task.checkCancellation()
-                let suffix = index == 0 ? "" : " (\(index + 1))"
-                let destination = parent.appendingPathComponent(name + suffix + ext)
-                do {
-                    try moveExclusively(from: result, to: destination)
-                    published = destination
-                    break
-                } catch let error as CocoaError where error.code == .fileWriteFileExists {
-                    continue
+            if request.volumeSize != nil {
+                published = try publishVolumes(of: result, to: parent, name: name, extension: ext)
+            }
+            if published == nil {
+                for index in 0...10_000 {
+                    try Task.checkCancellation()
+                    let suffix = index == 0 ? "" : " (\(index + 1))"
+                    let destination = parent.appendingPathComponent(name + suffix + ext)
+                    do {
+                        try moveExclusively(from: result, to: destination)
+                        published = destination
+                        break
+                    } catch let error as CocoaError where error.code == .fileWriteFileExists {
+                        continue
+                    }
                 }
             }
             guard let published else { throw CocoaError(.fileWriteFileExists) }
@@ -538,8 +562,8 @@ nonisolated enum ArchiveService {
             if request.operation == .extractAndDelete || request.deletesSourcesAfterSuccess {
                 do {
                     try Task.checkCancellation()
-                    let sources = request.operation == .extractAndDelete ? [first] : request.urls
-                    for source in sources { try fm.removeItem(at: source) }
+                    if let deletionError { throw deletionError }
+                    try sourceSnapshot?.removeUnchanged()
                 } catch is CancellationError {
                     // Published output remains available; cancellation preserves
                     // every source not already removed.

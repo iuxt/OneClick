@@ -40,6 +40,26 @@ nonisolated struct ArchiveEntry: Identifiable, Equatable, Sendable {
 nonisolated enum ArchiveBrowserService {
     static let previewLimit = 64 * 1_024 * 1_024
 
+    /// Ask the split-container reader how many parts belong to this archive;
+    /// unrelated or orphaned numbered files must never be swept up by a glob.
+    @concurrent
+    static func sourceVolumes(_ url: URL, password: String? = nil,
+                              progress: ArchiveProgress = ArchiveProgress()) async throws -> [URL] {
+        guard ["zip.001", "7z.001"].contains(ArchiveFormat.suffix(for: url) ?? "") else { return [url] }
+        return try await withTaskCancellationHandler {
+            try validate(url, password: password)
+            let data = try capture(url: url, arguments: ["l", "-slt", "-sccUTF-8", "-bd", "--", url.path],
+                                   password: password, limit: 32 * 1_024 * 1_024, progress: progress)
+            let header = String(decoding: data, as: UTF8.self).components(separatedBy: "\n----------")[0]
+            guard let line = header.components(separatedBy: .newlines).first(where: { $0.hasPrefix("Volumes = ") }),
+                  let count = Int(line.dropFirst("Volumes = ".count)), (1...100_000).contains(count) else {
+                throw ArchiveBrowserError.invalidListing
+            }
+            let base = url.deletingPathExtension()
+            return (1...count).map { base.appendingPathExtension(String(format: "%03d", $0)) }
+        } onCancel: { progress.cancel() }
+    }
+
     @concurrent
     static func list(_ url: URL, password: String? = nil, progress: ArchiveProgress = ArchiveProgress()) async throws -> [ArchiveEntry] {
         try await withTaskCancellationHandler {
