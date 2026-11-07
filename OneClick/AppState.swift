@@ -26,8 +26,6 @@ class AppState: ObservableObject, ActionStateProviding {
     @Published var cdirs: [CommonDir] = []
     @Published var inExt: Bool
 
-    let bookmarkManager = BookmarkManager()
-
     // 折叠开关状态 - 每个分类独立控制
     //
     // 全部存在 App Group 里，和 showMenuBarExtra 一致，全项目只剩一个 store。
@@ -88,7 +86,6 @@ class AppState: ObservableObject, ActionStateProviding {
         self.inExt = inExt
         // SharedDataManager commits defaults before exposing its container.
         refresh()
-        bookmarkManager.restoreBookmarks(context: ModelContext(self.configService.modelContext.container))
     }
 
     // MARK: - Apps

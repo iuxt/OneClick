@@ -1,252 +1,210 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-"This monitoring module is not available on this Mac." : {
-  "localizations": {
-    "en": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "This monitoring module is not available on this Mac."
+    "Feature Modules" : {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Feature Modules"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "功能模块"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "機能モジュール"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Módulos de funciones"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modules fonctionnels"
+          }
+        }
       }
     },
-    "zh-Hans": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "此 Mac 不支持该监控模块。"
+    "Startup & Menu Bar" : {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Startup & Menu Bar"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "启动与菜单栏"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "起動とメニューバー"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Inicio y barra de menús"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Démarrage et barre des menus"
+          }
+        }
       }
     },
-    "ja": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "この Mac では、この監視モジュールを利用できません。"
+    "Compression" : {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Compression"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "压缩设置"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "圧縮設定"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Compresión"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Compression"
+          }
+        }
       }
     },
-    "es": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "Este módulo de monitorización no está disponible en este Mac."
+    "Switching Preferences" : {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Switching Preferences"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "切换设置"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "切り替え設定"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preferencias de cambio"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Préférences de changement"
+          }
+        }
       }
     },
-    "fr": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "Ce module de surveillance n’est pas disponible sur ce Mac."
-      }
-    }
-  }
-},
-"Show in menu bar" : {
-  "localizations": {
-    "en": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "Show in menu bar"
-      }
-    },
-    "zh-Hans": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "在菜单栏中显示"
-      }
-    },
-    "ja": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "メニューバーに表示"
-      }
-    },
-    "es": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "Mostrar en la barra de menús"
-      }
-    },
-    "fr": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "Afficher dans la barre des menus"
-      }
-    }
-  }
-},
-"Overview" : {
-  "localizations": {
-    "en": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "Overview"
+    "Expanded" : {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Expanded"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已展开"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "展開済み"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Expandido"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Développé"
+          }
+        }
       }
     },
-    "zh-Hans": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "总览"
+    "Collapsed" : {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Collapsed"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已折叠"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "折りたたみ済み"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Contraído"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Réduit"
+          }
+        }
       }
     },
-    "ja": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "概要"
-      }
-    },
-    "es": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "Resumen"
-      }
-    },
-    "fr": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "Vue d’ensemble"
-      }
-    }
-  }
-},
-  "1 minute" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "1 minute" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "1 分钟" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "1 分" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "1 minuto" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "1 minute" } }
-    }
-  },
-  "5 minutes" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "5 minutes" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "5 分钟" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "5 分" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "5 minutos" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "5 minutes" } }
-    }
-  },
-  "15 minutes" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "15 minutes" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "15 分钟" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "15 分" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "15 minutos" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "15 minutes" } }
-    }
-  },
-  "All Cores" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "All Cores" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "所有核心" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "すべてのコア" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Todos los núcleos" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Tous les cœurs" } }
-    }
-  },
-  "App Memory" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "App Memory" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "App 内存" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "App メモリ" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Memoria de apps" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Mémoire des apps" } }
-    }
-  },
-  "Available" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "Available" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "可用" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "使用可能" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Disponible" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Disponible" } }
-    }
-  },
-  "Average Load" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "Average Load" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "平均负载" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "平均負荷" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Carga media" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Charge moyenne" } }
-    }
-  },
-  "Compressed" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "Compressed" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "压缩内存" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "圧縮メモリ" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Comprimida" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Compressée" } }
-    }
-  },
-  "Connection History" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "Connection History" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "连接历史" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "接続履歴" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Historial de conexión" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Historique de connexion" } }
-    }
-  },
-  "Critical" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "Critical" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "严重" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "重大" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Crítico" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Critique" } }
-    }
-  },
-  "Details" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "Details" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "详细信息" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "詳細情報" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Detalles" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Détails" } }
-    }
-  },
-  "Frequency" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "Frequency" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "频率" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "周波数" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Frecuencia" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Fréquence" } }
-    }
-  },
-  "Idle" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "Idle" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "闲置" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "アイドル" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Inactivo" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Inactif" } }
-    }
-  },
-  "Interface" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "Interface" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "接口" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "インターフェース" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Interfaz" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Interface" } }
-    }
-  },
-  "Load History" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "Load History" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "负载历史" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "負荷履歴" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Historial de carga" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Historique de charge" } }
-    }
-  },
-  "Local IP" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "Local IP" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "本地 IP" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "ローカル IP" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "IP local" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "IP locale" } }
-    }
-  },
   "Normal" : {
     "localizations" : {
       "en" : { "stringUnit" : { "state" : "translated", "value" : "Normal" } },
@@ -254,438 +212,6 @@
       "ja" : { "stringUnit" : { "state" : "translated", "value" : "正常" } },
       "es" : { "stringUnit" : { "state" : "translated", "value" : "Normal" } },
       "fr" : { "stringUnit" : { "state" : "translated", "value" : "Normal" } }
-    }
-  },
-  "Process" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "Process" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "进程" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "プロセス" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Proceso" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Processus" } }
-    }
-  },
-  "Status" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "Status" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "状态" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "状態" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Estado" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "État" } }
-    }
-  },
-  "Swap Used" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "Swap Used" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "交换区" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "スワップ使用量" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Intercambio usado" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Swap utilisé" } }
-    }
-  },
-  "Total Download" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "Total Download" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "总下载" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "総ダウンロード" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Descarga total" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Téléchargement total" } }
-    }
-  },
-  "Total Upload" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "Total Upload" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "总上传" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "総アップロード" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Subida total" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Envoi total" } }
-    }
-  },
-  "Uptime" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "Uptime" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "启动时间" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "稼働時間" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Tiempo activo" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Durée de fonctionnement" } }
-    }
-  },
-  "Usage" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "Usage" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "用量" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "使用量" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Uso" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Utilisation" } }
-    }
-  },
-  "Used" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "Used" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "已用" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "使用済み" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Usada" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Utilisée" } }
-    }
-  },
-  "Wired Memory" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "Wired Memory" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "联动内存" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "ワイヤードメモリ" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Memoria cableada" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Mémoire résidente" } }
-    }
-  },
-  "Charging" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "Charging" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "正在充电" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "充電中" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Cargando" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "En charge" } }
-    }
-  },
-  "Display" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "Display" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "显示方式" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "表示" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Visualización" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Affichage" } }
-    }
-  },
-  "Download" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "Download" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "下载" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "ダウンロード" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Descarga" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Téléchargement" } }
-    }
-  },
-  "Download and upload" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "Download and upload" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "下载和上传" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "ダウンロードとアップロード" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Descarga y subida" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Téléchargement et envoi" } }
-    }
-  },
-  "Download only" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "Download only" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "仅下载" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "ダウンロードのみ" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Solo descarga" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Téléchargement uniquement" } }
-    }
-  },
-  "Each enabled item appears separately in the menu bar. Click an item to see its history and rankings." : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "Each enabled item appears separately in the menu bar. Click an item to see its history and rankings." } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "启用的项目会分别显示在菜单栏中。点击项目可查看历史曲线和排行统计。" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "有効な項目はメニューバーに個別表示されます。クリックすると履歴とランキングを確認できます。" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Cada elemento activado aparece por separado en la barra de menús. Haz clic para ver su historial y clasificación." } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Chaque élément activé apparaît séparément dans la barre des menus. Cliquez dessus pour afficher son historique et son classement." } }
-    }
-  },
-  "Free space" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "Free space" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "可用空间" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "空き容量" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Espacio libre" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Espace libre" } }
-    }
-  },
-  "GPU utilization" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "GPU utilization" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "GPU 使用率" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "GPU 使用率" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Uso de GPU" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Utilisation du GPU" } }
-    }
-  },
-  "Icon and percentage" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "Icon and percentage" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "图标和百分比" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "アイコンとパーセント" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Icono y porcentaje" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Icône et pourcentage" } }
-    }
-  },
-  "Interface Ranking" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "Interface Ranking" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "网络接口排行" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "インターフェースランキング" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Clasificación de interfaces" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Classement des interfaces" } }
-    }
-  },
-  "Menu Bar Items" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "Menu Bar Items" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "菜单栏项目" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "メニューバー項目" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Elementos de la barra de menús" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Éléments de la barre des menus" } }
-    }
-  },
-  "No battery" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "No battery" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "未检测到电池" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "バッテリーがありません" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Sin batería" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Aucune batterie" } }
-    }
-  },
-  "On battery" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "On battery" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "使用电池供电" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "バッテリー駆動" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Con batería" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Sur batterie" } }
-    }
-  },
-  "Percentage" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "Percentage" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "百分比" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "パーセント" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Porcentaje" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Pourcentage" } }
-    }
-  },
-  "Primary" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "Primary" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "主接口" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "プライマリ" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Principal" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Principale" } }
-    }
-  },
-  "System" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "System" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "系统" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "システム" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Sistema" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Système" } }
-    }
-  },
-  "System Monitor Settings" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "System Monitor Settings" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "系统监控设置" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "システムモニタ設定" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Ajustes del monitor del sistema" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Réglages du moniteur système" } }
-    }
-  },
-  "Top Processes" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "Top Processes" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "进程排行" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "上位プロセス" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Procesos principales" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Principaux processus" } }
-    }
-  },
-  "Upload" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "Upload" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "上传" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "アップロード" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Subida" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Envoi" } }
-    }
-  },
-  "Upload only" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "Upload only" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "仅上传" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "アップロードのみ" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Solo subida" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Envoi uniquement" } }
-    }
-  },
-  "Used memory" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "Used memory" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "已用内存" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "使用済みメモリ" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Memoria usada" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Mémoire utilisée" } }
-    }
-  },
-  "User" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "User" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "用户" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "ユーザ" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Usuario" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Utilisateur" } }
-    }
-  },
-  "Volume Usage" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "Volume Usage" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "磁盘卷使用率" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "ボリューム使用量" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Uso de volúmenes" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Utilisation des volumes" } }
-    }
-  },
-  "Battery" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "Battery" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "电池" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "バッテリー" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Batería" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Batterie" } }
-    }
-  },
-  "CPU" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "CPU" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "CPU" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "CPU" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "CPU" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "CPU" } }
-    }
-  },
-  "Disk" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "Disk" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "磁盘" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "ディスク" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Disco" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Disque" } }
-    }
-  },
-  "Every 2 seconds" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "Every 2 seconds" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "每 2 秒" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "2 秒ごと" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Cada 2 segundos" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Toutes les 2 secondes" } }
-    }
-  },
-  "Every 5 seconds" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "Every 5 seconds" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "每 5 秒" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "5 秒ごと" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Cada 5 segundos" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Toutes les 5 secondes" } }
-    }
-  },
-  "Every second" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "Every second" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "每秒" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "1 秒ごと" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Cada segundo" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Chaque seconde" } }
-    }
-  },
-  "GPU" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "GPU" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "GPU" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "GPU" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "GPU" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "GPU" } }
-    }
-  },
-  "Live Preview" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "Live Preview" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "实时预览" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "ライブプレビュー" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Vista previa en vivo" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Aperçu en direct" } }
-    }
-  },
-  "Memory" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "Memory" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "内存" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "メモリ" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Memoria" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Mémoire" } }
-    }
-  },
-  "Modules" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "Modules" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "模块" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "モジュール" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Módulos" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Modules" } }
-    }
-  },
-  "Network" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "Network" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "网络" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "ネットワーク" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Red" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Réseau" } }
-    }
-  },
-  "No data" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "No data" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "暂无数据" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "データなし" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Sin datos" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Aucune donnée" } }
-    }
-  },
-  "Overview metrics are processed locally. Stats network checks may contact the configured host." : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "Overview metrics are processed locally. Stats network checks may contact the configured host." } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "概览指标在本机处理；Stats 网络检查可能会连接到所配置的主机。" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "概要メトリクスはローカルで処理されます。Stats のネットワーク確認は設定済みのホストに接続する場合があります。" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Las métricas generales se procesan localmente. Las comprobaciones de red de Stats pueden contactar al host configurado." } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Les métriques d’ensemble sont traitées localement. Les vérifications réseau de Stats peuvent contacter l’hôte configuré." } }
-    }
-  },
-  "System Monitor" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "System Monitor" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "系统监控" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "システムモニタ" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Monitor del sistema" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Moniteur système" } }
-    }
-  },
-  "System monitoring is paused" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "System monitoring is paused" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "系统监控已暂停" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "システム監視は一時停止中です" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "La supervisión del sistema está en pausa" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "La surveillance du système est en pause" } }
-    }
-  },
-  "Update interval" : {
-    "localizations" : {
-      "en" : { "stringUnit" : { "state" : "translated", "value" : "Update interval" } },
-      "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "更新间隔" } },
-      "ja" : { "stringUnit" : { "state" : "translated", "value" : "更新間隔" } },
-      "es" : { "stringUnit" : { "state" : "translated", "value" : "Intervalo de actualización" } },
-      "fr" : { "stringUnit" : { "state" : "translated", "value" : "Intervalle d’actualisation" } }
     }
   },
   "The output was created, but the source files could not be deleted.": {
@@ -2183,37 +1709,37 @@
       }
     }
   },
-  "Backups include app settings and templates. Folder permissions, login items and file associations are managed separately.": {
+  "Backups include app settings and templates. Login items and file associations are managed separately.": {
     "extractionState": "manual",
     "localizations": {
       "en": {
         "stringUnit": {
           "state": "translated",
-          "value": "Backups include app settings and templates. Folder permissions, login items and file associations are managed separately."
+          "value": "Backups include app settings and templates. Login items and file associations are managed separately."
         }
       },
       "zh-Hans": {
         "stringUnit": {
           "state": "translated",
-          "value": "备份包含应用设置和模板。文件夹权限、登录项和文件关联由各自入口单独管理。"
+          "value": "备份包含应用设置和模板。登录项和文件关联由各自入口单独管理。"
         }
       },
       "ja": {
         "stringUnit": {
           "state": "translated",
-          "value": "バックアップにはアプリの設定とテンプレートが含まれます。フォルダのアクセス権、ログイン項目、ファイルの関連付けは個別に管理されます。"
+          "value": "バックアップにはアプリの設定とテンプレートが含まれます。ログイン項目とファイルの関連付けは個別に管理されます。"
         }
       },
       "es": {
         "stringUnit": {
           "state": "translated",
-          "value": "Las copias incluyen ajustes y plantillas. Los permisos de carpetas, elementos de inicio y asociaciones de archivos se gestionan por separado."
+          "value": "Las copias incluyen ajustes y plantillas. Los elementos de inicio y las asociaciones de archivos se gestionan por separado."
         }
       },
       "fr": {
         "stringUnit": {
           "state": "translated",
-          "value": "Les sauvegardes incluent les réglages et les modèles. Les autorisations de dossiers, éléments de connexion et associations de fichiers sont gérés séparément."
+          "value": "Les sauvegardes incluent les réglages et les modèles. Les éléments de connexion et les associations de fichiers sont gérés séparément."
         }
       }
     }
@@ -2428,37 +1954,37 @@
       }
     }
   },
-  "This restores default app settings. Folder permissions, login items and file associations are kept. This action cannot be undone.": {
+  "This restores default app settings. Login items and file associations are kept. This action cannot be undone.": {
     "extractionState": "manual",
     "localizations": {
       "en": {
         "stringUnit": {
           "state": "translated",
-          "value": "This restores default app settings. Folder permissions, login items and file associations are kept. This action cannot be undone."
+          "value": "This restores default app settings. Login items and file associations are kept. This action cannot be undone."
         }
       },
       "zh-Hans": {
         "stringUnit": {
           "state": "translated",
-          "value": "这将恢复应用的默认设置，并保留文件夹权限、登录项和文件关联。此操作无法撤销。"
+          "value": "这将恢复应用的默认设置，并保留登录项和文件关联。此操作无法撤销。"
         }
       },
       "ja": {
         "stringUnit": {
           "state": "translated",
-          "value": "アプリの設定を初期値に戻します。フォルダのアクセス権、ログイン項目、ファイルの関連付けは保持されます。この操作は取り消せません。"
+          "value": "アプリの設定を初期値に戻します。ログイン項目とファイルの関連付けは保持されます。この操作は取り消せません。"
         }
       },
       "es": {
         "stringUnit": {
           "state": "translated",
-          "value": "Se restauran los ajustes predeterminados. Se conservan los permisos de carpetas, elementos de inicio y asociaciones de archivos. Esta acción no se puede deshacer."
+          "value": "Se restauran los ajustes predeterminados. Se conservan los elementos de inicio y las asociaciones de archivos. Esta acción no se puede deshacer."
         }
       },
       "fr": {
         "stringUnit": {
           "state": "translated",
-          "value": "Les réglages par défaut seront rétablis. Les autorisations de dossiers, éléments de connexion et associations de fichiers seront conservés. Cette action est irréversible."
+          "value": "Les réglages par défaut seront rétablis. Les éléments de connexion et les associations de fichiers seront conservés. Cette action est irréversible."
         }
       }
     }

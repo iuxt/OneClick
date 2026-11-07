@@ -12,7 +12,12 @@ struct SettingsNavigationTests {
         #expect(groupedTabs.count == Tabs.allCases.count)
         #expect(Set(groupedTabs) == Set(Tabs.allCases))
         #expect(SettingsModule.rightClickTools.tabs == [.actions, .apps, .newFile, .cdirs])
-        #expect(SettingsModule.general.tabs == [.general, .about])
+        #expect(SettingsModule.general.tabs == [.general, .permissions, .management, .about])
+        #expect(SettingsModule.archives.tabs == [.archives, .archiveMenu, .archiveAssociations])
+        #expect(SettingsModule.inputMethods.tabs == [.inputMethods, .inputRules])
+        #expect(SettingsModule.allCases.allSatisfy { module in
+            module.tabs.allSatisfy { $0.module == module }
+        })
         #expect(SettingsModule.allCases.allSatisfy { $0.defaultTab.module == $0 })
     }
 

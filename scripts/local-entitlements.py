@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate portable sandbox entitlements for ad-hoc local and release builds."""
+"""Sign a non-sandboxed host and the mandatory sandboxed Finder extension."""
 import pathlib
 import plistlib
 import sys
@@ -9,12 +9,17 @@ def local_entitlements(source, is_host, directory="/Library/Application Support/
     entitlements = dict(source)
     entitlements.pop("com.apple.security.application-groups", None)
     if is_host:
-        # Ad-hoc signatures do not provide a stable Team ID. Hardened Runtime's
-        # library validation would therefore reject the separately signed Stats
-        # frameworks even though they are nested in, and sealed by, the app.
-        entitlements["com.apple.security.cs.disable-library-validation"] = True
+        # Never carry old host sandbox permissions or temporary exceptions into
+        # a local/release signature. The Finder extension has a separate policy.
+        entitlements = {
+            key: value for key, value in entitlements.items()
+            if not key.startswith(("com.apple.security.app-sandbox", "com.apple.security.inherit",
+                                   "com.apple.security.files.", "com.apple.security.network.",
+                                   "com.apple.security.temporary-exception."))
+        }
+        return entitlements
     entitlements["com.apple.security.temporary-exception.files.home-relative-path.read-write"] = [directory + "/"]
-    operations = "network-bind network-outbound" if is_host else "network-outbound"
+    operations = "network-outbound"
     # home-literal is resolved by the application sandbox at launch, on the
     # recipient's machine. A literal build-time /Users/runner path cannot work.
     import json

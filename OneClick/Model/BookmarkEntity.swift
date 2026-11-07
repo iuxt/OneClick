@@ -8,14 +8,8 @@
 import Foundation
 import SwiftData
 
-/// Security-Scoped Bookmark 持久化实体
-///
-/// 存储用户通过 NSOpenPanel 授权的目录的安全作用域书签，
-/// 用于替代 Full Disk Access 权限。
-///
-/// 与 CommonDirEntity 独立：
-/// - CommonDir: "我常用这个文件夹"（收藏夹语义）
-/// - BookmarkEntity: "我授权访问这个文件夹"（权限凭证语义）
+/// Legacy sandbox grants retained only for compatibility with existing stores.
+/// The non-sandboxed host neither restores nor requires these records.
 @Model
 final class BookmarkEntity {
     /// 唯一标识

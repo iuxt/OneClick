@@ -2,7 +2,7 @@ import Darwin
 import Foundation
 
 /// Compiled with the production transport by test-local-ipc.py. Each endpoint
-/// runs in its own signed app sandbox and authenticates the counterpart's code.
+/// authenticates its counterpart: a non-sandboxed host and sandboxed extension.
 @main
 struct LocalIPCProbe {
     static func main() throws {
@@ -11,8 +11,8 @@ struct LocalIPCProbe {
         let directory = URL(fileURLWithPath: arguments[2], isDirectory: true)
         let peer = URL(fileURLWithPath: arguments[3])
         let timeout = Double(arguments[4])!
-        precondition(FileManager.default.homeDirectoryForCurrentUser.path != SharedAppGroup.realHomeDirectory.path,
-                     "Probe must run inside the app sandbox")
+        let sandboxed = FileManager.default.homeDirectoryForCurrentUser.path != SharedAppGroup.realHomeDirectory.path
+        precondition(sandboxed == !isServer, "Only the Finder extension must run inside App Sandbox")
         let verifier = try PeerCodeVerifier(bundleURL: peer)
         let connected = DispatchSemaphore(value: 0)
         let received = DispatchSemaphore(value: 0)
@@ -32,6 +32,6 @@ struct LocalIPCProbe {
         transport.send(Data((isServer ? "pong" : "done").utf8))
         if isServer, done.wait(timeout: .now() + timeout) != .success { exit(4) }
         if !isServer, disconnected.wait(timeout: .now() + timeout) != .success { exit(5) }
-        print("\(isServer ? "Host" : "Extension"): authenticated sandbox IPC passed")
+        print("\(isServer ? "Non-sandboxed host" : "Sandboxed extension"): authenticated IPC passed")
     }
 }

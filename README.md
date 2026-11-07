@@ -21,7 +21,6 @@ An everyday Mac toolkit for Finder right-click actions, archive browsing and inp
 
 - [x] **Toolbox Home** — A shared settings home for right-click tools, archive tools and input method switching, with grouped navigation.
 - [x] **Automatic Input Method Switching** — Choose an input source per app, set a default or remember each app's choice. Based on [LockIME](https://github.com/oomol-lab/LockIME); see [input method switching](docs/input-methods.md).
-- [x] **System Monitor** — Show CPU, memory and live network speed as simultaneous, independently configurable menu bar items, with optional disk, GPU and battery items. The native menu bar widgets, readers and detail panels directly integrate the MIT-licensed [Stats](https://github.com/exelban/stats) framework targets; see [system monitoring](docs/system-monitor.md).
 - [x] **Archive Browser & Preview** — Navigate and search archives, preview text and images, or use Quick Look. Associate selected archive formats from the archive settings.
 
 - [x] **Open with External App** — Open files or directories with any installed application, with support for custom arguments and environment variables. Ships with presets for popular editors, terminals and IDEs, per-app visibility for the toolbar and context menus, and none/simple/original icon styles.
@@ -93,9 +92,13 @@ To build, install to `/Applications/OneClick.app`, and launch in one step:
 
 The script builds Release by default, quits any running OneClick and its Finder
 extension after a successful build, replaces the app, then launches the new
-version. The default `local` mode needs no Apple developer account. Both targets
-remain sandboxed and receive explicit access only to
-`~/Library/Application Support/RClickLocal/` for the database and launch marker.
+version. The default `local` mode needs no Apple developer account. The main app and archive tools run without App Sandbox. The Finder Sync
+extension retains the sandbox required by macOS, with access to
+`~/Library/Application Support/RClickLocal/` for launch markers and IPC.
+The database stays at that existing path, so this change preserves local data.
+On the first launch after upgrading, the host imports its previous container
+preferences and custom templates; the old container and legacy grant records
+are left intact. File operations no longer require app-level folder grants.
 Local preferences use the main app's standard defaults; the extension receives
 menu settings through IPC. Existing App Group data is left untouched, so local
 mode starts with separate settings that persist across local updates.

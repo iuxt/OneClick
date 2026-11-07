@@ -45,7 +45,7 @@ final class ActionService {
 
     // MARK: - AppActions
 
-    /// 用指定应用打开选中文件/目录（沙盒门控：先 hasAccess，失败兜底再授权重试）
+    /// Open the selected files or directories with the configured application.
     func openApp(rid: String, target: [String]) async {
         guard let rcitem = state.getAppItem(rid: rid) else {
             logger.warning("when openapp, but not have app \(rid)")
@@ -60,41 +60,23 @@ final class ActionService {
         var decisions: [URL: Bool] = [:]
         for target in targets {
             guard await authorize(target.directory, decisions: &decisions) else { continue }
-            openWithApp(target.url, appUrl: appUrl, accessURL: target.directory, options: options)
+            openWithApp(target.url, appUrl: appUrl, options: options)
         }
     }
 
-    private func openWithApp(_ url: URL, appUrl: URL, accessURL: URL, options: AppLaunchOptions) {
+    private func openWithApp(_ url: URL, appUrl: URL, options: AppLaunchOptions) {
         let logger = self.logger
         let config = options.configuration()
-        NSWorkspace.shared.open([url], withApplicationAt: appUrl, configuration: config) { [weak self] runningApp, error in
-            guard let self else { return }
+        NSWorkspace.shared.open([url], withApplicationAt: appUrl, configuration: config) { runningApp, error in
             if let error {
-                // 失败兜底：再弹授权并重试一次
-                Task { @MainActor in
-                    await self.openRetryAfterPermission(url: url, appUrl: appUrl, accessURL: accessURL, options: options, firstError: error)
-                }
+                logger.error("打开失败：\(url.path) — \(error.localizedDescription)")
             } else if let runningApp {
                 logger.debug("Successfully opened with application: \(runningApp.localizedName ?? "Unknown")")
             }
         }
     }
 
-    private func openRetryAfterPermission(url: URL, appUrl: URL, accessURL: URL, options: AppLaunchOptions, firstError: Error) async {
-        let logger = self.logger  // 捕获 Sendable logger
-        guard await permission.promptForPermission(for: accessURL) != nil else {
-            logger.error("打开失败且用户取消授权：\(url.path) — \(firstError.localizedDescription)")
-            return
-        }
-        let config = options.configuration()
-        NSWorkspace.shared.open([url], withApplicationAt: appUrl, configuration: config) { _, retryError in
-            if let retryError {
-                logger.error("重试打开仍失败：\(url.path) — \(retryError.localizedDescription)")
-            }
-        }
-    }
-
-    /// 打开常用目录（沙盒门控：目录需已授权，B4 之后添加时即存 bookmark，此处为兜底）
+    /// Open common directories using the process's normal file access.
     func openCommonDirs(target: [String]) async {
         logger.debug("开始打开常用目录，目标路径：\(target)")
 

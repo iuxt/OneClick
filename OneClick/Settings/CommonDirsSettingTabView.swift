@@ -91,8 +91,6 @@ struct CommonDirsSettingTabView: View {
                     if let url = urls.first {
                         let commonDir = CommonDir(id: UUID().uuidString, name: url.lastPathComponent, url: url, icon: iconForDirectory(url: url))
                         if !store.cdirs.contains(where: { $0.url == commonDir.url }) {
-                            // 添加常用目录时即存 bookmark：沙盒下避免每次点击打开都弹授权
-                            store.bookmarkManager.saveBookmark(for: url)
                             store.cdirs.append(commonDir)
                             store.sync()
                         }

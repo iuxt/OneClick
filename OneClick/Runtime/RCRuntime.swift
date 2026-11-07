@@ -18,7 +18,7 @@ final class RCRuntime {
     let configService: ConfigService
     /// 菜单构建
     let menuService: MenuService
-    /// 权限（委托 BookmarkManager）
+    /// Direct file access policy; the host has no App Sandbox folder gate.
     let permissionService: PermissionService
     /// 动作执行（文件操作）
     let actionService: ActionService
@@ -28,7 +28,7 @@ final class RCRuntime {
     private init() {
         self.state = AppState.shared
         self.configService = state.configService
-        self.permissionService = PermissionService(bookmarkManager: state.bookmarkManager)
+        self.permissionService = PermissionService()
         self.menuService = MenuService()
         self.actionService = ActionService(state: state, permission: permissionService, confirmation: AlertDeleteConfirmation())
         self.messager = Messager.shared

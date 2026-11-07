@@ -8,67 +8,54 @@
 import SwiftUI
 
 enum Tabs: String, CaseIterable, Identifiable {
-    case general = "General"
+    case general = "Startup & Menu Bar"
+    case permissions = "Permissions"
+    case management = "Settings Management"
     case apps = "Apps"
     case actions = "Actions"
-    case archives = "Compression & Extraction"
-    case inputMethods = "Input Method Switching"
-    case systemMonitor = "System Monitor"
+    case archives = "Compression"
+    case archiveMenu = "Context Menu"
+    case archiveAssociations = "File Associations"
+    case inputMethods = "Switching Preferences"
+    case inputRules = "Application Rules"
     case newFile = "New File"
     case cdirs = "Common Dir"
     case about = "About"
 
-    var id: String { self.rawValue }
-
-    var titleKey: String {
-        self == .archives ? "Archive Tools" : rawValue
-    }
-
-    var pageTitleKey: String {
-        switch self {
-        case .systemMonitor: "System Monitor"
-        case .archives: "Archive Settings"
-        case .inputMethods: "Input Method Settings"
-        default: titleKey
-        }
-    }
+    var id: String { rawValue }
+    var titleKey: String { rawValue }
+    var pageTitleKey: String { titleKey }
 
     var icon: String {
         switch self {
-        case .systemMonitor: "gauge.with.dots.needle.50percent"
         case .inputMethods: "character.bubble"
-        case .general: "gearshape"
+        case .inputRules: "app.badge"
+        case .general: "power"
+        case .permissions: "lock.shield"
+        case .management: "externaldrive"
         case .apps: "app.badge"
-        case .actions: "bolt.square"
+        case .actions: "bolt"
         case .archives: "archivebox"
+        case .archiveMenu: "list.bullet"
+        case .archiveAssociations: "doc.zipper"
         case .newFile: "doc.badge.plus"
-        case .cdirs: "folder.badge.gearshape"
+        case .cdirs: "folder"
         case .about: "info.circle"
         }
     }
 
     var module: SettingsModule {
         switch self {
-        case .actions, .apps, .newFile, .cdirs:
-            .rightClickTools
-        case .archives:
-            .archives
-        case .inputMethods:
-            .inputMethods
-        case .systemMonitor:
-            .systemMonitor
-        case .general, .about:
-            .general
+        case .actions, .apps, .newFile, .cdirs: .rightClickTools
+        case .archives, .archiveMenu, .archiveAssociations: .archives
+        case .inputMethods, .inputRules: .inputMethods
+        case .general, .permissions, .management, .about: .general
         }
     }
 }
 
 enum SettingsModule: String, CaseIterable, Identifiable {
-    case rightClickTools
-    case archives
-    case inputMethods
-    case systemMonitor
-    case general
+    case rightClickTools, archives, inputMethods, general
 
     var id: String { rawValue }
 
@@ -77,7 +64,6 @@ enum SettingsModule: String, CaseIterable, Identifiable {
         case .rightClickTools: "Right-click Tools"
         case .archives: "Archive Tools"
         case .inputMethods: "Input Method Switching"
-        case .systemMonitor: "System Monitor"
         case .general: "General"
         }
     }
@@ -87,18 +73,25 @@ enum SettingsModule: String, CaseIterable, Identifiable {
         case .rightClickTools: "cursorarrow.click.2"
         case .archives: "archivebox"
         case .inputMethods: "character.bubble"
-        case .systemMonitor: "gauge.with.dots.needle.50percent"
         case .general: "gearshape"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .rightClickTools: .blue
+        case .archives: .orange
+        case .inputMethods: .purple
+        case .general: .gray
         }
     }
 
     var tabs: [Tabs] {
         switch self {
         case .rightClickTools: [.actions, .apps, .newFile, .cdirs]
-        case .archives: [.archives]
-        case .inputMethods: [.inputMethods]
-        case .systemMonitor: [.systemMonitor]
-        case .general: [.general, .about]
+        case .archives: [.archives, .archiveMenu, .archiveAssociations]
+        case .inputMethods: [.inputMethods, .inputRules]
+        case .general: [.general, .permissions, .management, .about]
         }
     }
 
@@ -108,27 +101,24 @@ enum SettingsModule: String, CaseIterable, Identifiable {
 @available(macOS 27, *)
 struct SettingsView: View {
     @State private var selectedTab: Tabs = .actions
+    @State private var isModuleExpanded = true
     @State private var rememberedTabs: [SettingsModule: Tabs] = [:]
     @EnvironmentObject var appState: AppState
 
     private var selectedModule: SettingsModule { selectedTab.module }
 
-    private var moduleSelection: Binding<SettingsModule> {
-        Binding(get: { selectedModule }, set: selectModule)
-    }
-
-    private var tabSelection: Binding<Tabs> {
-        Binding(get: { selectedTab }, set: selectTab)
-    }
-
     private func selectModule(_ module: SettingsModule) {
-        guard module != selectedModule else { return }
-        rememberedTabs[selectedModule] = selectedTab
+        guard module != selectedModule else {
+            isModuleExpanded.toggle()
+            return
+        }
+        isModuleExpanded = true
         selectTab(rememberedTabs[module] ?? module.defaultTab)
     }
 
     private func selectTab(_ tab: Tabs) {
         guard tab != selectedTab else { return }
+        rememberedTabs[selectedModule] = selectedTab
         rememberedTabs[tab.module] = tab
 
         // Keep controls, focus and scroll positions stable while switching pages.
@@ -139,18 +129,26 @@ struct SettingsView: View {
 
     @ViewBuilder private func page(for tab: Tabs) -> some View {
         switch tab {
-        case .systemMonitor:
-            SystemMonitorSettingsView()
         case .inputMethods:
-            InputMethodSettingsView()
+            InputMethodSettingsView(section: .preferences)
+        case .inputRules:
+            InputMethodSettingsView(section: .applicationRules)
         case .general:
-            GeneralSettingsTabView()
+            GeneralSettingsTabView(section: .startup)
+        case .permissions:
+            GeneralSettingsTabView(section: .permissions)
+        case .management:
+            GeneralSettingsTabView(section: .management)
         case .apps:
             AppsSettingsTabView()
         case .actions:
             ActionSettingsTabView()
         case .archives:
-            ArchiveSettingsTabView()
+            ArchiveSettingsTabView(section: .compression)
+        case .archiveMenu:
+            ArchiveSettingsTabView(section: .contextMenu)
+        case .archiveAssociations:
+            ArchiveSettingsTabView(section: .associations)
         case .newFile:
             NewFileSettingsTabView()
         case .cdirs:
@@ -161,21 +159,21 @@ struct SettingsView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            SettingsModuleTabBar(selection: moduleSelection)
-
+        HStack(spacing: 0) {
+            sidebar
+                .frame(width: 238)
             Divider()
-
-            if selectedModule.tabs.count > 1 {
-                SettingsSubtabBar(tabs: selectedModule.tabs, selection: tabSelection)
+            VStack(spacing: 0) {
+                pageHeader
+                Divider().padding(.horizontal, 28)
+                SettingsPageStack(selection: selectedTab) { page(for: $0) }
+                    .frame(maxWidth: 980, maxHeight: .infinity)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .buttonStyle(.glass)
             }
-
-            SettingsPageStack(selection: selectedTab) { page(for: $0) }
-                .frame(minWidth: 620)
-                .buttonStyle(.glass)
+            .frame(minWidth: 640)
+            .background(Color(nsColor: .windowBackgroundColor))
         }
-        // A failed write used to be invisible: the change stayed on screen but was
-        // never stored, so the only way to notice was losing it on the next launch.
         .alert(
             Text(appLocalized: "Settings could not be saved"),
             isPresented: Binding(
@@ -188,96 +186,142 @@ struct SettingsView: View {
             Text(appState.lastSaveError ?? "")
         }
     }
-}
 
-@available(macOS 27, *)
-private struct SettingsModuleTabBar: View {
-    @Binding var selection: SettingsModule
+    private var sidebar: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 10) {
+                Image("Logo")
+                    .resizable().scaledToFit()
+                    .frame(width: 36, height: 36)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("OneClick").font(.headline)
+                    Text(appLocalized: "Settings")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 20)
+            .padding(.bottom, 24)
 
-    var body: some View {
-        HStack(spacing: 6) {
-            ForEach(SettingsModule.allCases) { module in
-                SettingsModuleTabButton(
-                    module: module,
-                    isSelected: module == selection,
-                    action: { selection = module }
-                )
+            ScrollView {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(appLocalized: "Feature Modules")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 12)
+                        .padding(.bottom, 4)
+                    ForEach(SettingsModule.allCases) { module in
+                        if module == .general {
+                            Divider().padding(.horizontal, 12).padding(.vertical, 8)
+                        }
+                        moduleGroup(module)
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.bottom, 16)
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 12)
+        .background(.regularMaterial)
+    }
+
+    private func moduleGroup(_ module: SettingsModule) -> some View {
+        VStack(spacing: 3) {
+            SettingsNavigationButton(isSelected: selectedModule == module && !isModuleExpanded) { selectModule(module) } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: module.icon)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 27, height: 27)
+                        .background(module.color.gradient, in: RoundedRectangle(cornerRadius: 7))
+                        .accessibilityHidden(true)
+                    Text(AppLocalization.localized(module.titleKey))
+                        .font(.system(size: 13, weight: selectedModule == module ? .semibold : .medium))
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 0)
+                    Image(systemName: selectedModule == module && isModuleExpanded ? "chevron.down" : "chevron.right")
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(.tertiary)
+                        .accessibilityHidden(true)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
+            }
+            .accessibilityValue(AppLocalization.localized(selectedModule == module && isModuleExpanded ? "Expanded" : "Collapsed"))
+
+            if selectedModule == module && isModuleExpanded {
+                VStack(spacing: 2) {
+                    ForEach(module.tabs) { tab in
+                        SettingsNavigationButton(isSelected: selectedTab == tab) { selectTab(tab) } label: {
+                            HStack(spacing: 9) {
+                                Image(systemName: tab.icon)
+                                    .font(.system(size: 12))
+                                    .frame(width: 16)
+                                    .accessibilityHidden(true)
+                                Text(AppLocalization.localized(tab.pageTitleKey))
+                                    .font(.system(size: 12, weight: selectedTab == tab ? .semibold : .regular))
+                                    .fixedSize(horizontal: false, vertical: true)
+                                Spacer(minLength: 0)
+                            }
+                            .padding(.vertical, 8)
+                            .padding(.horizontal, 12)
+                        }
+                    }
+                }
+                .padding(.leading, 28)
+                .padding(.bottom, 6)
+            }
+        }
+    }
+
+    private var pageHeader: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(AppLocalization.localized(selectedModule.titleKey))
+                .font(.callout)
+                .foregroundStyle(.secondary)
+            HStack(spacing: 12) {
+                Image(systemName: selectedTab.icon)
+                    .font(.system(size: 19, weight: .medium))
+                    .foregroundStyle(selectedModule.color)
+                    .accessibilityHidden(true)
+                Text(AppLocalization.localized(selectedTab.pageTitleKey))
+                    .font(.system(size: 25, weight: .bold))
+                    .accessibilityAddTraits(.isHeader)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 30)
+        .padding(.top, 24)
+        .padding(.bottom, 22)
     }
 }
 
-@available(macOS 27, *)
-private struct SettingsModuleTabButton: View {
-    let module: SettingsModule
+private struct SettingsNavigationButton<Label: View>: View {
     let isSelected: Bool
     let action: () -> Void
-
+    @ViewBuilder var label: () -> Label
     @State private var isHovering = false
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 5) {
-                Image(systemName: module.icon)
-                    .font(.system(size: 17, weight: isSelected ? .semibold : .regular))
-                    .symbolRenderingMode(.monochrome)
-                    .foregroundStyle(isSelected ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
-
-                Text(AppLocalization.localized(module.titleKey))
-                    .font(.callout.weight(isSelected ? .semibold : .regular))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
-            }
-            .frame(maxWidth: .infinity, minHeight: 48)
-            .padding(.horizontal, 6)
-            .contentShape(.rect)
+            label()
+                .frame(maxWidth: .infinity)
+                .contentShape(.rect)
         }
         .buttonStyle(.plain)
+        .foregroundStyle(isSelected ? Color.accentColor : Color.primary)
         .background {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(backgroundStyle)
+            RoundedRectangle(cornerRadius: 8)
+                .fill(isSelected ? Color.accentColor.opacity(0.12) : Color.primary.opacity(isHovering ? 0.05 : 0))
         }
-        .overlay(alignment: .bottom) {
-            Capsule()
-                .fill(.tint)
-                .frame(width: 24, height: 3)
-                .padding(.bottom, 3)
-                .opacity(isSelected ? 1 : 0)
-        }
+        .contentShape(.rect)
         .onHover { isHovering = $0 }
         .accessibilityAddTraits(isSelected ? .isSelected : [])
-    }
-
-    private var backgroundStyle: AnyShapeStyle {
-        if isSelected { return AnyShapeStyle(.tint.opacity(0.12)) }
-        if isHovering { return AnyShapeStyle(.primary.opacity(0.05)) }
-        return AnyShapeStyle(.clear)
-    }
-}
-
-@available(macOS 27, *)
-private struct SettingsSubtabBar: View {
-    let tabs: [Tabs]
-    @Binding var selection: Tabs
-
-    var body: some View {
-        Picker(AppLocalization.localized("Settings"), selection: $selection) {
-            ForEach(tabs) { tab in
-                Label(AppLocalization.localized(tab.pageTitleKey), systemImage: tab.icon)
-                    .tag(tab)
-            }
-        }
-        .pickerStyle(.segmented)
-        .labelsHidden()
-        .frame(maxWidth: 560)
-        .padding(.horizontal, 20)
-        .padding(.top, 16)
-        .padding(.bottom, 4)
     }
 }
 
 #Preview {
     SettingsView()
+        .environmentObject(AppState.shared)
+        .frame(width: 1020, height: 720)
 }

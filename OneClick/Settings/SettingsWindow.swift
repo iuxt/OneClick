@@ -15,23 +15,18 @@ struct SettingsWindow: Scene {
     
     @EnvironmentObject var updateManager: UpdateManager
     
-    let onAppear: () -> Void
-
     var body: some Scene {
         Window("OneClick", id: Constants.settingsWindowID) {
             SettingsView()
                 .environmentObject(appState)
-                .onAppear {
-                    onAppear()
-                }
-                .frame(minWidth: 860, minHeight: 600)
+                .frame(minWidth: 900, minHeight: 640)
                 .sheet(isPresented: $updateManager.showUpdateSheet) {
                     UpdateView(updateManager: updateManager)
                 }
         }
         .commandsRemoved()
         .windowResizability(.contentSize)
-        .defaultSize(width: 960, height: 680)
+        .defaultSize(width: 1020, height: 720)
         .windowToolbarStyle(.unifiedCompact)
         // 压缩包打开事件由 AppDelegate 交给 ArchiveBrowserPresenter 处理。
         // 禁止 SwiftUI 同时为文件打开事件创建主窗口；启动抑制不覆盖这条路径。

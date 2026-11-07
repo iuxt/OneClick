@@ -148,7 +148,6 @@ final class ArchiveViewModel: ObservableObject {
     static func shouldCloseAutomatically(rows: [Row], isRunning: Bool) -> Bool {
         !isRunning && !rows.isEmpty && rows.allSatisfy {
             $0.output != nil && $0.error == nil && !$0.isRunning && !$0.needsPassword && !$0.needsConfiguration
-                && !($0.request.verifyAfterCompression && !$0.request.operation.isExtraction)
         }
     }
 
@@ -364,7 +363,7 @@ private struct ArchiveView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            if model.isRunning {
+            if model.isRunning || model.shouldCloseAutomatically {
                 ArchiveActivityView(activity: model.activity, cancel: close)
                     .padding(.horizontal, 20)
                     .padding(.vertical, 12)
@@ -423,7 +422,7 @@ private struct ArchiveView: View {
                 .background(.bar)
             }
         }
-        .frame(minWidth: 500, minHeight: model.isRunning ? 80 : 280)
+        .frame(minWidth: 500, minHeight: model.isRunning || model.shouldCloseAutomatically ? 80 : 280)
         .onAppear { model.start() }
         .onChange(of: pendingRow?.id) { form.clearPassword() }
         .onChange(of: form.format) {

@@ -82,6 +82,7 @@ class SharedDataManager {
     /// 改成显式抛出后，调用方能把原因说清楚再退。
     static func bootstrap() throws {
         guard openedContainer == nil else { return }
+        try LegacySandboxMigration.prepare()
         openedContainer = try makeSharedModelContainer()
     }
 

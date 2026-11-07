@@ -38,7 +38,10 @@ struct InputMethodServiceTests {
         try await Task.sleep(for: .milliseconds(350))
         #expect(provider.selected.isEmpty)
         service.activate(bundleID: "editor")
-        try await Task.sleep(for: .milliseconds(350))
+        let deadline = ContinuousClock.now + .seconds(3)
+        while provider.selected.isEmpty && ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
         #expect(provider.selected == ["chinese"])
         service.stop()
         let restored = InputMethodService(defaults: defaults, provider: provider, secureInputEnabled: { false })

@@ -73,7 +73,6 @@ final class ArchiveBrowserModel: ObservableObject {
     private var task: Task<Void, Never>?
     private var previewTask: Task<Void, Never>?
     private var previewDirectory: URL?
-    private var scoped = false
     private var closed = false
     @Published private(set) var extracting = false
     @Published private(set) var extractionError: String?
@@ -85,7 +84,6 @@ final class ArchiveBrowserModel: ObservableObject {
     }) {
         self.url = url
         self.extractArchive = extractArchive
-        scoped = url.startAccessingSecurityScopedResource()
     }
 
     var selectedEntry: ArchiveEntry? { selection.flatMap { index.byID[$0] } }
@@ -121,16 +119,6 @@ final class ArchiveBrowserModel: ObservableObject {
         task = Task { [weak self] in
             guard let self else { return }
             do {
-                if ArchiveFormat.suffix(for: url)?.hasSuffix(".001") == true {
-                    // A file-open grant covers the selected volume only. All
-                    // volumes require the same explicit folder grant as extraction.
-                    let permission = RCRuntime.shared.permissionService
-                    let parent = url.deletingLastPathComponent()
-                    if !permission.hasAccess(to: parent) {
-                        guard await permission.promptForPermission(for: parent) != nil,
-                              permission.hasAccess(to: parent) else { throw CocoaError(.fileReadNoPermission) }
-                    }
-                }
                 let listed = try await ArchiveBrowserService.list(url, password: password)
                 try Task.checkCancellation()
                 let built = try await ArchiveBrowserIndex.build(listed)
@@ -260,7 +248,6 @@ final class ArchiveBrowserModel: ObservableObject {
         task?.cancel(); previewTask?.cancel(); searchTask?.cancel(); extractionTask?.cancel()
         password = nil
         if let previewDirectory { Task { await ArchivePreparedPreview.removeDirectory(previewDirectory) } }
-        if scoped { url.stopAccessingSecurityScopedResource(); scoped = false }
     }
 }
 

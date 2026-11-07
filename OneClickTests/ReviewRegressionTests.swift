@@ -124,34 +124,11 @@ struct ReviewRegressionTests {
         #expect(oldHome.path.pathComponents == real.pathComponents)
         let custom = CommonDirEntity(id: "documents", name: "Custom", path: real.appendingPathComponent("Work"))
         #expect(!custom.migratePath(sandboxHome: sandbox, realHome: real))
-    }
-
-    @Test func renamedDuplicateBookmarksAreRevokedByIDAndScopesAreBalanced() throws {
-        let context = try context()
-        let original = URL(fileURLWithPath: "/tmp/old-folder")
-        let moved = URL(fileURLWithPath: "/tmp/new-folder")
-        for _ in 0..<2 { context.insert(BookmarkEntity(bookmarkData: Data([1]), pathString: original.path)) }
-        // An unresolved grant on an offline volume must remain intact.
-        context.insert(BookmarkEntity(bookmarkData: Data([2]), pathString: "/Volumes/Offline"))
-        try context.save()
-        var started: [URL] = []
-        var stopped: [URL] = []
-        let manager = BookmarkManager(context: context, startAccess: { started.append($0); return true },
-                                      stopAccess: { stopped.append($0) }, resolve: { data in
-            if data == Data([2]) { throw CocoaError(.fileNoSuchFile) }
-            return (moved, false)
-        })
-        manager.restoreBookmarks(context: context)
-        manager.restoreBookmarks(context: context)
-        #expect(manager.authorizedDirectories.count == 1)
-        #expect(started.count == 2)
-        #expect(manager.hasAccess(to: moved.appendingPathComponent("child")))
-        manager.removeDirectory(moved)
-        #expect(manager.authorizedDirectories.isEmpty)
-        #expect(stopped == started)
-        let remaining = try ModelContext(context.container).fetch(FetchDescriptor<BookmarkEntity>())
-        #expect(remaining.count == 1)
-        #expect(remaining.first?.pathString == "/Volumes/Offline")
+        let previousContainer = LegacySandboxMigration.legacyDataDirectory
+        let containerShortcut = CommonDirEntity(id: "documents", name: "Documents", path: previousContainer.appendingPathComponent("Documents"))
+        containerShortcut.pathEncodingVersion = 0
+        #expect(containerShortcut.migratePath())
+        #expect(containerShortcut.path == SharedAppGroup.realHomeDirectory.appendingPathComponent("Documents"))
     }
 
     @Test(arguments: ["txt", ".txt", "  txt\n", "..txt"])

@@ -30,8 +30,9 @@ They require selected items; Finder's empty-space and toolbar menus disable them
 
 The operation window shows current activity, errors, and a
 **Show in Finder** button for each completed result. **Cancel** closes the window.
-When **Verify After Compression** is enabled, the window stays open after success
-to show the verification result and output location. Click **Done** to close it.
+Successful operations close automatically, including when **Verify After
+Compression** is enabled. Verification failures keep the window open to show the
+error; click **Done** to close it.
 Closing the window cancels unfinished work. Folder authorization uses OneClick's
 existing bookmark service.
 Cancelling authorization never produces a partially selected compression archive.
@@ -148,7 +149,7 @@ TAR-family extraction. An unmodified, bundled official
 7-Zip 26.05 universal macOS executable handles configurable ZIP/7Z compression,
 encrypted compression and ZIP/7Z/RAR
 extraction. Each is launched by `Process` with separate arguments and no shell.
-The helper is signed with sandbox-inheritance entitlements. Operations run off
+The host and helper run without App Sandbox or sandbox-inheritance entitlements. Operations run off
 the main actor and stream bounded diagnostic output. File data is handled by the
 tools, not buffered in Swift memory. The build includes the 7-Zip licenses and
 complete corresponding source archive under `Contents/Resources/7zip/`.

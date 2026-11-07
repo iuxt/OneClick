@@ -23,13 +23,7 @@ extension NSNotification.Name {
 struct OneClickApp: App {
     @NSApplicationDelegateAdaptor private var appDelegate: AppDelegate
 
-    @Environment(\.scenePhase) private var scenePhase
-
     @AppStorage(Key.showMenuBarExtra, store: .group) private var showMenuBarExtra = true
-
-    @AppLog(category: "main")
-    private var logger
-    let messager = Messager.shared
 
     @StateObject var appState = AppState.shared
 
@@ -40,7 +34,7 @@ struct OneClickApp: App {
     )
 
     var body: some Scene {
-        SettingsWindow(appState: appState, onAppear: {})
+        SettingsWindow(appState: appState)
             .defaultAppStorage(.group)
             .environmentObject(updateManager)
             .modelContainer(SharedDataManager.sharedModelContainer)
@@ -69,11 +63,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     lazy var appState: AppState = .shared
     private var pluginActivity = PeerActivity()
     var pluginRunning: Bool { pluginActivity.isActive() }
-    var heartBeatCount = 0
 
     let messager = Messager.shared
-    var showMenuBarExtra = UserDefaults.group.bool(forKey: Key.showMenuBarExtra)
-    var settingsWindow: NSWindow!
     private var openedArchiveDuringLaunch = false
 
     override init() {
@@ -95,9 +86,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ aNotification: Notification) {
         logger.info("applicationDidFinishLaunching called")
+        // Tests explicitly create the services/windows they exercise. A normal
+        // launch here would open settings after 0.3s and cover their test window,
+        // as well as start input method switching against real preferences.
+        guard ProcessInfo.processInfo.environment["ONECLICK_TESTING"] != "1" else { return }
         InputMethodService.shared.start()
-        SystemMonitor.shared.start()
-        StatsMenuBarModules.shared.start()
 
         // 设置窗口打开策略。注意 OneClick 是 LSUIElement 应用，启动时系统不会
         // 激活它（NSApp.isActive 恒为 false），无法用激活状态区分启动来源，
@@ -220,7 +213,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        StatsMenuBarModules.shared.stop()
         InputMethodService.shared.stop()
         messager.sendQuitNotification()
         logger.info("applicationWillTerminate")

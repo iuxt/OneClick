@@ -2,43 +2,52 @@ import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
+enum InputMethodSettingsSection {
+    case preferences, applicationRules
+}
+
 @available(macOS 27, *)
 struct InputMethodSettingsView: View {
+    var section: InputMethodSettingsSection = .preferences
     @Environment(\.isSettingsPageActive) private var isActive
     @ObservedObject private var service = InputMethodService.shared
     @State private var addingApp = false
 
     var body: some View {
         Form {
-            Section {
-                Toggle(AppLocalization.localized("Automatically switch input methods"), isOn: Binding(
-                    get: { service.configuration.enabled },
-                    set: { value in service.update { $0.enabled = value } }
-                ))
-                LabeledContent(AppLocalization.localized("Current Input Method")) {
-                    Text(service.sources.first { $0.id == service.currentSourceID }?.name ?? "—")
-                        .foregroundStyle(.secondary)
+            if section == .preferences {
+                Section {
+                    Toggle(AppLocalization.localized("Automatically switch input methods"), isOn: Binding(
+                        get: { service.configuration.enabled },
+                        set: { value in service.update { $0.enabled = value } }
+                    ))
+                    LabeledContent(AppLocalization.localized("Current Input Method")) {
+                        Text(service.sources.first { $0.id == service.currentSourceID }?.name ?? "—")
+                            .foregroundStyle(.secondary)
+                    }
+                    LabeledContent(AppLocalization.localized("Active Application"), value: service.activeAppName)
+                } footer: {
+                    Text(appLocalized: "Switch input methods when you activate an application. Manual changes remain available until the next app switch.")
                 }
-                LabeledContent(AppLocalization.localized("Active Application"), value: service.activeAppName)
-            } footer: {
-                Text(appLocalized: "Switch input methods when you activate an application. Manual changes remain available until the next app switch.")
-            }
-            Section {
-                Picker(AppLocalization.localized("Default Input Method"), selection: Binding(
-                    get: { service.configuration.defaultSourceID },
-                    set: { value in service.update { $0.defaultSourceID = value } }
-                )) {
-                    Text(appLocalized: "Keep Current Input Method").tag("")
-                    sourceOptions(including: service.configuration.defaultSourceID)
+                Section {
+                    Picker(AppLocalization.localized("Default Input Method"), selection: Binding(
+                        get: { service.configuration.defaultSourceID },
+                        set: { value in service.update { $0.defaultSourceID = value } }
+                    )) {
+                        Text(appLocalized: "Keep Current Input Method").tag("")
+                        sourceOptions(including: service.configuration.defaultSourceID)
+                    }
+                    Toggle(AppLocalization.localized("Remember input method for each application"), isOn: Binding(
+                        get: { service.configuration.remember },
+                        set: { value in service.update { $0.remember = value } }
+                    ))
+                } footer: {
+                    Text(appLocalized: "Application rules take priority, followed by remembered input methods and the default. Secure password fields are respected.")
                 }
-                Toggle(AppLocalization.localized("Remember input method for each application"), isOn: Binding(
-                    get: { service.configuration.remember },
-                    set: { value in service.update { $0.remember = value } }
-                ))
-            } footer: {
-                Text(appLocalized: "Application rules take priority, followed by remembered input methods and the default. Secure password fields are respected.")
             }
-            applicationRules
+            if section == .applicationRules {
+                applicationRules
+            }
             if let error = service.error {
                 Section { Label(error, systemImage: "exclamationmark.triangle").foregroundStyle(.orange) }
             }
@@ -276,8 +285,6 @@ private struct AddInputMethodRuleSheet: View {
                     .keyboardShortcut(.cancelAction)
                 Button(AppLocalization.localized("Add")) {
                     guard canAdd, let applicationURL else { return }
-                    let scoped = applicationURL.startAccessingSecurityScopedResource()
-                    defer { if scoped { applicationURL.stopAccessingSecurityScopedResource() } }
                     service.setRule(appURL: applicationURL, sourceID: selectedSource)
                     if let serviceError = service.error { error = serviceError }
                     else { dismiss() }
@@ -296,8 +303,6 @@ private struct AddInputMethodRuleSheet: View {
         .fileImporter(isPresented: $browsing, allowedContentTypes: [.application]) { result in
             switch result {
             case .success(let url):
-                let scoped = url.startAccessingSecurityScopedResource()
-                defer { if scoped { url.stopAccessingSecurityScopedResource() } }
                 guard Bundle(url: url)?.bundleIdentifier != nil else {
                     error = AppLocalization.localized("Choose a valid application.")
                     return

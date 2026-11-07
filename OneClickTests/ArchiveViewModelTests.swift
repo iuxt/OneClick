@@ -47,8 +47,10 @@ struct ArchiveViewModelTests {
         #expect(ArchiveViewModel.windowHeight(rows: model.rows, isRunning: true) == 80)
     }
 
-    @Test func successfulAutoCloseKeepsTheCompactProgressHeight() {
-        let request = ArchiveRequest(operation: .zip, urls: [URL(fileURLWithPath: "/tmp/file")])
+    @Test(arguments: [false, true])
+    func successfulAutoCloseKeepsTheCompactProgressHeight(verify: Bool) {
+        let request = ArchiveRequest(operation: .zip, urls: [URL(fileURLWithPath: "/tmp/file")],
+                                     verifyAfterCompression: verify)
         let rows = [ArchiveViewModel.Row(
             id: 0,
             request: request,
@@ -75,6 +77,17 @@ struct ArchiveViewModelTests {
         #expect(observedHeights.allSatisfy { $0 == 80 })
         model.cancel()
         withExtendedLifetime(changes) {}
+    }
+
+    @Test func failedVerificationKeepsTheResultWindowOpen() {
+        let rows = [ArchiveViewModel.Row(
+            id: 0,
+            request: ArchiveRequest(operation: .zip, urls: [URL(fileURLWithPath: "/tmp/file")],
+                                    verifyAfterCompression: true),
+            error: ArchiveError.verificationFailed("Damaged archive").localizedDescription
+        )]
+        #expect(!ArchiveViewModel.shouldCloseAutomatically(rows: rows, isRunning: false))
+        #expect(ArchiveViewModel.windowHeight(rows: rows, isRunning: false) == 340)
     }
 
     @Test func activityCombinesBatchAndVerificationProgress() {
@@ -178,6 +191,10 @@ struct ArchiveViewModelTests {
         #expect(!model.shouldCloseAutomatically)
         #expect(try FileManager.default.contentsOfDirectory(atPath: root.path) == ["file.txt"])
 
+        var observedHeights: [CGFloat] = []
+        let changes = model.$rows.combineLatest(model.$isRunning).dropFirst().sink { rows, isRunning in
+            observedHeights.append(ArchiveViewModel.windowHeight(rows: rows, isRunning: isRunning))
+        }
         let password = encrypted ? "test-password" : nil
         model.submitCompression(for: 0, format: format, level: .fast, password: password, verifyAfterCompression: true)
         try await waitUntilIdle(model)
@@ -187,7 +204,11 @@ struct ArchiveViewModelTests {
         #expect(model.rows[0].request.verifyAfterCompression)
         #expect(model.rows[0].error == nil)
         #expect(!model.isVerifying)
-        #expect(!model.shouldCloseAutomatically)
+        #expect(model.shouldCloseAutomatically)
+        #expect(model.preferredWindowHeight == 80)
+        #expect(!observedHeights.isEmpty)
+        #expect(observedHeights.allSatisfy { $0 == 80 })
+        withExtendedLifetime(changes) {}
         if encrypted {
             await #expect(throws: ArchiveError.passwordRequired) {
                 try await ArchiveService.perform(ArchiveRequest(operation: .extract, urls: [archive]))

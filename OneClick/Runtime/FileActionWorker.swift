@@ -1,6 +1,6 @@
 import Foundation
 
-/// Only values cross the actor boundary; permission prompts and Finder stay on main.
+/// Only values cross the actor boundary; operation UI and Finder stay on main.
 nonisolated enum FileActionWorker {
     struct Failure: Sendable {
         let url: URL
@@ -60,8 +60,6 @@ nonisolated enum FileActionWorker {
     static func importTemplate(from source: URL, into root: URL, existing: URL? = nil) async throws -> URL {
         try Task.checkCancellation()
         if source.standardizedFileURL == existing?.standardizedFileURL { return source }
-        let scoped = source.startAccessingSecurityScopedResource()
-        defer { if scoped { source.stopAccessingSecurityScopedResource() } }
         let directory = root.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         var completed = false

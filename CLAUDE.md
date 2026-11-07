@@ -40,10 +40,10 @@ The main app and extension communicate over a UNIX-domain stream (`LocalIPCTrans
 - Implementation: [Messager.swift](Shared/Messager.swift)
 
 ### 4. State Management
-- **AppState**: `@MainActor ObservableObject` holding runtime state (in-memory config arrays, fold toggles, `BookmarkManager`)
+- **AppState**: `@MainActor ObservableObject` holding runtime state (in-memory config arrays, fold toggles)
 - **ConfigService**: SwiftData config load/save/reset (persistence separated from runtime state)
 - **RCRuntime**: in-process dependency container (`OneClick/Runtime/`) holding AppState + ConfigService + MenuService + ActionService + PermissionService + Messager. **It is NOT a separate process / Helper.**
-- **BookmarkManager**: security-scoped bookmarks — the only folder-authorization mechanism (mandatory for the sandboxed App Store build)
+- **File access**: the main app and archive tools are non-sandboxed. `PermissionService` uses direct file access; filesystem/TCC errors are reported by the operation. Only Finder Sync retains the system-required sandbox. Legacy `BookmarkEntity` records remain for database compatibility.
 - Data categories: Apps (external apps), Actions (context menu actions), NewFiles (file templates), CommonDirs (quick access folders), BookmarkEntity (authorized folder credentials)
 - Persistence: SwiftData with shared App Group container between app and extension
 - Location: [AppState.swift](OneClick/AppState.swift) / [OneClick/Runtime/](OneClick/Runtime/)
@@ -105,27 +105,14 @@ When adding new message types:
 2. Register message handler in the appropriate `init` / `applicationDidFinishLaunching`
 3. If the extension needs to detect whether the main app received a message, add a matching ack message
 
-### Security-Scoped Resource Access
+### File Access and Distribution
 
-When working with files outside the sandbox container (required for the App Store build):
-1. Check `PermissionService.hasAccess(to:)` (bookmark prefix match, covers subtree)
-2. If not authorized, `PermissionService.promptForPermission(for:)` shows `NSOpenPanel` (powerbox) → user grants once → bookmark cached
-3. See [BookmarkManager.swift](OneClick/Shared/BookmarkManager.swift) (implementation) and [ActionService.swift](OneClick/Runtime/ActionService.swift) (usage in delete/create/hide/open)
-
-## Important Constraints
-
-### OneClick Constitution Requirements
-- **MUST use Swift 6.2 syntax** - no older Swift patterns
-- **MUST use SwiftUI for all UI** - no AppKit UI components
-- **AppKit usage limited to system integration only** (e.g., NSWorkspace, NSPasteboard, file operations)
-- **Target macOS 27 Golden Gate and above only**
-
-### Extension Development
-- Extension runs in separate process with limited memory (keep it a thin renderer + event forwarder)
-- **Connection state is a UX cache, not a reliability mechanism**: the extension tracks "last message from main app" (`lastMainActivity`, 30s timeout) to show a disabled "OneClick is not running" menu — it does NOT determine operation success
-- **Real liveness check is at click time**: extension sends `.click`; main app replies `.actionAck`; if no ack in 3s, extension shows a "OneClick did not respond" alert
-- On `.quit` the extension immediately marks itself offline (no 30s "zombie" window)
-- See [FinderSyncExt.swift](FinderSyncExt/FinderSyncExt.swift)
+- The main application (Debug/Release) and archive helpers run without App Sandbox.
+- Finder Sync retains its system-required sandbox and forwards file actions to the host.
+- Do not reintroduce folder-grant prompts or security-scoped bookmarks in the host.
+- Keep ordinary macOS privacy permissions, protected-directory checks, delete confirmation and authenticated IPC.
+- Preserve existing database paths. `LegacySandboxMigration` imports container preferences/history once; legacy grant entities stay in the schema.
+- This configuration targets independent distribution, not Mac App Store submission.
 
 ### Logging
 - Use `@AppLog` property wrapper for structured logging
@@ -160,7 +147,7 @@ OneClick/
 │   ├── Runtime/                  # In-process service layer (MenuService/ActionService/PermissionService/ConfigService/RCRuntime)
 │   ├── Model/                    # SwiftData entities
 │   ├── Settings/                 # Settings views (UI)
-│   ├── Shared/                   # Utilities (BookmarkManager, LaunchAtLogin, Updater, …)
+│   ├── Shared/                   # Utilities (LegacySandboxMigration, LaunchAtLogin, Updater, …)
 │   ├── Assets.xcassets/          # Images, templates, icons
 │   └── Resources/                # Localization files
 ├── FinderSyncExt/                # Finder extension target (thin: render + forward)
@@ -177,10 +164,10 @@ OneClick/
 - Check that `FIFinderSyncController.default().directoryURLs` is set
 - Verify heartbeat messages are being sent/received
 
-### Security-Scope Access Fails
-- Ensure bookmarks are stored and retrieved correctly
-- Check `isStale` flag and refresh bookmarks if needed
-- Always call `stopAccessingSecurityScopedResource()` when done
+### File Access Fails
+- The host uses direct file access; report the actual filesystem or macOS privacy error.
+- Keep protected-directory checks and permanent-delete confirmation.
+- Do not restore the removed bookmark allowlist or folder-permission prompts.
 
 ### SwiftUI Views Not Updating
 - Ensure `@MainActor` annotation when updating `@Published` properties

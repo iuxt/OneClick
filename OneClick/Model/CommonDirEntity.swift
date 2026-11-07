@@ -51,7 +51,7 @@ final class CommonDirEntity {
     /// Decode old URL.path() storage exactly once, then repair only untouched
     /// built-in shortcuts that still point into this app's sandbox home.
     @discardableResult
-    func migratePath(sandboxHome: URL = FileManager.default.homeDirectoryForCurrentUser,
+    func migratePath(sandboxHome: URL = LegacySandboxMigration.legacyDataDirectory,
                      realHome: URL = SharedAppGroup.realHomeDirectory) -> Bool {
         guard pathEncodingVersion == 0 else { return false }
         path = self.path

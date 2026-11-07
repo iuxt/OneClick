@@ -8,7 +8,7 @@
 
 仓库需要启用 GitHub Actions。发布使用 GitHub 自动提供的 `GITHUB_TOKEN`，通过工作流的 `contents: write` 权限创建 Release 和上传附件，无需额外配置 GitHub PAT。如果组织策略限制此权限，需要仓库或组织管理员允许。
 
-应用与 Finder 扩展保留沙盒，编译时启用 `RC_LOCAL_BUILD`，使用明确授权的 `~/Library/Application Support/RClickLocal/` 存储数据库和启动标记，不依赖需要 Apple 授权的 App Group。菜单设置由主应用保存，通过 IPC 同步给扩展。此版本与 Developer ID 签名版本使用独立设置，不迁移或覆盖原 App Group 数据。
+主程序与归档工具关闭 App Sandbox；Finder 扩展保留 macOS 强制要求的沙盒。编译时启用 `RC_LOCAL_BUILD`，继续使用 `~/Library/Application Support/RClickLocal/` 存储数据库、启动标记和 IPC 套接字（仅扩展需要目录与出站例外授权），不依赖需要 Apple 授权的 App Group。菜单设置由主应用保存，通过 IPC 同步给扩展。此版本与 Developer ID 签名版本使用独立设置，不迁移或覆盖原 App Group 数据。
 
 ## 发布命令
 

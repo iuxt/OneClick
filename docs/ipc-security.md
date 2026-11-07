@@ -30,17 +30,15 @@ For provisioned builds the socket lives in the App Group container. Apple's
 describes UNIX-domain IPC within that container. Normal target entitlements need
 no extra networking permissions for this arrangement.
 
-Local (`RC_LOCAL_BUILD`) builds keep the sandbox and use the existing
-`Library/Application Support/RClickLocal` directory. Its existing file-access
-exception alone does not allow a socket bind. Both the local installer and the
-release workflow use `scripts/local-entitlements.py` to add an SBPL exception for
-the exact `ipc.sock` path: bind/outbound for the host, outbound for the extension.
-The rule uses `home-literal`, resolved relative to the recipient's real home at
-launch, so release artifacts never embed the CI runner's home path. This uses the local
-macOS sandbox's temporary-exception mechanism; it is not included in provisioned
-or App Store entitlements. It grants no TCP listener or general network access.
-The socket is mode 0600 and its parent is shared only as an endpoint location,
-not as a source of trusted identities. Peer code validation still applies.
+The host runs without App Sandbox. Finder Sync extensions must remain sandboxed
+for macOS to load them. Local (`RC_LOCAL_BUILD`) builds keep the existing
+`Library/Application Support/RClickLocal` directory and socket location.
+`scripts/local-entitlements.py` grants only the extension file access to this
+directory and outbound access to the exact `ipc.sock` path. The host needs no
+sandbox exception to bind or connect. The rule uses `home-literal`, so release
+artifacts never embed the CI runner's home path. Provisioned extension builds
+continue using their App Group. The socket is mode 0600; removing the host's
+sandbox does not change peer code validation, replay checks or protocol limits.
 
 Protocol v3 does not register DistributedNotificationCenter observers. Legacy
 notifications, public fixed-key signatures, and old Keychain-backed envelopes
@@ -51,9 +49,9 @@ version never reads, replaces or deletes it.
 host restart/reconnection, rejection before dispatch and preservation of a
 pre-existing regular file at the endpoint path. `IPCEnvelopeTests` verifies
 freshness, direction, replay and legacy-envelope rejection. A separate real
-sandboxed, ad-hoc-signed integration harness (`python3 scripts/test-local-ipc.py`)
+mixed-process, ad-hoc-signed integration harness (`python3 scripts/test-local-ipc.py`)
 uses the production transport and entitlement generator to exercise bidirectional
-code validation. A negative control verifies that file-access permission alone
-cannot bind the socket. It uses disposable bundles and a separate socket directory,
-and never launches the installed app or accesses its settings. The release workflow
-runs this check before building the artifact.
+code validation between a non-sandboxed host and a sandboxed extension. It uses
+disposable bundles and a separate socket directory, and never launches the
+installed app or accesses its settings. The release workflow runs this check
+before building the artifact.

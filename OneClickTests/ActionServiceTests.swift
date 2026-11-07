@@ -24,10 +24,9 @@ final class ActionServiceTests {
     private final class MockPermission: PermissionProviding {
         var hasAccessResult = false
         var accessChecks = 0
-        /// 模拟授权面板已把目录写进 BookmarkManager 的那部分目录
+        /// Simulates a restrictive file-access policy for failure-path tests.
         var authorizedDirs: Set<String> = []
         var promptResult: URL?
-        var saveCalls: [URL] = []
         var promptCalls: [URL] = []
         var callLog: CallLog?
 
@@ -38,12 +37,11 @@ final class ActionServiceTests {
         func promptForPermission(for url: URL) async -> URL? {
             promptCalls.append(url)
             callLog?.steps.append("permission")
-            if let granted = promptResult {          // 对齐 saveBookmark 的副作用
+            if let granted = promptResult {
                 authorizedDirs.insert(granted.resolvingSymlinksInPath().path)
             }
             return promptResult
         }
-        func saveBookmark(for url: URL) { saveCalls.append(url) }
     }
 
     @MainActor
@@ -99,6 +97,30 @@ final class ActionServiceTests {
         #expect(permission.accessChecks == 2)
         #expect(permission.promptCalls.count == 1)
         #expect(checksums.inputs.allSatisfy { $0.error != nil })
+    }
+
+    @Test func productionPolicyProcessesUnregisteredFoldersWithoutFolderGrants() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let file = root.appendingPathComponent("unregistered.txt")
+        try Data("direct access".utf8).write(to: file)
+        let permission = PermissionService()
+        #expect(permission.hasAccess(to: root))
+        #expect(permission.hasAccess(toResolvedURL: root))
+        #expect(await permission.promptForPermission(for: root) == nil)
+        let checksums = MockChecksums()
+        let service = ActionService(state: MockState(), permission: permission,
+                                    confirmation: MockConfirmation(), checksums: checksums)
+        await service.showChecksums([file.path])
+        #expect(checksums.inputs.count == 1)
+        #expect(checksums.inputs.first?.error == nil)
+        await service.hideFilesAndDirs([file.path], "ctx-items")
+        #expect(try URL(fileURLWithPath: file.path).resourceValues(forKeys: [.isHiddenKey]).isHidden == true)
+        await service.unhideFilesAndDirs([file.path], "ctx-items")
+        #expect(try URL(fileURLWithPath: file.path).resourceValues(forKeys: [.isHiddenKey]).isHidden == false)
+        await service.deleteFoldorFile([file.path], "ctx-items")
+        #expect(!FileManager.default.fileExists(atPath: file.path))
     }
 
     @Test(arguments: ["report%20.txt", "literal%2F.txt", "100%25.txt", "中文%20.txt"])

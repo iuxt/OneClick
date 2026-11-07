@@ -42,7 +42,7 @@ jobs:
           fi
           swift --version
 
-      - name: Verify Sandbox IPC Entitlements
+      - name: Verify Host and Finder Extension IPC
         run: python3 scripts/test-local-ipc.py
 
       - name: Get Version from Tag
@@ -87,7 +87,7 @@ jobs:
 
       - name: Ad-hoc Sign App and Finder Extension
         run: |
-          # 保留沙盒；无证书构建改用单独授权的数据目录，不申请 App Group。
+          # 主程序不使用沙盒；Finder 扩展保留系统要求的沙盒和 IPC 出站授权。
           python3 scripts/local-entitlements.py "$PWD" "$BUILD_DIR/Signing"
 
           EXT_PATH="$APP_PATH/Contents/PlugIns/${EXTENSION_NAME}.appex"
@@ -101,6 +101,7 @@ jobs:
           codesign --force --options runtime --timestamp=none --sign - \
             --entitlements "$BUILD_DIR/Signing/${APP_NAME}.entitlements" "$APP_PATH"
           codesign --verify --deep --strict --verbose=2 "$APP_PATH"
+          python3 scripts/verify-runtime-entitlements.py "$APP_PATH"
 
       - name: Package DMG and App ZIP
         env:
