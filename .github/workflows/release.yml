@@ -1,0 +1,172 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-and-release:
+    name: Build and Release (no Apple certificate required)
+    runs-on: xcode-27
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    env:
+      APP_NAME: OneClick
+      EXTENSION_NAME: FinderSyncExt
+      BUILD_DIR: .build/release
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Select Xcode
+        run: |
+          sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+          xcodebuild -version
+          SDK_VERSION=$(xcrun --sdk macosx --show-sdk-version)
+          if [[ "${SDK_VERSION%%.*}" -lt 27 ]]; then
+            echo "::error::Xcode 27 with the macOS 27 SDK is required."
+            exit 1
+          fi
+          swift --version
+
+      - name: Verify Host and Finder Extension IPC
+        run: python3 scripts/test-local-ipc.py
+
+      - name: Get Version from Tag
+        id: version
+        run: |
+          TAG_PATTERN='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-(alpha|beta|rc)\.(0|[1-9][0-9]*))?$'
+          if [[ ! "$GITHUB_REF_NAME" =~ $TAG_PATTERN ]]; then
+            echo '::error::Expected vX.Y.Z or vX.Y.Z-{alpha,beta,rc}.N (for example v2.4.0-rc.1)'
+            exit 1
+          fi
+          VERSION="${GITHUB_REF_NAME#v}"
+          PRERELEASE=false
+          if [[ "$VERSION" == *-* ]]; then PRERELEASE=true; fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "app_version=${VERSION%%-*}" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$PRERELEASE" >> "$GITHUB_OUTPUT"
+
+      - name: Build Release
+        env:
+          VERSION: ${{ steps.version.outputs.app_version }}
+        run: |
+          mkdir -p "$BUILD_DIR"
+          xcodebuild build \
+            -project OneClick.xcodeproj \
+            -scheme OneClick \
+            -configuration Release \
+            -derivedDataPath "$BUILD_DIR/DerivedData" \
+            -destination 'generic/platform=macOS' \
+            ARCHS=arm64 \
+            MACOSX_DEPLOYMENT_TARGET=27.0 \
+            CODE_SIGNING_ALLOWED=NO \
+            'SWIFT_ACTIVE_COMPILATION_CONDITIONS=$(inherited) RC_LOCAL_BUILD' \
+            CURRENT_PROJECT_VERSION="$(date -u +%Y%m%d%H%M)" \
+            MARKETING_VERSION="$VERSION" \
+            2>&1 | tee "$BUILD_DIR/build.log"
+
+          APP_PATH="$PWD/$BUILD_DIR/DerivedData/Build/Products/Release/${APP_NAME}.app"
+          test -x "$APP_PATH/Contents/MacOS/${APP_NAME}"
+          lipo -verify_arch arm64 "$APP_PATH/Contents/MacOS/${APP_NAME}"
+          lipo -verify_arch arm64 "$APP_PATH/Contents/PlugIns/${EXTENSION_NAME}.appex/Contents/MacOS/${EXTENSION_NAME}"
+          echo "APP_PATH=$APP_PATH" >> "$GITHUB_ENV"
+
+      - name: Ad-hoc Sign App and Finder Extension
+        run: |
+          # 主程序不使用沙盒；Finder 扩展保留系统要求的沙盒和 IPC 出站授权。
+          python3 scripts/local-entitlements.py "$PWD" "$BUILD_DIR/Signing"
+
+          EXT_PATH="$APP_PATH/Contents/PlugIns/${EXTENSION_NAME}.appex"
+          rm -f "$APP_PATH/Contents/embedded.provisionprofile" "$EXT_PATH/Contents/embedded.provisionprofile"
+          for helper in 7zz pigz; do
+            codesign --force --options runtime --timestamp=none --sign - \
+              --entitlements Vendor/7zip/7zz.entitlements "$APP_PATH/Contents/Helpers/$helper"
+          done
+          codesign --force --options runtime --timestamp=none --sign - \
+            --entitlements "$BUILD_DIR/Signing/${EXTENSION_NAME}.entitlements" "$EXT_PATH"
+          codesign --force --options runtime --timestamp=none --sign - \
+            --entitlements "$BUILD_DIR/Signing/${APP_NAME}.entitlements" "$APP_PATH"
+          codesign --verify --deep --strict --verbose=2 "$APP_PATH"
+          python3 scripts/verify-runtime-entitlements.py "$APP_PATH"
+
+      - name: Package DMG and App ZIP
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          PACKAGE_DIR="$BUILD_DIR/packages"
+          DMG_STAGING="$BUILD_DIR/dmg-staging"
+          mkdir -p "$PACKAGE_DIR" "$DMG_STAGING"
+          ditto "$APP_PATH" "$DMG_STAGING/${APP_NAME}.app"
+          ln -s /Applications "$DMG_STAGING/Applications"
+
+          hdiutil create \
+            -volname "$APP_NAME" \
+            -srcfolder "$DMG_STAGING" \
+            -format UDZO \
+            "$PACKAGE_DIR/${APP_NAME}-v${VERSION}.dmg" \
+            2>&1 | tee "$BUILD_DIR/package.log"
+
+          ditto -c -k --sequesterRsrc --keepParent \
+            "$APP_PATH" "$PACKAGE_DIR/${APP_NAME}-v${VERSION}.app.zip"
+          (
+            cd "$PACKAGE_DIR"
+            for FILE in *.dmg *.app.zip; do
+              shasum -a 256 "$FILE" > "$FILE.sha256"
+              shasum -a 256 -c "$FILE.sha256"
+            done
+          )
+
+      - name: Prepare Installation Notes
+        run: |
+          cat > "$BUILD_DIR/release-notes.md" <<'EOF'
+          Apple Silicon (arm64), macOS 27 or later.
+
+          This build uses ad-hoc signing and is not notarized by Apple.
+          Download the DMG and drag OneClick to Applications. If macOS blocks the
+          first launch, follow [Apple's instructions](https://support.apple.com/en-gb/102445)
+          to allow it in System Settings → Privacy & Security → Open Anyway.
+          Then enable OneClick's Finder extension in System Settings.
+
+          This edition stores settings separately from Developer ID builds.
+          EOF
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: OneClick ${{ github.ref_name }}
+          body_path: ${{ env.BUILD_DIR }}/release-notes.md
+          generate_release_notes: true
+          prerelease: ${{ steps.version.outputs.prerelease == 'true' }}
+          fail_on_unmatched_files: true
+          files: |
+            ${{ env.BUILD_DIR }}/packages/*.dmg
+            ${{ env.BUILD_DIR }}/packages/*.dmg.sha256
+            ${{ env.BUILD_DIR }}/packages/*.app.zip
+            ${{ env.BUILD_DIR }}/packages/*.app.zip.sha256
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # 失败时保留 tag，直接在 Actions 页面重新运行即可。
+      - name: Upload Build Logs
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-logs-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.BUILD_DIR }}/*.log
+          if-no-files-found: ignore
+          retention-days: 14

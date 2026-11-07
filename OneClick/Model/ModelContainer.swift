@@ -1,0 +1,166 @@
+//
+//  ModelContainer.swift
+//  OneClick
+//
+//  Created by 李旭 on 2025/10/3.
+//
+
+import Foundation
+import SwiftData
+import OSLog
+
+/// 共享库打不开的原因。
+///
+/// 拆成两个 case 而不是笼统一个"失败"，因为两者的排查路径完全不同：
+/// 前者查 App Group 配置，后者多半是构建签名问题。
+enum SharedStoreError: LocalizedError {
+    /// 拿不到 App Group 容器目录：App Group 没配好，或 entitlement 没生效。
+    case appGroupUnavailable(identifier: String)
+    /// 目录拿到了，但库文件打不开。
+    case storeUnreadable(url: URL, underlying: Error)
+
+    /// 诊断用，不是给用户看的文案 —— 用户看到的那份由 `StartupFailure.describe()`
+    /// 组装并走本地化。这里保持英文，避免一条没进 catalog 的中文串从某处
+    /// `localizedDescription` 漏到界面上。
+    var errorDescription: String? {
+        switch self {
+        case .appGroupUnavailable(let identifier):
+            return "Cannot resolve the App Group container: \(identifier)"
+        case .storeUnreadable(let url, let underlying):
+            return "Cannot open the store at \(url.path): \(underlying)"
+        }
+    }
+
+    /// 错误链里是否出现 SQLite 的授权被拒（SQLITE_AUTH = 23）。
+    ///
+    /// 这是"库文件在、当前进程却不许读"的特征。已知的唯一成因是构建产物没有有效签名：
+    /// `com.apple.security.application-groups` 没有被 provisioning profile 背书，
+    /// 沙盒因此不把容器目录写进本进程的 profile，打开库时即被拒。
+    ///
+    /// 之所以靠字符串而不是 `NSError.userInfo`：SwiftData 把 Cocoa 错误裹在
+    /// `SwiftDataError` 里，`NSSQLiteErrorDomain` 只出现在它的描述中，沿错误链取不到。
+    var looksLikeAuthorizationDenial: Bool {
+        guard case .storeUnreadable(_, let underlying) = self else { return false }
+        return "\(underlying)".contains("NSSQLiteErrorDomain=23")
+    }
+}
+
+// 共享 ModelContainer 配置工具类
+@MainActor
+class SharedDataManager {
+    static let appGroupIdentifier = Constants.suitName
+
+    private static let logger = Logger(
+        subsystem: Bundle.main.bundleIdentifier ?? "OneClick",
+        category: "ModelContainer"
+    )
+
+    /// `bootstrap()` 打开的那个容器。
+    private static var openedContainer: ModelContainer?
+
+    /// 已打开的共享容器。
+    ///
+    /// 正常路径由启动代码先跑 `bootstrap()`。若仍有更早的访问者（SwiftUI 求值顺序不是
+    /// 我们能保证的），这里补一次并走同一个失败出口 —— 总之不再有 trap。
+    static var sharedModelContainer: ModelContainer {
+        if let openedContainer { return openedContainer }
+
+        do {
+            let container = try makeSharedModelContainer()
+            openedContainer = container
+            return container
+        } catch {
+            StartupFailure.presentAndExit(error)
+        }
+    }
+
+    /// 打开共享容器，失败则抛出。
+    ///
+    /// 启动路径应当在任何东西碰 `sharedModelContainer` 之前调用它。原先是静态 lazy
+    /// 初始化 + `fatalError`，于是"读不到库"表现为毫无提示的 SIGTRAP —— 崩溃报告里
+    /// 只有 `_assertionFailure`，真正的原因（哪个文件、为什么打不开）随进程一起没了。
+    /// 改成显式抛出后，调用方能把原因说清楚再退。
+    static func bootstrap() throws {
+        guard openedContainer == nil else { return }
+        try LegacySandboxMigration.prepare()
+        openedContainer = try makeSharedModelContainer()
+    }
+
+    /// 定位容器目录并打开 ModelContainer。不做任何 trap，失败一律抛给调用方。
+    static func makeSharedModelContainer() throws -> ModelContainer {
+        // The test host launches the app too. Its startup must never restore or
+        // mutate folder grants from the user's real database.
+        if ProcessInfo.processInfo.environment["ONECLICK_TESTING"] == "1" {
+            let container = try ModelContainer(
+                for: AppEntity.self, ActionEntity.self, NewFileTypeEntity.self,
+                     CommonDirEntity.self, BookmarkEntity.self, DataVersion.self,
+                configurations: ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
+            )
+            try initializeDefaultData(context: ModelContext(container))
+            return container
+        }
+        // 开发者构建使用 App Group，本地构建使用单独授权的数据目录。
+        guard let containerURL = SharedAppGroup.containerURL else {
+            throw SharedStoreError.appGroupUnavailable(identifier: appGroupIdentifier)
+        }
+        let storeURL = containerURL.appendingPathComponent("RClickDatabase.sqlite")
+
+        // 创建 ModelConfiguration 使用共享路径
+        let configuration = ModelConfiguration(
+            url: storeURL,
+            allowsSave: true,
+            cloudKitDatabase: .none
+        )
+
+        // 创建 ModelContainer，注册所有模型
+        do {
+            try FileManager.default.createDirectory(at: containerURL, withIntermediateDirectories: true)
+            let existed = FileManager.default.fileExists(atPath: storeURL.path)
+            let container = try ModelContainer(
+                for: AppEntity.self,
+                     ActionEntity.self,
+                     NewFileTypeEntity.self,
+                     CommonDirEntity.self,
+                     BookmarkEntity.self,
+                     DataVersion.self,
+                configurations: configuration
+            )
+            try initializeDefaultData(context: ModelContext(container), isExistingStore: existed)
+            return container
+        } catch {
+            logger.error("打开共享 ModelContainer 失败: \(error)")
+            throw SharedStoreError.storeUnreadable(url: storeURL, underlying: error)
+        }
+    }
+
+    static let defaultsVersionKey = "default-configuration-initialized"
+
+    /// The marker and seed rows commit together. An existing store (including a
+    /// deliberately empty legacy store) must never be repopulated on launch.
+    static func initializeDefaultData(context: ModelContext, isExistingStore: Bool = false) throws {
+        let key = defaultsVersionKey
+        guard try context.fetchCount(FetchDescriptor<DataVersion>(predicate: #Predicate { $0.key == key })) == 0 else { return }
+        let hasData = try context.fetchCount(FetchDescriptor<AppEntity>()) > 0
+            || context.fetchCount(FetchDescriptor<ActionEntity>()) > 0
+            || context.fetchCount(FetchDescriptor<NewFileTypeEntity>()) > 0
+            || context.fetchCount(FetchDescriptor<CommonDirEntity>()) > 0
+            || context.fetchCount(FetchDescriptor<BookmarkEntity>()) > 0
+        do {
+            try context.transaction {
+                if !isExistingStore && !hasData {
+                    for action in ActionEntity.createDefaultActions() { context.insert(action) }
+                    for file in NewFileTypeEntity.createDefaultFileTypes() { context.insert(file) }
+                    for (index, app) in OpenWithApp.defaultApps.enumerated() {
+                        context.insert(AppEntity(from: app, sortOrder: index))
+                    }
+                    for directory in CommonDirEntity.createDefaultCommonDirs() { context.insert(directory) }
+                }
+                context.insert(DataVersion(key: key, version: 1))
+                try context.save()
+            }
+        } catch {
+            context.rollback()
+            throw error
+        }
+    }
+}
