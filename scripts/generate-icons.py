@@ -77,7 +77,7 @@ def main():
     write_manifest(logo_dir, [{"filename": "OneClick.pdf", "idiom": "universal"}],
                    **{"preserves-vector-representation": True})
 
-    # The menu mark has its own 18 pt geometry, rather than a reduced app portrait.
+    # The menu mark has its own tightly framed geometry for a 22 pt menu slot.
     mono_svg = (BRANDING / "oneclick-mark-mono.svg").read_bytes()
     menu_dir = ASSETS / "MenuBar.imageset"
     cairosvg.svg2pdf(bytestring=mono_svg, write_to=str(menu_dir / "OneClick.pdf"))
@@ -104,7 +104,7 @@ def main():
     menu_preview = Image.new("RGB", (480, 112), "#F5F5F5")
     menu_preview.paste("#282828", (240, 0, 480, 112))
     for origin, foreground in ((0, "#222222"), (240, "#FFFFFF")):
-        for center, size in ((40, 18), (112, 36), (192, 54)):
+        for center, size in ((40, 22), (112, 44), (192, 66)):
             png = cairosvg.svg2png(bytestring=mono_svg, output_width=size, output_height=size)
             alpha = Image.open(io.BytesIO(png)).getchannel("A")
             menu_preview.paste(foreground,
