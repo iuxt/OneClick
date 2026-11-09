@@ -39,15 +39,23 @@ def main():
         "width": "1024", "height": "1024", "viewBox": "0 0 256 256", "fill": "none",
     })
     ET.SubElement(app, f"{{{NS}}}title").text = "OneClick app icon"
-    ET.SubElement(app, f"{{{NS}}}desc").text = "A large, cropped woodpecker portrait."
+    ET.SubElement(app, f"{{{NS}}}desc").text = "A soft woodpecker portrait on a warm porcelain tile."
     tile = {
-        "x": "20", "y": "20", "width": "216", "height": "216",
-        "rx": "48",
+        "x": "25", "y": "25", "width": "206", "height": "206",
+        "rx": "46",
     }
     defs = ET.SubElement(app, f"{{{NS}}}defs")
+    for definition in mark.find(f"{{{NS}}}defs"):
+        defs.append(copy.deepcopy(definition))
+    background = ET.SubElement(defs, f"{{{NS}}}linearGradient", {
+        "id": "porcelain", "x1": "51", "y1": "25", "x2": "204", "y2": "231",
+        "gradientUnits": "userSpaceOnUse",
+    })
+    ET.SubElement(background, f"{{{NS}}}stop", {"stop-color": "#F6F3EE"})
+    ET.SubElement(background, f"{{{NS}}}stop", {"offset": "1", "stop-color": "#ECE8E1"})
     clip = ET.SubElement(defs, f"{{{NS}}}clipPath", {"id": "tile"})
     ET.SubElement(clip, f"{{{NS}}}rect", tile)
-    ET.SubElement(app, f"{{{NS}}}rect", {**tile, "fill": "#F4F0E8"})
+    ET.SubElement(app, f"{{{NS}}}rect", {**tile, "fill": "url(#porcelain)"})
     portrait = ET.SubElement(app, f"{{{NS}}}g", {"clip-path": "url(#tile)"})
     for element in mark:
         if element.tag in (f"{{{NS}}}path", f"{{{NS}}}circle"):
@@ -69,23 +77,8 @@ def main():
     write_manifest(logo_dir, [{"filename": "OneClick.pdf", "idiom": "universal"}],
                    **{"preserves-vector-representation": True})
 
-    mono = ET.Element(f"{{{NS}}}svg", {
-        "width": "18", "height": "18", "viewBox": "-10 20 270 270", "fill": "none",
-    })
-    ET.SubElement(mono, f"{{{NS}}}title").text = "OneClick monochrome woodpecker"
-    crest, body, cheek = mark.findall(f"{{{NS}}}path")
-    ET.SubElement(mono, f"{{{NS}}}path", {"fill": "#000", "d": crest.get("d")})
-    # Close the cheek inside the head at menu sizes to keep the neck connected.
-    menu_cheek = "m36 116 64-22c26 5 45 20 54 39l-45 16-23 31c-30-15-47-36-50-64Z"
-    ET.SubElement(mono, f"{{{NS}}}path", {
-        "fill": "#000", "fill-rule": "evenodd",
-        "d": body.get("d") + " " + menu_cheek,
-    })
-    eye = copy.deepcopy(mark.find(f"{{{NS}}}circle"))
-    eye.set("fill", "#000")
-    mono.append(eye)
-    mono_svg = svg_bytes(mono)
-    (BRANDING / "oneclick-mark-mono.svg").write_bytes(mono_svg)
+    # The menu mark has its own 18 pt geometry, rather than a reduced app portrait.
+    mono_svg = (BRANDING / "oneclick-mark-mono.svg").read_bytes()
     menu_dir = ASSETS / "MenuBar.imageset"
     cairosvg.svg2pdf(bytestring=mono_svg, write_to=str(menu_dir / "OneClick.pdf"))
     write_manifest(menu_dir, [{"filename": "OneClick.pdf", "idiom": "mac"}],
@@ -100,13 +93,23 @@ def main():
         png = cairosvg.svg2png(bytestring=app_svg, output_width=size, output_height=size)
         icon = Image.open(io.BytesIO(png))
         preview.paste(icon, (x, (160 - size) // 2), icon)
-    for x, background, foreground in ((468, "#F4F0E8", "#192D2C"),
-                                       (588, "#192D2C", "#FFFFFF")):
+    for x, background, foreground in ((468, "#F6F3EE", "#343330"),
+                                       (588, "#343330", "#FFFFFF")):
         preview.paste(background, (x, 24, x + 104, 136))
         png = cairosvg.svg2png(bytestring=mono_svg, output_width=36, output_height=36)
         alpha = Image.open(io.BytesIO(png)).getchannel("A")
         preview.paste(foreground, (x + 34, 62, x + 70, 98), alpha)
+    (ROOT / ".build").mkdir(exist_ok=True)
     preview.save(ROOT / ".build/oneclick-icon-sizes.png")
+    menu_preview = Image.new("RGB", (480, 112), "#F5F5F5")
+    menu_preview.paste("#282828", (240, 0, 480, 112))
+    for origin, foreground in ((0, "#222222"), (240, "#FFFFFF")):
+        for center, size in ((40, 18), (112, 36), (192, 54)):
+            png = cairosvg.svg2png(bytestring=mono_svg, output_width=size, output_height=size)
+            alpha = Image.open(io.BytesIO(png)).getchannel("A")
+            menu_preview.paste(foreground,
+                               (origin + center - size // 2, (112 - size) // 2), alpha)
+    menu_preview.save(BRANDING / "menu-bar-preview.png")
     print("Exported app icons, vector PDFs, SVGs and previews.")
 
 

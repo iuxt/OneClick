@@ -1,6 +1,23 @@
 <?xml version='1.0' encoding='utf-8'?>
-<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 256 256" fill="none"><title>OneClick app icon</title><desc>A large, cropped woodpecker portrait.</desc><defs><clipPath id="tile"><rect x="20" y="20" width="216" height="216" rx="48" /></clipPath></defs><rect x="20" y="20" width="216" height="216" rx="48" fill="#F4F0E8" /><g clip-path="url(#tile)"><path fill="#E84632" d="M25 105 46 30l80 36 37 48-61-26c-30-11-56-5-77 17Z" />
-  <path fill="#192D2C" d="M26 104c13-23 42-31 73-22 32 8 54 26 64 45l82 18-81 15c-13 20-32 32-56 36L83 270H-4l63-90c-28-16-41-42-37-62 1-5 2-10 4-14Z" />
-  <path fill="#F4F0E8" d="m36 116 64-22c26 5 45 20 54 39l-45 16-47 121H18l54-98c-23-16-35-35-36-56Z" />
-  <circle cx="128" cy="122" r="7" fill="#192D2C" />
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 256 256" fill="none"><title>OneClick app icon</title><desc>A soft woodpecker portrait on a warm porcelain tile.</desc><defs><linearGradient id="crest" x1="63" y1="43" x2="121" y2="110" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#CA8175" />
+      <stop offset="1" stop-color="#AC5E55" />
+    </linearGradient>
+    <linearGradient id="body" x1="49" y1="107" x2="142" y2="250" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#66635F" />
+      <stop offset="1" stop-color="#343330" />
+    </linearGradient>
+    <linearGradient id="cheek" x1="66" y1="113" x2="135" y2="231" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#E3DFD7" />
+      <stop offset="1" stop-color="#C7C2B9" />
+    </linearGradient>
+    <linearGradient id="beak" x1="165" y1="137" x2="204" y2="168" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#B9B4AB" />
+      <stop offset="1" stop-color="#979188" />
+    </linearGradient>
+  <linearGradient id="porcelain" x1="51" y1="25" x2="204" y2="231" gradientUnits="userSpaceOnUse"><stop stop-color="#F6F3EE" /><stop offset="1" stop-color="#ECE8E1" /></linearGradient><clipPath id="tile"><rect x="25" y="25" width="206" height="206" rx="46" /></clipPath></defs><rect x="25" y="25" width="206" height="206" rx="46" fill="url(#porcelain)" /><g clip-path="url(#tile)"><path id="crest-shape" fill="url(#crest)" d="M46 103C39 84 42 57 50 39C52 34 57 34 62 38L110 72C122 81 129 94 130 109L46 103Z" />
+  <path id="body-shape" fill="url(#body)" d="M24 159C16 132 22 106 41 90C59 75 85 74 108 82C137 84 159 105 165 130C170 150 166 170 153 184C175 204 187 233 189 264H-7C-1 220 8 183 24 159Z" />
+  <path id="cheek-shape" fill="url(#cheek)" d="M42 122C61 105 87 101 111 110C137 120 152 140 151 159C150 174 137 187 117 194C112 216 116 241 124 264H43C50 239 60 217 76 197C50 186 34 163 35 142C35 134 37 127 42 122Z" />
+  <path id="beak-shape" fill="url(#beak)" d="M150 139C170 133 196 138 227 149C231 150 232 153 227 156C205 168 178 174 151 167C154 158 154 149 150 139Z" />
+  <circle id="eye" cx="121" cy="136" r="5.5" fill="#302F2C" />
 </g></svg>
