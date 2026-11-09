@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" fill="none">
+  <title>OneClick woodpecker</title>
+  <desc>A bold, cropped woodpecker portrait with a sweeping vermilion crest, a long beak and a diagonal ivory face stripe.</desc>
+  <path fill="#E84632" d="M25 105 46 30l80 36 37 48-61-26c-30-11-56-5-77 17Z"/>
+  <path fill="#192D2C" d="M26 104c13-23 42-31 73-22 32 8 54 26 64 45l82 18-81 15c-13 20-32 32-56 36L83 270H-4l63-90c-28-16-41-42-37-62 1-5 2-10 4-14Z"/>
+  <path fill="#F4F0E8" d="m36 116 64-22c26 5 45 20 54 39l-45 16-47 121H18l54-98c-23-16-35-35-36-56Z"/>
+  <circle cx="128" cy="122" r="7" fill="#192D2C"/>
+</svg>
