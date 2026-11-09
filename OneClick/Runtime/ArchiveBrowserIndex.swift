@@ -1,5 +1,24 @@
 import Foundation
 
+nonisolated enum ArchiveEntryFilter: String, CaseIterable, Sendable {
+    case all = "All", files = "Files", folders = "Folders"
+
+    func includes(_ entry: ArchiveEntry) -> Bool {
+        switch self {
+        case .all: true
+        case .files: !entry.isDirectory
+        case .folders: entry.isDirectory
+        }
+    }
+}
+
+/// One immutable tree per query/sort change; selection and preview updates reuse it.
+nonisolated struct ArchiveBrowserOutline: Sendable {
+    let id = UUID()
+    var roots: [ArchiveEntry] = []
+    var children: [String: [ArchiveEntry]] = [:]
+}
+
 /// Built once off the UI thread. Folder navigation and selection are dictionary
 /// lookups; preview updates never rescan or sort the archive directory.
 nonisolated struct ArchiveBrowserIndex: Sendable {
@@ -49,6 +68,22 @@ nonisolated struct ArchiveBrowserIndex: Sendable {
             if item.path.localizedStandardContains(query) { result.append(item.entry) }
         }
         return result
+    }
+
+    @concurrent
+    func outline(folder: String, query: String, filter: ArchiveEntryFilter,
+                 sortOrder: [ArchiveEntrySortComparator]) async throws -> ArchiveBrowserOutline {
+        let comparators = sortOrder.isEmpty ? [ArchiveEntrySortComparator()] : sortOrder
+        if !query.isEmpty || filter != .all {
+            let matches = query.isEmpty ? entries : try await search(query)
+            return ArchiveBrowserOutline(roots: try await Self.sorted(matches.filter(filter.includes), using: comparators))
+        }
+        var sortedChildren: [String: [ArchiveEntry]] = [:]
+        for (path, entries) in children {
+            try Task.checkCancellation()
+            sortedChildren[path] = entries.sorted(using: comparators)
+        }
+        return ArchiveBrowserOutline(roots: sortedChildren[folder] ?? [], children: sortedChildren)
     }
 
     @concurrent

@@ -226,6 +226,27 @@ struct ArchiveBrowserTests {
         await #expect(throws: CancellationError.self) { try await cancelled.value }
     }
 
+    @Test func outlineSortsEachFolderAndFiltersAcrossNestedPaths() async throws {
+        let index = try await ArchiveBrowserIndex.build([
+            ArchiveEntry(path: "source/nested/large.json", size: 900, isDirectory: false),
+            ArchiveEntry(path: "source/file10.txt", size: 10, isDirectory: false),
+            ArchiveEntry(path: "source/file2.txt", size: 20, isDirectory: false),
+            ArchiveEntry(path: "root.txt", size: 5, isDirectory: false),
+        ])
+        let tree = try await index.outline(folder: "", query: "", filter: .all, sortOrder: [.init(field: .size, order: .reverse)])
+        #expect(tree.roots.map(\.path) == ["source", "root.txt"])
+        #expect(tree.children["source"]?.map(\.name) == ["nested", "file2.txt", "file10.txt"])
+        #expect(tree.children["source/nested"]?.map(\.name) == ["large.json"])
+        let files = try await index.outline(folder: "", query: "", filter: .files, sortOrder: [.init(field: .size)])
+        #expect(files.roots.map(\.name) == ["root.txt", "file10.txt", "file2.txt", "large.json"])
+        #expect(files.children.isEmpty)
+        let folders = try await index.outline(folder: "", query: "nested", filter: .folders, sortOrder: [.init()])
+        #expect(folders.roots.map(\.path) == ["source/nested"])
+        let search = try await index.outline(folder: "", query: "large", filter: .all, sortOrder: [.init()])
+        #expect(search.roots.map(\.path) == ["source/nested/large.json"])
+        #expect(search.children.isEmpty)
+    }
+
     @Test @MainActor func rapidNavigationAndSelectionKeepLatestPreview() async throws {
         let root = try temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: root) }

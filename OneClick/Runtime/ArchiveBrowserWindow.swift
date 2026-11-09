@@ -34,11 +34,13 @@ private final class ArchiveBrowserWindowController: NSWindowController, NSWindow
         window.contentViewController = NSHostingController(rootView: ArchiveBrowserView(model: model) { [weak window] in
             window?.performClose(nil)
         })
-        window.title = url.lastPathComponent
-        window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
+        window.title = url.path
+        window.titleVisibility = .hidden
+        window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
         window.applyOneClickChrome()
-        window.setContentSize(NSSize(width: 1080, height: 600))
-        window.contentMinSize = NSSize(width: 900, height: 420)
+        window.isMovableByWindowBackground = true
+        window.setContentSize(NSSize(width: 1280, height: 780))
+        window.contentMinSize = NSSize(width: 1060, height: 500)
         window.center()
         super.init(window: window)
         window.delegate = self
@@ -61,6 +63,11 @@ final class ArchiveBrowserModel: ObservableObject {
     @Published private(set) var previewImage: NSImage?
     @Published private(set) var previewError: String?
     @Published private(set) var visibleEntries: [ArchiveEntry] = []
+    @Published private(set) var outline = ArchiveBrowserOutline()
+    @Published private(set) var fileCount = 0
+    @Published private(set) var folderCount = 0
+    @Published private(set) var archiveSize: Int64 = 0
+    @Published var filter: ArchiveEntryFilter = .all { didSet { updateVisibleEntries() } }
     @Published var folder = "" { didSet { updateVisibleEntries() } }
     @Published var search = "" { didSet { updateVisibleEntries() } }
     @Published var sortOrder = [ArchiveEntrySortComparator()] {
@@ -88,6 +95,8 @@ final class ArchiveBrowserModel: ObservableObject {
 
     var selectedEntry: ArchiveEntry? { selection.flatMap { index.byID[$0] } }
 
+    func reload() { load(password: password) }
+
     private func updateVisibleEntries() {
         searchTask?.cancel()
         guard !closed else { return }
@@ -95,18 +104,23 @@ final class ArchiveBrowserModel: ObservableObject {
         let children = index.children[folder] ?? []
         let sortOrder = self.sortOrder
         let defaultOrder = sortOrder.isEmpty || sortOrder == [ArchiveEntrySortComparator()]
-        if query.isEmpty && defaultOrder {
+        if query.isEmpty && defaultOrder && filter == .all {
             visibleEntries = children
+            outline = ArchiveBrowserOutline(roots: children, children: index.children)
             return
         }
         let snapshot = index
+        let folder = self.folder
+        let filter = self.filter
         searchTask = Task { [weak self] in
             do {
                 if !query.isEmpty { try await Task.sleep(for: .milliseconds(120)) }
                 let matches = query.isEmpty ? children : try await snapshot.search(query)
                 let results = defaultOrder ? matches : try await ArchiveBrowserIndex.sorted(matches, using: sortOrder)
+                let outline = try await snapshot.outline(folder: folder, query: query, filter: filter, sortOrder: sortOrder)
                 try Task.checkCancellation()
                 self?.visibleEntries = results
+                self?.outline = outline
             } catch { /* A new query or closing the window cancels stale results. */ }
         }
     }
@@ -125,6 +139,9 @@ final class ArchiveBrowserModel: ObservableObject {
                 try Task.checkCancellation()
                 index = built
                 entries = built.entries
+                fileCount = built.entries.lazy.filter { !$0.isDirectory }.count
+                folderCount = built.entries.count - fileCount
+                archiveSize = Int64((try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0)
                 updateVisibleEntries()
             } catch is CancellationError { return }
             catch {
@@ -251,23 +268,37 @@ final class ArchiveBrowserModel: ObservableObject {
     }
 }
 
-private struct ArchiveBrowserView: View {
+private enum ArchiveBrowserPalette {
+    static let toolbar = Color(red: 0.49, green: 0.25, blue: 0.10)
+    static func canvas(_ scheme: ColorScheme) -> Color {
+        scheme == .dark ? Color(red: 0.16, green: 0.14, blue: 0.12) : Color(red: 0.93, green: 0.87, blue: 0.78)
+    }
+    static func paper(_ scheme: ColorScheme) -> Color {
+        scheme == .dark ? Color(nsColor: .textBackgroundColor) : .white
+    }
+}
+
+struct ArchiveBrowserView: View {
     @ObservedObject var model: ArchiveBrowserModel
     let close: () -> Void
+    @Environment(\.colorScheme) private var colorScheme
     @State private var password = ""
     @State private var quickLookURL: URL?
     @State private var previewProgressVisible = false
+    @State private var showsPreview = true
+    @State private var expandAll = false
+    @State private var expansionRequest = 0
+    @State private var showsCreatedDate = false
 
     var body: some View {
         VStack(spacing: 0) {
+            toolbar
             if model.extracting {
                 HStack(spacing: 10) {
                     ProgressView().controlSize(.small)
-                    Text(appLocalized: "Extracting…")
-                        .font(.callout.weight(.medium))
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
+                    Text(appLocalized: "Extracting…").font(.callout.weight(.medium))
+                    Spacer()
+                }.padding(12)
             }
             if let error = model.extractionError {
                 Label(error, systemImage: "exclamationmark.triangle").foregroundStyle(.red).padding(12)
@@ -281,25 +312,6 @@ private struct ArchiveBrowserView: View {
                 }.padding(16)
                 Divider()
             }
-            HStack {
-                Button { model.navigate(to: model.folder.components(separatedBy: "/").dropLast().joined(separator: "/")) }
-                    label: { Image(systemName: "chevron.up") }
-                    .disabled(model.folder.isEmpty).help(AppLocalization.localized("Parent Folder"))
-                Button(AppLocalization.localized("Archive")) { model.navigate(to: "") }.buttonStyle(.plain)
-                if !model.folder.isEmpty {
-                    Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary)
-                    Text(model.folder).lineLimit(1).truncationMode(.middle)
-                }
-                Spacer()
-                Button(AppLocalization.localized("Extract All…"), systemImage: "arrow.down.doc") {
-                    model.extract(closeWindow: close)
-                }
-                .buttonStyle(.glassProminent)
-                .disabled(model.loading || model.extracting)
-                TextField(AppLocalization.localized("Search Archive"), text: $model.search)
-                    .textFieldStyle(.roundedBorder).frame(width: 220)
-            }.padding(.horizontal, 16).padding(.vertical, 10)
-            Divider()
             if model.loading {
                 ProgressView(AppLocalization.localized("Reading archive…")).frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let error = model.error {
@@ -307,96 +319,151 @@ private struct ArchiveBrowserView: View {
                     Label(AppLocalization.localized("Unable to Open Archive"), systemImage: "exclamationmark.triangle")
                 } description: { Text(error) } actions: {
                     if !model.needsPassword { Button(AppLocalization.localized("Retry")) { model.load() } }
-                }
+                }.frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 HSplitView {
-                    fileList.frame(minWidth: 700)
-                    preview.frame(minWidth: 280, idealWidth: 350, maxWidth: .infinity, maxHeight: .infinity)
+                    fileList.frame(minWidth: 490, idealWidth: 640, maxWidth: .infinity, maxHeight: .infinity)
+                    if showsPreview {
+                        preview
+                            .background(ArchiveBrowserPalette.paper(colorScheme))
+                            .padding(10)
+                            .frame(minWidth: 320, idealWidth: 640, maxWidth: .infinity, maxHeight: .infinity)
+                    }
                 }
             }
             Divider()
-            HStack {
-                Text(String(format: AppLocalization.localized("%lld entries"), model.entries.count))
-                Spacer()
-                if let entry = model.selectedEntry { Text(entry.normalizedPath).lineLimit(1).truncationMode(.middle) }
-            }.font(.caption).foregroundStyle(.secondary).padding(.horizontal, 16).padding(.vertical, 9)
+            statusBar
         }
-        .background(.background)
+        .background(ArchiveBrowserPalette.canvas(colorScheme))
+        .ignoresSafeArea(.container, edges: .top)
         .task { model.load() }
         .onChange(of: model.selection) { model.showPreview() }
         .quickLookPreview($quickLookURL)
     }
 
-    private var fileList: some View {
-        Table(model.visibleEntries, selection: $model.selection, sortOrder: $model.sortOrder) {
-            TableColumn(AppLocalization.localized("Name"), sortUsing: ArchiveEntrySortComparator()) { entry in
+    private var toolbar: some View {
+        VStack(spacing: 0) {
+            Text(model.url.path)
+                .font(.system(size: 13, weight: .medium))
+                .lineLimit(1).truncationMode(.middle)
+                .padding(.horizontal, 120)
+                .frame(maxWidth: .infinity).frame(height: 26)
+                .help(model.url.path)
+            HStack(alignment: .bottom, spacing: 18) {
+                toolbarAction("Quick Look", symbol: "eye", colors: [.pink, .purple]) {
+                    quickLookURL = model.previewURL
+                }.disabled(model.previewURL == nil || model.previewing)
+                toolbarAction("Extract All…", symbol: "archivebox", colors: [.yellow, .orange]) {
+                    model.extract(closeWindow: close)
+                }.disabled(model.loading || model.extracting || model.error != nil)
+                toolbarAction("Refresh", symbol: "arrow.clockwise", colors: [.mint, .green]) {
+                    model.reload()
+                }.disabled(model.loading || model.extracting)
+                toolbarAction(expandAll ? "Collapse All" : "Expand All", symbol: expandAll ? "chevron.down" : "chevron.right",
+                              colors: [.purple, .blue]) {
+                    expandAll.toggle()
+                    expansionRequest += 1
+                }.disabled(model.loading || model.outline.children.isEmpty)
+                Spacer(minLength: 8)
                 HStack(spacing: 10) {
-                    Image(systemName: entry.isDirectory ? "folder.fill" : entry.isLink ? "link" : "doc")
-                        .foregroundStyle(entry.isDirectory ? .blue : .secondary).frame(width: 22)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(entry.name).lineLimit(1)
-                        if !model.search.isEmpty { Text(entry.parent).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
+                    Text(appLocalized: "Filter:").font(.system(size: 13, weight: .medium))
+                    Picker(AppLocalization.localized("Filter:"), selection: $model.filter) {
+                        ForEach(ArchiveEntryFilter.allCases, id: \.self) { filter in
+                            Text(AppLocalization.localized(filter.rawValue)).tag(filter)
+                        }
+                    }.labelsHidden().frame(width: 104)
+                    HStack(spacing: 6) {
+                        Image(systemName: "magnifyingglass")
+                        TextField(AppLocalization.localized("Search Archive"), text: $model.search)
+                            .textFieldStyle(.plain)
+                        if !model.search.isEmpty {
+                            Button { model.search = "" } label: { Image(systemName: "xmark.circle.fill") }
+                                .buttonStyle(.plain).accessibilityLabel(AppLocalization.localized("Clear Search"))
+                        }
                     }
-                    Spacer()
-                    if entry.encrypted { Image(systemName: "lock").font(.caption).foregroundStyle(.secondary) }
-                    if entry.isDirectory {
-                        Button { model.navigate(to: entry.normalizedPath) } label: { Image(systemName: "chevron.right") }
-                            .buttonStyle(.borderless).help(AppLocalization.localized("Open Folder"))
-                    }
+                    .padding(.horizontal, 9).frame(width: 175, height: 28)
+                    .background(.white.opacity(0.12), in: RoundedRectangle(cornerRadius: 6))
+                    Button { showsPreview.toggle() } label: { Image(systemName: "sidebar.right") }
+                        .help(AppLocalization.localized(showsPreview ? "Hide Preview" : "Show Preview"))
+                        .accessibilityLabel(AppLocalization.localized(showsPreview ? "Hide Preview" : "Show Preview"))
+                    Menu {
+                        Toggle(AppLocalization.localized("Date Created"), isOn: $showsCreatedDate)
+                    } label: { Image(systemName: "line.3.horizontal.decrease") }
+                    .menuIndicator(.hidden).fixedSize()
+                    .help(AppLocalization.localized("Columns"))
                 }
-                .padding(.vertical, 5)
+                .buttonStyle(.borderless)
+                .controlSize(.regular)
+                .padding(.bottom, 3)
             }
-            .width(min: 200, ideal: 260)
-            TableColumn(AppLocalization.localized("Size"), sortUsing: ArchiveEntrySortComparator(field: .size)) { entry in
-                Text(entry.isDirectory ? "—" : ByteCountFormatter.string(fromByteCount: entry.size, countStyle: .file))
-                    .foregroundStyle(.secondary).monospacedDigit()
-                    .frame(maxWidth: .infinity, alignment: .trailing)
-                    .help(entry.isDirectory ? "—" : entry.size.formatted() + " B")
-            }
-            .width(min: 80, ideal: 90, max: 120)
-            TableColumn(AppLocalization.localized("Date Modified"), sortUsing: ArchiveEntrySortComparator(field: .modified)) { entry in
-                dateCell(entry.modifiedDate)
-            }
-            .width(min: 170, ideal: 180, max: 220)
-            TableColumn(AppLocalization.localized("Date Created"), sortUsing: ArchiveEntrySortComparator(field: .created)) { entry in
-                dateCell(entry.createdDate)
-            }
-            .width(min: 170, ideal: 180, max: 220)
+            .padding(.horizontal, 24).padding(.top, 2).padding(.bottom, 10)
         }
-        // Let the table handle double-clicks without delaying single-click selection
-        // while a row-level double-tap recognizer waits for a second click.
-        .contextMenu(forSelectionType: String.self) { _ in
-            EmptyView()
-        } primaryAction: { selection in
-            guard let id = selection.first else { return }
-            model.selection = id
-            if let entry = model.selectedEntry, entry.isDirectory {
-                model.navigate(to: entry.normalizedPath)
-            }
-        }
-        .overlay {
-            if model.visibleEntries.isEmpty {
-                ContentUnavailableView(AppLocalization.localized("No Files"), systemImage: "folder")
-            }
-        }
+        .foregroundStyle(.white)
+        .background(ArchiveBrowserPalette.toolbar.gradient)
+        .environment(\.colorScheme, .dark)
     }
 
-    private func dateCell(_ date: Date?) -> some View {
-        Text(date?.formatted(date: .numeric, time: .shortened) ?? "—")
-            .foregroundStyle(.secondary).monospacedDigit().lineLimit(1)
-            .help(date?.formatted(date: .complete, time: .standard) ?? "—")
+    private func toolbarAction(_ title: String, symbol: String, colors: [Color], action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 7) {
+                Image(systemName: symbol)
+                    .font(.system(size: 20, weight: .semibold))
+                    .frame(width: 32, height: 32)
+                    .background(LinearGradient(colors: colors, startPoint: .top, endPoint: .bottom), in: Circle())
+                    .shadow(color: .black.opacity(0.1), radius: 2, y: 1)
+                Text(AppLocalization.localized(title)).font(.system(size: 12, weight: .semibold)).lineLimit(1)
+            }.frame(minWidth: 66)
+        }
+        .buttonStyle(.plain)
+        .help(AppLocalization.localized(title))
+    }
+
+    private var fileList: some View {
+        ArchiveOutlineView(model: model, expansionRequest: expansionRequest, expandAll: expandAll,
+                           showsCreatedDate: showsCreatedDate, quickLook: { quickLookURL = model.previewURL })
+            .overlay {
+                if model.outline.roots.isEmpty {
+                    ContentUnavailableView(AppLocalization.localized("No Files"), systemImage: "folder")
+                }
+            }
+    }
+
+    private var statusBar: some View {
+        HStack(spacing: 12) {
+            Spacer(minLength: 0)
+            Text(String(format: AppLocalization.localized("Archive Size: %@"),
+                        ByteCountFormatter.string(fromByteCount: model.archiveSize, countStyle: .file)))
+            Text(String(format: AppLocalization.localized("%lld files, %lld folders"), model.fileCount, model.folderCount))
+            if model.selectedEntry != nil {
+                Text("|").foregroundStyle(.secondary)
+                Text(String(format: AppLocalization.localized("%lld selected"), 1))
+            }
+            Spacer(minLength: 0)
+        }
+        .font(.system(size: 12)).lineLimit(1)
+        .padding(.horizontal, 16).frame(height: 30)
     }
 
     private var preview: some View {
         // Content and loading indicators must not change the split pane's sizing.
         GeometryReader { geometry in
-            ZStack {
+            ZStack(alignment: .topTrailing) {
                 previewContent
                     .frame(width: geometry.size.width, height: geometry.size.height)
+                if let file = model.previewURL {
+                    Button { quickLookURL = file } label: {
+                        Image(systemName: "eye.fill").font(.system(size: 16))
+                    }
+                    .buttonStyle(.plain).foregroundStyle(.secondary)
+                    .help(AppLocalization.localized("Quick Look"))
+                    .accessibilityLabel(AppLocalization.localized("Quick Look"))
+                    .disabled(model.previewing).padding(8)
+                }
                 if model.previewing && previewProgressVisible {
                     ProgressView(AppLocalization.localized("Preparing preview…"))
                         .padding(16)
                         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
             .frame(width: geometry.size.width, height: geometry.size.height)
@@ -416,8 +483,8 @@ private struct ArchiveBrowserView: View {
         if let error = model.previewError {
             ContentUnavailableView { Label(AppLocalization.localized("Preview Unavailable"), systemImage: "eye.slash") }
                 description: { Text(error) }
-        } else if let file = model.previewURL {
-            VStack(spacing: 16) {
+        } else if model.previewURL != nil {
+            VStack(spacing: 0) {
                 if let text = model.previewText {
                     ArchiveTextPreview(text: text)
                 } else if let image = model.previewImage {
@@ -429,9 +496,6 @@ private struct ArchiveBrowserView: View {
                     Text(appLocalized: "Open Quick Look to preview this file.").foregroundStyle(.secondary)
                     Spacer()
                 }
-                Button(AppLocalization.localized("Quick Look"), systemImage: "eye") { quickLookURL = file }
-                    .disabled(model.previewing)
-                    .padding(.bottom, 16)
             }
         } else if !model.previewing {
             ContentUnavailableView(AppLocalization.localized("Select a File to Preview"), systemImage: "doc.text.magnifyingglass")
@@ -467,7 +531,7 @@ private struct ArchiveTextPreview: NSViewRepresentable {
         view.drawsBackground = false
         view.font = .monospacedSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
         view.textColor = .labelColor
-        view.textContainerInset = NSSize(width: 16, height: 16)
+        view.textContainerInset = NSSize(width: 10, height: 8)
         view.isVerticallyResizable = true
         view.isHorizontallyResizable = true
         view.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
