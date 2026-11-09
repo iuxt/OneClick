@@ -55,6 +55,13 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		C0DEC0DE0000000000000001 /* Exceptions for "OneClick" folder in "OneClick" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 5C8A28D92F83D65900FE687C /* OneClick */;
+		};
 		5C8A29232F83D74A00FE687C /* Exceptions for "FinderSyncExt" folder in "FinderSyncExt" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
@@ -82,6 +89,7 @@
 		5C8A28DC2F83D65900FE687C /* OneClick */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
+				C0DEC0DE0000000000000001 /* Exceptions for "OneClick" folder in "OneClick" target */,
 				5C96A3872F8A9E2B00D022F8 /* Exceptions for "OneClick" folder in "OneClickTests" target */,
 				5C96A3892F8A9E2B00D022F8 /* Exceptions for "OneClick" folder in "FinderSyncExt" target */,
 			);
@@ -534,6 +542,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = OneClick/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = OneClick;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_LSUIElement = YES;
@@ -573,6 +582,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = OneClick/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = OneClick;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_LSUIElement = YES;

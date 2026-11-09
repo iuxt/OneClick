@@ -91,6 +91,7 @@ xcodebuild "${BUILD_ARGS[@]}" 2>&1 | tee "$BUILD_DIR/build.log"
 [[ -x "$APP_PATH/Contents/MacOS/OneClick" ]] || fail "未找到构建产物：$APP_PATH"
 EXTENSION_PATH="$APP_PATH/Contents/PlugIns/FinderSyncExt.appex"
 [[ -d "$EXTENSION_PATH" ]] || fail '构建产物缺少 FinderSync 扩展。'
+python3 "$ROOT_DIR/scripts/verify-archive-document-types.py" "$APP_PATH"
 
 if [[ "$BUILD_MODE" == local ]]; then
     log '本地签名（无需开发者账号，保留沙盒）'
@@ -216,6 +217,9 @@ if [[ -e "$PREVIOUS_APP" || -L "$PREVIOUS_APP" ]]; then
     as_installer mv "$PREVIOUS_APP" "$STAGING_DIR/previous.app"
 fi
 as_installer mv "$STAGING_DIR/OneClick.app" "$TARGET_APP"
+
+# Refresh archive document declarations after replacing the app at the same path.
+/System/Library/Frameworks/CoreServices.framework/Versions/Current/Frameworks/LaunchServices.framework/Support/lsregister -f "$TARGET_APP"
 
 # 注册新路径，保留用户在系统设置中选择的扩展开关状态。
 if ! pluginkit -a "$TARGET_APP/Contents/PlugIns/FinderSyncExt.appex"; then

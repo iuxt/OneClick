@@ -72,12 +72,18 @@ struct ArchiveAssociationView: View {
         result = nil
         Task {
             var failures: [String] = []
+            var updated: Set<String> = []
             for format in ArchiveAssociationFormat.all where selected.contains(format.id) {
                 guard let type = UTType(format.typeID) else { failures.append(format.id); continue }
-                do { try await NSWorkspace.shared.setDefaultApplication(at: Bundle.main.bundleURL, toOpen: type) }
+                do {
+                    try await NSWorkspace.shared.setDefaultApplication(at: Bundle.main.bundleURL, toOpen: type)
+                    updated.insert(format.id)
+                }
                 catch { failures.append(format.id + ": " + error.localizedDescription) }
             }
             await refresh()
+            // An accepted request is not sufficient: verify the effective handler.
+            failures += updated.subtracting(associated).sorted()
             associating = false
             result = failures.isEmpty ? AppLocalization.localized("File associations updated.")
                 : AppLocalization.localized("Some file associations could not be updated:") + "\n" + failures.joined(separator: "\n")
