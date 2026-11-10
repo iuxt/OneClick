@@ -59,7 +59,7 @@ struct ArchiveServiceTests {
         #expect(try Data(contentsOf: output.appendingPathComponent(source.lastPathComponent)) == contents)
     }
 
-    @Test(arguments: ArchiveCompressionFormat.allCases)
+    @Test(arguments: ArchiveCompressionFormat.archiveFormats)
     func storeOnlyCreatesRoundTripArchivesWithoutCompression(format: ArchiveCompressionFormat) async throws {
         let root = try temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
@@ -403,7 +403,7 @@ struct ArchiveServiceTests {
         #expect(ArchiveCompressionSettings.load(from: defaults).exclusionPatterns.isEmpty)
     }
 
-    @Test(arguments: ArchiveCompressionFormat.allCases)
+    @Test(arguments: ArchiveCompressionFormat.archiveFormats)
     func compressionLevelChangesOutputAndPreservesContents(format: ArchiveCompressionFormat) async throws {
         let root = try temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: root) }

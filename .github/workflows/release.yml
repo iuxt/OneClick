@@ -27,9 +27,13 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
+
+      - name: Validate Release Version
+        id: version
+        run: python3 scripts/version.py release "$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
 
       - name: Select Xcode
         run: |
@@ -42,23 +46,11 @@ jobs:
           fi
           swift --version
 
+      - name: Verify Localizations
+        run: python3 scripts/check-localization.py
+
       - name: Verify Host and Finder Extension IPC
         run: python3 scripts/test-local-ipc.py
-
-      - name: Get Version from Tag
-        id: version
-        run: |
-          TAG_PATTERN='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-(alpha|beta|rc)\.(0|[1-9][0-9]*))?$'
-          if [[ ! "$GITHUB_REF_NAME" =~ $TAG_PATTERN ]]; then
-            echo '::error::Expected vX.Y.Z or vX.Y.Z-{alpha,beta,rc}.N (for example v2.4.0-rc.1)'
-            exit 1
-          fi
-          VERSION="${GITHUB_REF_NAME#v}"
-          PRERELEASE=false
-          if [[ "$VERSION" == *-* ]]; then PRERELEASE=true; fi
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "app_version=${VERSION%%-*}" >> "$GITHUB_OUTPUT"
-          echo "prerelease=$PRERELEASE" >> "$GITHUB_OUTPUT"
 
       - name: Build Release
         env:
@@ -145,7 +137,7 @@ jobs:
           EOF
 
       - name: Create Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3.0.4
         with:
           tag_name: ${{ github.ref_name }}
           name: OneClick ${{ github.ref_name }}
@@ -164,7 +156,7 @@ jobs:
       # 失败时保留 tag，直接在 Actions 页面重新运行即可。
       - name: Upload Build Logs
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: release-logs-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ env.BUILD_DIR }}/*.log

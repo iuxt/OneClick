@@ -16,7 +16,10 @@ jobs:
     runs-on: xcode-27
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7.0.1
+
+      - name: Verify Version Commands
+        run: python3 scripts/test-version.py
 
       - name: Select Xcode
         run: |
@@ -28,6 +31,9 @@ jobs:
             exit 1
           fi
           swift --version
+
+      - name: Verify Localizations
+        run: python3 scripts/check-localization.py
 
       - name: Build OneClick
         run: |
@@ -42,7 +48,7 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
-            | tee build.log
+            2>&1 | tee build.log
 
       - name: Run Unit Tests
         run: |

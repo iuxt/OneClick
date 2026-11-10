@@ -16,7 +16,7 @@ xcrun --sdk macosx clang -O3 -DNOZOPFLI "${arch_flags[@]}" \
     -mmacosx-version-min="$MACOSX_DEPLOYMENT_TARGET" \
     "$pigz_vendor/pigz.c" "$pigz_vendor/yarn.c" "$pigz_vendor/try.c" \
     -lz -lpthread -o "$helpers/pigz"
-for file in License.txt COPYING.LESSER README.md 7zip-26.05-src.tar.xz; do
+for file in License.txt COPYING.LESSER README.md 7zip-26.06-src.tar.xz 7z.sfx; do
     install -m 644 "$vendor/$file" "$licenses/$file"
 done
 for file in LICENSE.txt README.md; do

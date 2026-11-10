@@ -118,6 +118,19 @@ Optional overrides: `CONFIGURATION=Debug ./build.sh`,
 `BUILD_MODE=developer DEVELOPMENT_TEAM="YOUR_TEAM_ID" ./build.sh`, or
 `INSTALL_DIR="$HOME/Applications" ./build.sh`.
 
+Version commands run without building or installing:
+
+```bash
+./build.sh version       # Show the current X.Y.Z version
+./build.sh bump-version  # X.Y.Z -> X.Y.(Z+1)
+./build.sh bump-minor    # X.Y.Z -> X.(Y+1).0
+./build.sh bump-major    # X.Y.Z -> (X+1).0.0
+```
+
+These commands read and update the matching Debug/Release `MARKETING_VERSION`
+settings for the app and Finder extension. Bump commands print the new version;
+they do not commit, create tags, or push.
+
 ### Requirements
 
 | Requirement | Details |
@@ -145,10 +158,12 @@ xcodebuild -project OneClick.xcodeproj -scheme OneClick -configuration Release
 
 ### Publishing a Release
 
-Push a version tag such as `v2.3.4` to trigger the release workflow. It builds an
+Commit the version bump, then push a tag matching `./build.sh version` (for
+example `v2.3.4`) to trigger the release workflow. It builds an
 Apple Silicon app with ad-hoc signing, then uploads a DMG, an app ZIP, and SHA-256
 checksums to GitHub Releases with automatically generated release notes.
-Tags such as `v2.3.3-rc.1` create prereleases instead.
+Tags such as `v2.3.4-rc.1` create prereleases instead. The shared version script
+validates tags and requires their base version to match the committed project.
 
 No Apple developer account or signing secrets are required. These builds are not
 notarized; the first launch may need approval in macOS Privacy & Security.

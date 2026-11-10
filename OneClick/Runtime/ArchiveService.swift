@@ -8,6 +8,8 @@ nonisolated enum ArchiveOperation: String, Sendable, CaseIterable {
     case tarGzip = "compress-targz"
     case encryptedZip = "compress-zip-encrypted"
     case encryptedSevenZip = "compress-7z-encrypted"
+    case dmg = "compress-dmg"
+    case encryptedDmg = "compress-dmg-encrypted"
     case extract = "extract"
     case extractAndDelete = "extract-and-delete"
 
@@ -19,6 +21,7 @@ nonisolated enum ArchiveOperation: String, Sendable, CaseIterable {
         case .tarGzip: "Compress to TAR.GZ"
         case .encryptedZip: "Compress to Encrypted ZIP…"
         case .encryptedSevenZip: "Compress to Encrypted 7Z…"
+        case .dmg, .encryptedDmg: "Create Disk Image"
         case .extract: "Extract Here"
         case .extractAndDelete: "Extract and Delete Archive"
         }
@@ -29,11 +32,13 @@ nonisolated enum ArchiveOperation: String, Sendable, CaseIterable {
         switch self {
         case .tarGzip: "tar.gz"
         case .sevenZip, .encryptedSevenZip: "7z"
+        case .dmg, .encryptedDmg: "dmg"
         default: "zip"
         }
     }
 
-    var isEncryptedCompression: Bool { self == .encryptedZip || self == .encryptedSevenZip }
+    var isEncryptedCompression: Bool { self == .encryptedZip || self == .encryptedSevenZip || self == .encryptedDmg }
+    var isDiskImage: Bool { self == .dmg || self == .encryptedDmg }
     var isExtraction: Bool { self == .extract || self == .extractAndDelete }
 }
 
@@ -41,12 +46,31 @@ nonisolated enum ArchiveCompressionFormat: String, CaseIterable, Sendable {
     case zip = "ZIP"
     case sevenZip = "7Z"
     case tarGzip = "TAR.GZ"
+    case dmg = "DMG"
+
+    static var archiveFormats: [Self] { allCases.filter { $0 != .dmg } }
+    var supportsVolumes: Bool { self == .zip || self == .sevenZip }
+    var supportsPassword: Bool { self != .tarGzip }
 
     func operation(encrypted: Bool) -> ArchiveOperation {
         switch self {
         case .zip: encrypted ? .encryptedZip : .zip
         case .sevenZip: encrypted ? .encryptedSevenZip : .sevenZip
         case .tarGzip: .tarGzip
+        case .dmg: encrypted ? .encryptedDmg : .dmg
+        }
+    }
+}
+
+nonisolated enum ArchiveDiskImageFormat: String, CaseIterable, Sendable {
+    case lzfse = "ULFO", zlib = "UDZO", lzma = "ULMO", readOnly = "UDRO"
+
+    var title: String {
+        switch self {
+        case .lzfse: "ULFO (LZFSE)"
+        case .zlib: "UDZO (Zlib)"
+        case .lzma: "ULMO (LZMA)"
+        case .readOnly: AppLocalization.localized("UDRO (Uncompressed)")
         }
     }
 }
@@ -129,15 +153,17 @@ nonisolated struct ArchiveCompressionSettings: Sendable {
     var exclusionList = defaultExclusionList
     /// Zero selects the available logical CPU count.
     var threadCount = 0
+    var excludeMacResourceFiles = false
 
     var effectiveThreadCount: Int {
         threadCount <= 0 ? Self.maximumThreadCount : min(threadCount, Self.maximumThreadCount)
     }
 
     var exclusionPatterns: [String] {
-        guard excludeFiles else { return [] }
+        let list = (excludeFiles ? exclusionList : "")
+            + (excludeMacResourceFiles ? "\n.DS_Store\n__MACOSX\n._*" : "")
         var seen = Set<String>()
-        return exclusionList.components(separatedBy: .newlines).compactMap { line in
+        return list.components(separatedBy: .newlines).compactMap { line in
             let pattern = line.trimmingCharacters(in: .whitespaces)
             guard !pattern.isEmpty, !pattern.contains("\0"), seen.insert(pattern).inserted else { return nil }
             return pattern
@@ -163,6 +189,12 @@ nonisolated struct ArchiveRequest: Sendable {
     /// Destructive compression shortcuts remove inputs only after the staged
     /// archive has passed verification and the finished output is published.
     var deletesSourcesAfterSuccess = false
+    var excludeMacResourceFiles: Bool? = nil
+    var zipUsesAES256 = true
+    var encryptFileNames = true
+    var windowsSelfExtracting = false
+    var diskImageFormat = ArchiveDiskImageFormat.lzfse
+    var volumeName = ""
 }
 
 nonisolated enum ArchiveError: LocalizedError, Equatable {
@@ -367,9 +399,17 @@ nonisolated final class ArchiveProgress: @unchecked Sendable {
 
     private func consumePercentage(_ text: String) {
         let text = text.trimmingCharacters(in: .whitespaces)
-        let digits = text.prefix(while: { $0.isASCII && $0.isNumber })
-        guard !digits.isEmpty, text.dropFirst(digits.count).first == "%",
-              let percent = Double(digits), percent <= 100 else { return }
+        let percent: Double
+        if text.hasPrefix("PERCENT:") {
+            guard let value = Double(text.dropFirst(8).trimmingCharacters(in: .whitespaces)),
+                  value.isFinite, (0...100).contains(value) else { return }
+            percent = value
+        } else {
+            let digits = text.prefix(while: { $0.isASCII && $0.isNumber })
+            guard !digits.isEmpty, text.dropFirst(digits.count).first == "%",
+                  let value = Double(digits), value <= 100 else { return }
+            percent = value
+        }
         let fraction = percent / 100
         if let nativeFraction, fraction <= nativeFraction { return }
         nativeFraction = fraction
@@ -401,6 +441,11 @@ nonisolated enum ArchiveService {
             try Task.checkCancellation()
             if let error = request.error { throw ArchiveError.failed(error) }
             guard request.operation != .compress else { throw ArchiveError.configurationRequired }
+            var settings = settings
+            if let exclude = request.excludeMacResourceFiles { settings.excludeMacResourceFiles = exclude }
+            if request.windowsSelfExtracting && (![.sevenZip, .encryptedSevenZip].contains(request.operation) || request.volumeSize != nil) {
+                throw ArchiveError.failed(AppLocalization.localized("Windows self-extracting archives require 7Z without split volumes."))
+            }
             if let volumeSize = request.volumeSize {
                 guard volumeSize > 0, volumeSize <= Int64.max else { throw ArchiveError.invalidVolumeSize }
                 guard [.zip, .sevenZip, .encryptedZip, .encryptedSevenZip].contains(request.operation) else {
@@ -461,7 +506,11 @@ nonisolated enum ArchiveService {
             let staging = parent.appendingPathComponent(".oneclick-archive-\(UUID().uuidString)", isDirectory: true)
             try fm.createDirectory(at: staging, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
             defer { try? fm.removeItem(at: staging) }
-            let result: URL
+            if request.operation.isDiskImage {
+                return try createDiskImage(request, password: password, staging: staging,
+                                           sourceSnapshot: sourceSnapshot, progress: progress)
+            }
+            var result: URL
             let name: String
             let ext: String
             let arguments: [String]
@@ -487,14 +536,15 @@ nonisolated enum ArchiveService {
                 useSevenZip = request.operation != .tarGzip
                 result = staging.appendingPathComponent(useSevenZip ? "archive." + request.operation.fileExtension : "archive")
                 name = request.urls.count == 1 ? first.lastPathComponent : AppLocalization.localized("Archive")
-                ext = "." + request.operation.fileExtension
+                ext = request.windowsSelfExtracting ? ".exe" : "." + request.operation.fileExtension
                 // ./ also prevents bsdtar's special @archive syntax and options
                 // from interpreting filenames such as @file or -file.
                 if useSevenZip {
                     let isZIP = request.operation == .zip || request.operation == .encryptedZip
                     let formatOptions = [isZIP ? "-tzip" : "-t7z", "-mmt=\(settings.effectiveThreadCount)"]
                     let encryption = request.operation.isEncryptedCompression
-                        ? (isZIP ? ["-mem=AES256", "-p"] : ["-mhe=on", "-p"]) : []
+                        ? (isZIP ? [request.zipUsesAES256 ? "-mem=AES256" : "-mem=ZipCrypto", "-p"]
+                           : [request.encryptFileNames ? "-mhe=on" : "-mhe=off", "-p"]) : []
                     let level = request.compressionLevel.map { ["-mx=\($0.rawValue)"] } ?? []
                     let exclusions = settings.exclusionPatterns.map { "-xr!" + $0 }
                     let volumes = request.volumeSize.map { ["-v\($0)b"] } ?? []
@@ -503,7 +553,8 @@ nonisolated enum ArchiveService {
                         + request.urls.map { "./" + $0.lastPathComponent }
                 } else {
                     let exclusions = settings.exclusionPatterns.flatMap { ["--exclude", $0] }
-                    arguments = ["-cvf", "-", "--format", "pax"] + exclusions + ["-C", parent.path, "--"]
+                    let metadata = settings.excludeMacResourceFiles ? ["--no-mac-metadata", "--no-xattrs"] : []
+                    arguments = ["-cvf", "-", "--format", "pax"] + exclusions + metadata + ["-C", parent.path, "--"]
                         + request.urls.map { "./" + $0.lastPathComponent }
                 }
             }
@@ -541,6 +592,11 @@ nonisolated enum ArchiveService {
                     // must never authorize deleting the originals.
                     deletionError = error
                 }
+            }
+            if request.windowsSelfExtracting {
+                result = try makeWindowsSelfExtracting(result)
+                // Test the final executable container as well as the 7Z payload.
+                try verifyArchive(at: result, operation: request.operation, password: password, progress: progress)
             }
             // Reserve each destination with an exclusive rename. A separate
             // existence check followed by rename can overwrite a concurrent job.
@@ -587,6 +643,112 @@ nonisolated enum ArchiveService {
         ["zip", "zip.001", "zipx", "7z", "7z.001", "rar", "jar", "war", "apk", "ipa", "xpi"].contains(ArchiveFormat.suffix(for: url) ?? "")
     }
 
+    private static func makeWindowsSelfExtracting(_ archive: URL) throws -> URL {
+        let module = Bundle.main.bundleURL.appendingPathComponent("Contents/Resources/7zip/7z.sfx")
+        guard FileManager.default.fileExists(atPath: module.path) else { throw ArchiveError.toolUnavailable }
+        let result = archive.deletingPathExtension().appendingPathExtension("exe")
+        guard FileManager.default.createFile(atPath: result.path, contents: nil) else { throw CocoaError(.fileWriteUnknown) }
+        let output = try FileHandle(forWritingTo: result)
+        defer { try? output.close() }
+        for source in [module, archive] {
+            let input = try FileHandle(forReadingFrom: source)
+            defer { try? input.close() }
+            while let data = try input.read(upToCount: 1_048_576), !data.isEmpty {
+                try Task.checkCancellation()
+                try output.write(contentsOf: data)
+            }
+        }
+        return result
+    }
+
+    static func isValidVolumeName(_ name: String) -> Bool {
+        name.utf8.count <= 255 && !name.contains { $0 == "/" || $0 == ":" || $0.isNewline || $0 == "\0" }
+            && name != "." && name != ".."
+    }
+
+    private static func createDiskImage(_ request: ArchiveRequest, password: String?, staging: URL,
+                                       sourceSnapshot: ArchiveSourceSnapshot?, progress: ArchiveProgress) throws -> URL {
+        let fm = FileManager.default
+        guard isValidVolumeName(request.volumeName), let first = request.urls.first else {
+            throw ArchiveError.failed(AppLocalization.localized("Enter a volume name without slashes, colons or line breaks (up to 255 UTF-8 bytes)."))
+        }
+        let parent = first.deletingLastPathComponent()
+        let payload = staging.appendingPathComponent("contents", isDirectory: true)
+        try fm.createDirectory(at: payload, withIntermediateDirectories: false)
+        for source in request.urls {
+            try Task.checkCancellation()
+            try fm.copyItem(at: source, to: payload.appendingPathComponent(source.lastPathComponent))
+        }
+        let result = staging.appendingPathComponent("archive.dmg")
+        let name = request.urls.count == 1 ? first.lastPathComponent : AppLocalization.localized("Archive")
+        let defaultName = String(name.prefix(60))
+        let volumeName = request.volumeName.isEmpty
+            ? (isValidVolumeName(defaultName) ? defaultName : AppLocalization.localized("Archive"))
+            : request.volumeName
+        let format = request.compressionLevel == .store ? ArchiveDiskImageFormat.readOnly : request.diskImageFormat
+        var arguments = ["create", "-srcfolder", payload.path, "-volname", volumeName,
+                         "-fs", "HFS+", "-format", format.rawValue, "-puppetstrings"]
+        if format == .zlib {
+            arguments += ["-imagekey", "zlib-level=\(request.compressionLevel?.rawValue ?? 5)"]
+        }
+        if password != nil { arguments += ["-encryption", "AES-256", "-stdinpass"] }
+        arguments.append(result.path)
+        try run(executable: URL(fileURLWithPath: "/usr/bin/hdiutil"), arguments: arguments,
+                directory: parent, password: password, progress: progress, passwordTerminator: "\0")
+        if request.verifyAfterCompression || request.deletesSourcesAfterSuccess {
+            try verifyArchive(at: result, operation: request.operation, password: password, progress: progress)
+        }
+        var deletionError: Error?
+        if let sourceSnapshot {
+            // Read the actual image before authorizing deletion of any original.
+            let mount = staging.appendingPathComponent("mounted", isDirectory: true)
+            try fm.createDirectory(at: mount, withIntermediateDirectories: false)
+            var needsDetach = true
+            defer {
+                // Use a separate progress object so cancellation cannot prevent unmounting.
+                if needsDetach {
+                    try? run(executable: URL(fileURLWithPath: "/usr/bin/hdiutil"),
+                             arguments: ["detach", "-force", mount.path], directory: parent,
+                             password: nil, progress: ArchiveProgress())
+                }
+            }
+            do {
+                var attach = ["attach", result.path, "-readonly", "-nobrowse", "-mountpoint", mount.path]
+                if password != nil { attach.append("-stdinpass") }
+                try run(executable: URL(fileURLWithPath: "/usr/bin/hdiutil"), arguments: attach,
+                        directory: parent, password: password, progress: progress, passwordTerminator: "\0")
+                let sources = try fm.contentsOfDirectory(at: mount, includingPropertiesForKeys: nil)
+                try sourceSnapshot.requireCoverage(in: compressionEntries(sources, settings: .init()), relativeTo: parent)
+                try run(executable: URL(fileURLWithPath: "/usr/bin/hdiutil"),
+                        arguments: ["detach", mount.path], directory: parent, password: nil, progress: ArchiveProgress())
+                needsDetach = false
+            } catch is CancellationError { throw CancellationError() }
+            catch { deletionError = error }
+        }
+        var published: URL?
+        for index in 0...10_000 {
+            try Task.checkCancellation()
+            let suffix = index == 0 ? "" : " (\(index + 1))"
+            let destination = parent.appendingPathComponent(name + suffix + ".dmg")
+            do {
+                try moveExclusively(from: result, to: destination)
+                published = destination
+                break
+            } catch let error as CocoaError where error.code == .fileWriteFileExists { continue }
+        }
+        guard let published else { throw CocoaError(.fileWriteFileExists) }
+        if request.deletesSourcesAfterSuccess {
+            do {
+                try Task.checkCancellation()
+                if let deletionError { throw deletionError }
+                try sourceSnapshot?.removeUnchanged()
+            } catch is CancellationError { return published }
+            catch { throw ArchiveError.sourceDeletionFailed(output: published, detail: error.localizedDescription) }
+        }
+        progress.complete()
+        return published
+    }
+
     private static func compressionEntries(_ urls: [URL], settings: ArchiveCompressionSettings) throws -> [ArchiveEntry] {
         guard let parent = urls.first?.deletingLastPathComponent() else { return [] }
         let keys: Set<URLResourceKey> = [.isDirectoryKey, .isSymbolicLinkKey, .fileSizeKey]
@@ -628,7 +790,12 @@ nonisolated enum ArchiveService {
         let directory = archive.deletingLastPathComponent()
         do {
             try Task.checkCancellation()
-            if operation == .tarGzip {
+            if operation.isDiskImage {
+                var arguments = ["verify", archive.path, "-puppetstrings"]
+                if password != nil { arguments.append("-stdinpass") }
+                try run(executable: URL(fileURLWithPath: "/usr/bin/hdiutil"), arguments: arguments,
+                        directory: directory, password: password, progress: progress, passwordTerminator: "\0")
+            } else if operation == .tarGzip {
                 // Validate gzip's payload CRC as well as the enclosed TAR structure.
                 try run(executable: URL(fileURLWithPath: "/usr/bin/gzip"), arguments: ["-t", "--", archive.path],
                         directory: directory, password: nil, progress: progress)
@@ -851,7 +1018,7 @@ nonisolated enum ArchiveService {
     }
 
     private static func run(executable: URL, arguments: [String], directory: URL,
-                            password: String?, progress: ArchiveProgress) throws {
+                            password: String?, progress: ArchiveProgress, passwordTerminator: String = "\n") throws {
         let process = Process()
         process.executableURL = executable
         process.arguments = arguments
@@ -863,7 +1030,7 @@ nonisolated enum ArchiveService {
             let pipe = Pipe()
             // Preload a bounded line before spawning. This avoids a broken-pipe
             // signal if the tool exits before it reads the password.
-            try pipe.fileHandleForWriting.write(contentsOf: Data((password + "\n").utf8))
+            try pipe.fileHandleForWriting.write(contentsOf: Data((password + passwordTerminator).utf8))
             try pipe.fileHandleForWriting.close()
             process.standardInput = pipe.fileHandleForReading
             input = pipe

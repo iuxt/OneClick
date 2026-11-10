@@ -21,6 +21,32 @@ struct ArchiveViewModelTests {
         #expect(form.level == .store)
     }
 
+    @Test func separateCompressionPreservesAllOptionsAndDeletesOnlyVerifiedSources() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("oneclick-separate-\(UUID())")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let sources = ["first.txt", "second.txt"].map { root.appendingPathComponent($0) }
+        for source in sources { try Data(source.lastPathComponent.utf8).write(to: source) }
+        let model = ArchiveViewModel(requests: [.init(operation: .compress, urls: sources)])
+        model.submitCompression(for: 0, format: .sevenZip, level: .fast, password: "password",
+                                solid: false, verifyAfterCompression: true, excludeMacResourceFiles: true,
+                                deletesSourcesAfterSuccess: true, separately: true, encryptFileNames: false)
+        try await waitUntilIdle(model)
+        #expect(model.rows.count == 2)
+        #expect(model.shouldCloseAutomatically)
+        for row in model.rows {
+            #expect(row.request.urls.count == 1)
+            #expect(row.request.solid == false)
+            #expect(row.request.encryptFileNames == false)
+            #expect(row.request.excludeMacResourceFiles == true)
+            #expect(!FileManager.default.fileExists(atPath: row.request.urls[0].path))
+            let archive = try #require(row.output)
+            let extracted = try await ArchiveService.perform(.init(operation: .extract, urls: [archive]), password: "password")
+            #expect(try String(contentsOf: extracted.appendingPathComponent(row.request.urls[0].lastPathComponent), encoding: .utf8)
+                    == row.request.urls[0].lastPathComponent)
+        }
+    }
+
     @Test func progressDoesNotInvalidateBatchAndPendingPromptTracksCancellation() {
         let model = ArchiveViewModel(requests: (0..<1000).map { _ in
             ArchiveRequest(operation: .compress, urls: [URL(fileURLWithPath: "/tmp/file")])
@@ -252,7 +278,7 @@ struct ArchiveViewModelTests {
         #expect(!FileManager.default.fileExists(atPath: output.appendingPathComponent("project/.DS_Store").path))
     }
 
-    @Test(arguments: ArchiveCompressionFormat.allCases, [false, true])
+    @Test(arguments: ArchiveCompressionFormat.archiveFormats, [false, true])
     func configurableCompressionWaitsForSubmission(format: ArchiveCompressionFormat, encrypted: Bool) async throws {
         if format == .tarGzip && encrypted { return }
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("oneclick-options-\(UUID())")

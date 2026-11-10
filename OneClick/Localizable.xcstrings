@@ -1,6 +1,652 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+"Compression level is available for Zlib disk images only." : {
+  "localizations": {
+    "en": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Compression level is available for Zlib disk images only."
+      }
+    },
+    "zh-Hans": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "仅 Zlib 格式的磁盘映像支持调整压缩级别。"
+      }
+    },
+    "ja": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "圧縮レベルを調整できるのはZlib形式のディスクイメージのみです。"
+      }
+    },
+    "es": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "El nivel de compresión solo se puede ajustar en imágenes de disco Zlib."
+      }
+    },
+    "fr": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Le niveau de compression est disponible uniquement pour les images disque Zlib."
+      }
+    }
+  }
+},
+"Create Disk Image" : {
+  "localizations": {
+    "en": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Create Disk Image"
+      }
+    },
+    "zh-Hans": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "创建磁盘映像"
+      }
+    },
+    "ja": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "ディスクイメージを作成"
+      }
+    },
+    "es": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Crear imagen de disco"
+      }
+    },
+    "fr": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Créer une image disque"
+      }
+    }
+  }
+},
+"UDRO (Uncompressed)" : {
+  "localizations": {
+    "en": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "UDRO (Uncompressed)"
+      }
+    },
+    "zh-Hans": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "UDRO（不压缩）"
+      }
+    },
+    "ja": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "UDRO（非圧縮）"
+      }
+    },
+    "es": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "UDRO (sin compresión)"
+      }
+    },
+    "fr": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "UDRO (sans compression)"
+      }
+    }
+  }
+},
+"Volume Name" : {
+  "localizations": {
+    "en": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Volume Name"
+      }
+    },
+    "zh-Hans": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "卷名"
+      }
+    },
+    "ja": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "ボリューム名"
+      }
+    },
+    "es": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Nombre del volumen"
+      }
+    },
+    "fr": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Nom du volume"
+      }
+    }
+  }
+},
+"Custom Name" : {
+  "localizations": {
+    "en": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Custom Name"
+      }
+    },
+    "zh-Hans": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "自定义名称"
+      }
+    },
+    "ja": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "カスタム名"
+      }
+    },
+    "es": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Nombre personalizado"
+      }
+    },
+    "fr": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Nom personnalisé"
+      }
+    }
+  }
+},
+"Split Volume Size" : {
+  "localizations": {
+    "en": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Split Volume Size"
+      }
+    },
+    "zh-Hans": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "分卷"
+      }
+    },
+    "ja": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "分割サイズ"
+      }
+    },
+    "es": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Tamaño de las partes"
+      }
+    },
+    "fr": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Taille des volumes fractionnés"
+      }
+    }
+  }
+},
+"e.g. 5 MB" : {
+  "localizations": {
+    "en": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "e.g. 5 MB"
+      }
+    },
+    "zh-Hans": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "例如：5 MB"
+      }
+    },
+    "ja": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "例：5 MB"
+      }
+    },
+    "es": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "p. ej., 5 MB"
+      }
+    },
+    "fr": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "p. ex. 5 MB"
+      }
+    }
+  }
+},
+"Do Not Split" : {
+  "localizations": {
+    "en": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Do Not Split"
+      }
+    },
+    "zh-Hans": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "不分卷"
+      }
+    },
+    "ja": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "分割しない"
+      }
+    },
+    "es": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "No dividir"
+      }
+    },
+    "fr": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Ne pas fractionner"
+      }
+    }
+  }
+},
+"Disk Image Format" : {
+  "localizations": {
+    "en": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Disk Image Format"
+      }
+    },
+    "zh-Hans": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "映像格式"
+      }
+    },
+    "ja": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "イメージ形式"
+      }
+    },
+    "es": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Formato de imagen"
+      }
+    },
+    "fr": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Format de l’image disque"
+      }
+    }
+  }
+},
+"Use AES-256 Encryption" : {
+  "localizations": {
+    "en": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Use AES-256 Encryption"
+      }
+    },
+    "zh-Hans": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "使用 AES-256 加密"
+      }
+    },
+    "ja": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "AES-256で暗号化"
+      }
+    },
+    "es": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Usar cifrado AES-256"
+      }
+    },
+    "fr": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Utiliser le chiffrement AES-256"
+      }
+    }
+  }
+},
+"Encrypt File Names" : {
+  "localizations": {
+    "en": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Encrypt File Names"
+      }
+    },
+    "zh-Hans": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "加密文件名"
+      }
+    },
+    "ja": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "ファイル名を暗号化"
+      }
+    },
+    "es": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Cifrar nombres de archivo"
+      }
+    },
+    "fr": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Chiffrer les noms de fichiers"
+      }
+    }
+  }
+},
+"Windows Self-Extracting Archive" : {
+  "localizations": {
+    "en": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Windows Self-Extracting Archive"
+      }
+    },
+    "zh-Hans": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Windows 自解压文件"
+      }
+    },
+    "ja": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Windows自己解凍形式"
+      }
+    },
+    "es": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Archivo autoextraíble para Windows"
+      }
+    },
+    "fr": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Archive auto-extractible Windows"
+      }
+    }
+  }
+},
+"Exclude Mac Resource Files" : {
+  "localizations": {
+    "en": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Exclude Mac Resource Files"
+      }
+    },
+    "zh-Hans": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "排除 Mac 资源文件"
+      }
+    },
+    "ja": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Macリソースファイルを除外"
+      }
+    },
+    "es": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Excluir archivos de recursos de Mac"
+      }
+    },
+    "fr": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Exclure les fichiers de ressources Mac"
+      }
+    }
+  }
+},
+"Delete Source Files After Compression" : {
+  "localizations": {
+    "en": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Delete Source Files After Compression"
+      }
+    },
+    "zh-Hans": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "压缩完成后删除源文件"
+      }
+    },
+    "ja": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "圧縮後に元のファイルを削除"
+      }
+    },
+    "es": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Eliminar archivos originales al comprimir"
+      }
+    },
+    "fr": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Supprimer les fichiers sources après la compression"
+      }
+    }
+  }
+},
+"Compress Each Item Separately" : {
+  "localizations": {
+    "en": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Compress Each Item Separately"
+      }
+    },
+    "zh-Hans": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "分别压缩每个文件"
+      }
+    },
+    "ja": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "各項目を個別に圧縮"
+      }
+    },
+    "es": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Comprimir cada elemento por separado"
+      }
+    },
+    "fr": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Compresser chaque élément séparément"
+      }
+    }
+  }
+},
+"Show Password" : {
+  "localizations": {
+    "en": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Show Password"
+      }
+    },
+    "zh-Hans": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "显示密码"
+      }
+    },
+    "ja": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "パスワードを表示"
+      }
+    },
+    "es": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Mostrar contraseña"
+      }
+    },
+    "fr": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Afficher le mot de passe"
+      }
+    }
+  }
+},
+"Hide Password" : {
+  "localizations": {
+    "en": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Hide Password"
+      }
+    },
+    "zh-Hans": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "隐藏密码"
+      }
+    },
+    "ja": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "パスワードを隠す"
+      }
+    },
+    "es": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Ocultar contraseña"
+      }
+    },
+    "fr": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Masquer le mot de passe"
+      }
+    }
+  }
+},
+"Windows self-extracting archives require 7Z without split volumes." : {
+  "localizations": {
+    "en": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Windows self-extracting archives require 7Z without split volumes."
+      }
+    },
+    "zh-Hans": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Windows 自解压文件仅支持不分卷的 7Z 格式。"
+      }
+    },
+    "ja": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Windows自己解凍形式では、分割しない7Z形式を選択してください。"
+      }
+    },
+    "es": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Los archivos autoextraíbles para Windows requieren 7Z sin división en partes."
+      }
+    },
+    "fr": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Les archives auto-extractibles Windows nécessitent le format 7Z sans volumes fractionnés."
+      }
+    }
+  }
+},
+"Enter a volume name without slashes, colons or line breaks (up to 255 UTF-8 bytes)." : {
+  "localizations": {
+    "en": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Enter a volume name without slashes, colons or line breaks (up to 255 UTF-8 bytes)."
+      }
+    },
+    "zh-Hans": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "卷名不能包含斜杠、冒号或换行，且不能超过 255 个 UTF-8 字节。"
+      }
+    },
+    "ja": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "ボリューム名はスラッシュ、コロン、改行を含まない255 UTF-8バイト以内にしてください。"
+      }
+    },
+    "es": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Escribe un nombre de volumen sin barras, dos puntos ni saltos de línea (hasta 255 bytes UTF-8)."
+      }
+    },
+    "fr": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Saisissez un nom de volume sans barres obliques, deux-points ni sauts de ligne (255 octets UTF-8 maximum)."
+      }
+    }
+  }
+},
 
 "All" : {
   "localizations": {

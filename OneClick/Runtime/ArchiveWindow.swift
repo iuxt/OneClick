@@ -34,14 +34,28 @@ private final class ArchiveWindowController: NSWindowController, NSWindowDelegat
         model = ArchiveViewModel(requests: requests)
         self.onClose = onClose
         let window = NSWindow()
-        window.contentViewController = NSHostingController(rootView: ArchiveView(model: model) { [weak window] in
-            window?.performClose(nil)
-        })
+        let sizesToContent = model.rows.contains { $0.needsConfiguration }
+        let minimumWidth: CGFloat = sizesToContent ? 440 : 500
         window.title = AppLocalization.localized("Archives")
-        window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
+        window.styleMask = sizesToContent
+            ? [.titled, .closable, .miniaturizable]
+            : [.titled, .closable, .miniaturizable, .resizable]
         window.applyOneClickChrome()
-        window.setContentSize(NSSize(width: 520, height: model.preferredWindowHeight))
-        window.contentMinSize = NSSize(width: 500, height: 280)
+        let screenHeight = (window.screen ?? NSScreen.main)?.visibleFrame.height ?? 800
+        let titlebarHeight = window.frameRect(forContentRect: .zero).height
+        window.contentViewController = NSHostingController(rootView: ArchiveView(
+            model: model,
+            maximumContentHeight: max(280, screenHeight - titlebarHeight),
+            contentHeightChanged: { [weak window, weak model = model] height in
+                guard let window, let model, !model.isRunning,
+                      model.pendingRow?.needsConfiguration == true else { return }
+                Self.setContentHeight(height, for: window)
+            },
+            close: { [weak window] in window?.performClose(nil) },
+            minimumContentWidth: minimumWidth
+        ))
+        window.setContentSize(NSSize(width: sizesToContent ? 440 : 520, height: model.preferredWindowHeight))
+        window.contentMinSize = NSSize(width: minimumWidth, height: 280)
         window.center()
         super.init(window: window)
         window.delegate = self
@@ -64,24 +78,40 @@ private final class ArchiveWindowController: NSWindowController, NSWindowDelegat
                 window.title = running
                     ? AppLocalization.localized(operation?.isExtraction == true ? "Extracting…" : "Processing archive…")
                     : AppLocalization.localized("Archives")
-                window.contentMinSize = NSSize(width: 500, height: running ? height : 280)
+                window.contentMinSize = NSSize(width: minimumWidth, height: running ? height : 280)
                 window.contentMaxSize = NSSize(
                     width: CGFloat.greatestFiniteMagnitude,
                     height: running ? height : CGFloat.greatestFiniteMagnitude
                 )
-                let size = NSSize(width: window.contentLayoutRect.width, height: height)
-                var frame = window.frameRect(forContentRect: NSRect(origin: .zero, size: size))
-                frame.origin = NSPoint(x: window.frame.minX, y: window.frame.maxY - frame.height)
+                // The configuration view measures its actual content, including
+                // options and validation messages that do not change the rows.
+                guard running || !rows.contains(where: { $0.needsConfiguration }) else { return }
                 // The form disappears in the same update that progress appears.
                 // Animating that large height change exposes an empty intermediate
                 // frame, which reads as a flash when the user clicks Compress.
-                window.setFrame(frame, display: true, animate: window.isVisible && !running)
+                Self.setContentHeight(height, for: window, animate: window.isVisible && !running)
             }
     }
 
     required init?(coder: NSCoder) { nil }
 
+    private static func setContentHeight(_ height: CGFloat, for window: NSWindow, animate: Bool = false) {
+        let size = NSSize(width: window.contentLayoutRect.width, height: ceil(height))
+        var frame = window.frameRect(forContentRect: NSRect(origin: .zero, size: size))
+        guard abs(frame.height - window.frame.height) > 0.5 else { return }
+        frame.origin = NSPoint(x: window.frame.minX, y: window.frame.maxY - frame.height)
+        if let screen = window.screen, frame.minY < screen.visibleFrame.minY {
+            frame.origin.y = screen.visibleFrame.minY
+        }
+        window.setFrame(frame, display: true, animate: animate)
+    }
+
     func windowWillClose(_ notification: Notification) {
+        // Cancellation publishes row changes synchronously. Stop sizing and
+        // hide the window before those changes replace the form/progress UI.
+        sizing?.cancel()
+        sizing = nil
+        window?.orderOut(nil)
         model.cancel()
         onClose()
     }
@@ -188,10 +218,14 @@ final class ArchiveViewModel: ObservableObject {
 
     func submitCompression(for index: Int, format: ArchiveCompressionFormat,
                            level: ArchiveCompressionLevel, password: String?,
-                           volumeSize: UInt64? = nil, solid: Bool? = nil, verifyAfterCompression: Bool = false) {
+                           volumeSize: UInt64? = nil, solid: Bool? = nil, verifyAfterCompression: Bool = false,
+                           excludeMacResourceFiles: Bool? = nil, deletesSourcesAfterSuccess: Bool = false,
+                           separately: Bool = false, zipUsesAES256: Bool = true, encryptFileNames: Bool = true,
+                           windowsSelfExtracting: Bool = false, diskImageFormat: ArchiveDiskImageFormat = .lzfse,
+                           volumeName: String = "") {
         guard !isRunning, rows.indices.contains(index), rows[index].needsConfiguration else { return }
         // Never silently discard a requested password for an unsupported format.
-        guard format != .tarGzip || password == nil else {
+        guard format.supportsPassword || password == nil else {
             rows[index].error = ArchiveError.encryptionNotSupported.localizedDescription
             return
         }
@@ -199,7 +233,7 @@ final class ArchiveViewModel: ObservableObject {
             rows[index].error = ArchiveError.invalidVolumeSize.localizedDescription
             return
         }
-        guard format != .tarGzip || volumeSize == nil else {
+        guard format.supportsVolumes || volumeSize == nil else {
             rows[index].error = ArchiveError.splittingNotSupported.localizedDescription
             return
         }
@@ -207,16 +241,34 @@ final class ArchiveViewModel: ObservableObject {
             rows[index].error = ArchiveError.solidNotSupported.localizedDescription
             return
         }
-        let request = ArchiveRequest(operation: format.operation(encrypted: password != nil),
-                                     urls: rows[index].request.urls, compressionLevel: level,
-                                     volumeSize: volumeSize, solid: solid, verifyAfterCompression: verifyAfterCompression)
-        run(indices: [index], password: password) {
+        guard !windowsSelfExtracting || (format == .sevenZip && volumeSize == nil) else {
+            rows[index].error = AppLocalization.localized("Windows self-extracting archives require 7Z without split volumes.")
+            return
+        }
+        let original = rows[index].request
+        let groups = separately ? original.urls.map { [$0] } : [original.urls]
+        let requests = groups.map { urls in
+            ArchiveRequest(operation: format.operation(encrypted: password != nil), urls: urls,
+                           compressionLevel: level, volumeSize: volumeSize, solid: solid,
+                           verifyAfterCompression: verifyAfterCompression,
+                           deletesSourcesAfterSuccess: deletesSourcesAfterSuccess || original.deletesSourcesAfterSuccess,
+                           excludeMacResourceFiles: format == .dmg ? nil : excludeMacResourceFiles,
+                           zipUsesAES256: zipUsesAES256, encryptFileNames: encryptFileNames,
+                           windowsSelfExtracting: windowsSelfExtracting, diskImageFormat: diskImageFormat,
+                           volumeName: volumeName)
+        }
+        guard let request = requests.first else { return }
+        let newIndices = Array(rows.count..<(rows.count + requests.count - 1))
+        run(indices: [index] + newIndices, password: password) {
             // Enter the running state before removing the form. Window sizing
             // then observes one direct configuration-to-progress transition
             // instead of briefly expanding the intermediate result layout.
             self.rows[index].request = request
             self.rows[index].error = nil
             self.rows[index].needsConfiguration = false
+            for (id, request) in zip(newIndices, requests.dropFirst()) {
+                self.rows.append(Row(id: id, request: request))
+            }
             self.refreshPendingRow()
         }
     }
@@ -340,14 +392,44 @@ struct ArchiveFormState {
     var volumeUnit = ArchiveVolumeUnit.mebibytes
     var solid = true
     var verifyAfterCompression = false
+    var excludeMacResourceFiles = true
+    var deletesSourcesAfterSuccess = false
+    var separately = false
+    var zipUsesAES256 = true
+    var encryptFileNames = true
+    var windowsSelfExtracting = false
+    var diskImageFormat = ArchiveDiskImageFormat.lzfse
+    var volumeName = ""
+    var volumeSizeText = ""
 
     var volumeSize: UInt64? {
-        guard splitVolumes, format != .tarGzip else { return nil }
+        guard format.supportsVolumes, !windowsSelfExtracting else { return nil }
+        if !volumeSizeText.trimmingCharacters(in: .whitespaces).isEmpty {
+            return Self.parseVolumeSize(volumeSizeText)
+        }
+        guard splitVolumes else { return nil }
         return volumePreset.bytes ?? volumeUnit.bytes(for: customVolumeSize)
     }
 
     var volumeSizeError: String? {
-        splitVolumes && format != .tarGzip && volumeSize == nil ? ArchiveError.invalidVolumeSize.localizedDescription : nil
+        (splitVolumes || !volumeSizeText.trimmingCharacters(in: .whitespaces).isEmpty)
+            && format.supportsVolumes && !windowsSelfExtracting && volumeSize == nil
+            ? ArchiveError.invalidVolumeSize.localizedDescription : nil
+    }
+
+    static func parseVolumeSize(_ text: String) -> UInt64? {
+        let value = text.trimmingCharacters(in: .whitespaces).uppercased()
+        let units: [(String, Double)] = [("GIB", 1_073_741_824), ("MIB", 1_048_576), ("KIB", 1_024),
+                                         ("GB", 1_000_000_000), ("MB", 1_000_000), ("KB", 1_000), ("B", 1)]
+        for (suffix, multiplier) in units where value.hasSuffix(suffix) {
+            let number = value.dropLast(suffix.count).trimmingCharacters(in: .whitespaces)
+            guard !number.isEmpty, number.allSatisfy({ $0.isASCII && ($0.isNumber || $0 == ".") }),
+                  let amount = Double(number), amount.isFinite else { return nil }
+            let bytes = amount * multiplier
+            guard bytes >= 1, bytes < Double(Int64.max), bytes.rounded(.down) == bytes else { return nil }
+            return UInt64(bytes)
+        }
+        return ArchiveVolumeUnit.bytes.bytes(for: value)
     }
 
     var passwordError: String? {
@@ -365,7 +447,8 @@ struct ArchiveFormState {
     }
 
     var canCompress: Bool {
-        volumeSizeError == nil && (!encrypted || (!password.isEmpty && password == confirmation && passwordError == nil && format != .tarGzip))
+        volumeSizeError == nil && (format != .dmg || ArchiveService.isValidVolumeName(volumeName))
+            && (!encrypted || (!password.isEmpty && password == confirmation && passwordError == nil && format.supportsPassword))
     }
 
     func canSubmitPassword(for operation: ArchiveOperation) -> Bool {
@@ -379,10 +462,15 @@ struct ArchiveFormState {
     }
 }
 
-private struct ArchiveView: View {
+struct ArchiveView: View {
     @ObservedObject var model: ArchiveViewModel
+    let maximumContentHeight: CGFloat
+    let contentHeightChanged: (CGFloat) -> Void
     let close: () -> Void
-    @State private var form = ArchiveFormState()
+    var minimumContentWidth: CGFloat = 500
+    @State var form = ArchiveFormState()
+    @State private var rowsHeight: CGFloat = 0
+    @State private var footerHeight: CGFloat = 0
 
     // A batch can request different passwords. Resolve one pending prompt at a time,
     // while keeping completed results and the remaining queue visible.
@@ -412,36 +500,30 @@ private struct ArchiveView: View {
                     .padding(.horizontal, 20)
                     .padding(.vertical, 12)
             } else {
-                if pendingRow?.needsConfiguration == true {
-                    HStack {
-                        Spacer()
-                        Picker(AppLocalization.localized("Archive Format"), selection: $form.format) {
-                            ForEach(ArchiveCompressionFormat.allCases, id: \.self) { format in
-                                Text(verbatim: format.rawValue).tag(format)
-                            }
-                        }
-                        .labelsHidden()
-                        .frame(width: 130)
-                        .controlSize(.large)
-                        .disabled(model.isRunning)
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                }
-
                 ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 14) {
-                        ForEach(model.rows) { row in
-                            archiveRow(row)
-                            if row.id != model.rows.last?.id {
-                                Divider()
-                            }
+                    if pendingRow?.needsConfiguration == true {
+                        // Measure every configuration row; a lazy stack only
+                        // knows the height of content already in its viewport.
+                        VStack(alignment: .leading, spacing: 8) {
+                            archiveRows
                         }
+                        .padding(.horizontal, 12)
+                        .padding(.top, 8)
+                        .padding(.bottom, 10)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { rowsHeight = $0 }
+                    } else {
+                        LazyVStack(alignment: .leading, spacing: 14) {
+                            archiveRows
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 16)
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 16)
                 }
                 .scrollBounceBehavior(.basedOnSize)
+                .frame(height: pendingRow?.needsConfiguration == true
+                       ? min(rowsHeight, max(0, maximumContentHeight - footerHeight - 1))
+                       : nil)
 
                 Divider()
                 HStack(spacing: 12) {
@@ -460,28 +542,49 @@ private struct ArchiveView: View {
                             .keyboardShortcut(.defaultAction)
                     }
                 }
-                .controlSize(.large)
-                .padding(.horizontal, 20)
-                .padding(.vertical, 14)
+                .controlSize(pendingRow?.needsConfiguration == true ? .regular : .large)
+                .padding(.horizontal, pendingRow?.needsConfiguration == true ? 14 : 20)
+                .padding(.vertical, pendingRow?.needsConfiguration == true ? 10 : 14)
                 .background(.bar)
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { footerHeight = $0 }
             }
         }
-        .frame(minWidth: 500, minHeight: model.isRunning || model.shouldCloseAutomatically ? 80 : 280)
+        .frame(minWidth: minimumContentWidth, minHeight: model.isRunning || model.shouldCloseAutomatically ? 80 : 280)
+        .fixedSize(horizontal: false, vertical: pendingRow?.needsConfiguration == true && !model.isRunning)
+        .background(ArchiveFormatTitlebarAccessory(
+            format: $form.format,
+            isVisible: pendingRow?.needsConfiguration == true && !model.isRunning
+        ).frame(width: 0, height: 0))
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeightChanged($0) }
         .onAppear { model.start() }
         .onChange(of: pendingRow?.id) { form.clearPassword() }
         .onChange(of: form.format) {
-            if form.format == .tarGzip {
+            if !form.format.supportsPassword {
                 form.encrypted = false
-                form.splitVolumes = false
+                form.clearPassword()
             }
+            if !form.format.supportsVolumes {
+                form.splitVolumes = false
+                form.volumeSizeText = ""
+            }
+            if form.format != .sevenZip { form.windowsSelfExtracting = false }
         }
         .onChange(of: form.encrypted) {
             if !form.encrypted { form.clearPassword() }
         }
     }
 
+    private var archiveRows: some View {
+        ForEach(model.rows) { row in
+            archiveRow(row)
+            if row.id != model.rows.last?.id {
+                Divider()
+            }
+        }
+    }
+
     private func archiveRow(_ row: ArchiveViewModel.Row) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: row.needsConfiguration ? 8 : 14) {
             Text(row.request.urls.map(\.lastPathComponent).joined(separator: ", "))
                 .font(.headline).lineLimit(2).textSelection(.enabled)
             if let error = row.error {
@@ -505,7 +608,7 @@ private struct ArchiveView: View {
                             ArchivePasswordForm(operation: row.request.operation, form: $form, submit: submit)
                         }
                     }
-                    .padding(.vertical, 8)
+                    .padding(.vertical, row.needsConfiguration ? 4 : 8)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .disabled(model.isRunning)
                 } else if !row.isRunning && row.error == nil {
@@ -517,16 +620,116 @@ private struct ArchiveView: View {
 
     private func submit() {
         guard canSubmit, let row = pendingRow else { return }
-        let password = form.password
+        let options = form
+        let password = options.encrypted ? options.password : nil
         form.clearPassword()
         if row.needsConfiguration {
-            model.submitCompression(for: row.id, format: form.format, level: form.level,
-                                    password: form.encrypted ? password : nil,
-                                    volumeSize: form.volumeSize, solid: form.format == .sevenZip ? form.solid : nil,
-                                    verifyAfterCompression: form.verifyAfterCompression)
+            model.submitCompression(for: row.id, format: options.format, level: options.level,
+                                    password: password, volumeSize: options.volumeSize,
+                                    solid: options.format == .sevenZip ? options.solid : nil,
+                                    verifyAfterCompression: options.verifyAfterCompression,
+                                    excludeMacResourceFiles: options.excludeMacResourceFiles,
+                                    deletesSourcesAfterSuccess: options.deletesSourcesAfterSuccess,
+                                    separately: options.separately, zipUsesAES256: options.zipUsesAES256,
+                                    encryptFileNames: options.encryptFileNames,
+                                    windowsSelfExtracting: options.windowsSelfExtracting,
+                                    diskImageFormat: options.diskImageFormat, volumeName: options.volumeName)
         } else {
-            model.submitPassword(for: row.id, password: password)
+            model.submitPassword(for: row.id, password: options.password)
         }
+    }
+}
+
+private struct ArchiveFormatTitlebarAccessory: NSViewRepresentable {
+    @Binding var format: ArchiveCompressionFormat
+    let isVisible: Bool
+
+    func makeNSView(context: Context) -> ArchiveFormatTitlebarHostView {
+        ArchiveFormatTitlebarHostView()
+    }
+
+    func updateNSView(_ view: ArchiveFormatTitlebarHostView, context: Context) {
+        view.update(format: $format, isVisible: isVisible)
+    }
+
+    static func dismantleNSView(_ view: ArchiveFormatTitlebarHostView, coordinator: ()) {
+        view.removeAccessory()
+    }
+}
+
+private final class ArchiveFormatTitlebarHostView: NSView {
+    private var format: Binding<ArchiveCompressionFormat> = .constant(.zip)
+    private var isPickerVisible = false
+    private weak var installedWindow: NSWindow?
+    private var accessory: NSTitlebarAccessoryViewController?
+    private var previousTitleVisibility: NSWindow.TitleVisibility = .visible
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        updateAccessory()
+    }
+
+    func update(format: Binding<ArchiveCompressionFormat>, isVisible: Bool) {
+        self.format = format
+        isPickerVisible = isVisible
+        updateAccessory()
+    }
+
+    func removeAccessory() {
+        if let installedWindow, let accessory,
+           let index = installedWindow.titlebarAccessoryViewControllers.firstIndex(of: accessory) {
+            installedWindow.removeTitlebarAccessoryViewController(at: index)
+            installedWindow.titleVisibility = previousTitleVisibility
+        }
+        accessory = nil
+        installedWindow = nil
+    }
+
+    private func updateAccessory() {
+        if installedWindow !== window || !isPickerVisible { removeAccessory() }
+        guard let window, isPickerVisible else { return }
+        let picker = ArchiveFormatPicker(format: format)
+        if let host = accessory?.view as? NSHostingView<ArchiveFormatPicker> {
+            host.rootView = picker
+            return
+        }
+        let host = NSHostingView(rootView: picker)
+        host.frame = NSRect(x: 0, y: 0, width: 156, height: 28)
+        let accessory = NSTitlebarAccessoryViewController()
+        // A trailing accessory shares the native titlebar with the traffic lights.
+        accessory.layoutAttribute = .trailing
+        accessory.view = host
+        previousTitleVisibility = window.titleVisibility
+        window.titleVisibility = .hidden
+        installedWindow = window
+        self.accessory = accessory
+        window.addTitlebarAccessoryViewController(accessory)
+    }
+}
+
+private struct ArchiveFormatPicker: View {
+    @Binding var format: ArchiveCompressionFormat
+
+    var body: some View {
+        Menu {
+            Picker(AppLocalization.localized("Archive Format"), selection: $format) {
+                ForEach(ArchiveCompressionFormat.allCases, id: \.self) { format in
+                    Label(format.rawValue, systemImage: format == .dmg ? "externaldrive" : "doc.zipper")
+                        .tag(format)
+                }
+            }
+        } label: {
+            Label(format.rawValue, systemImage: format == .dmg ? "externaldrive" : "doc.zipper")
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.visible)
+        .buttonStyle(.plain)
+        .frame(width: 140, height: 26)
+        .controlSize(.regular)
+        .glassEffect(.regular.interactive(), in: Capsule())
+        .accessibilityLabel(AppLocalization.localized("Archive Format"))
+        .padding(.trailing, 8)
+        .frame(maxHeight: .infinity)
     }
 }
 
@@ -585,123 +788,192 @@ private struct ArchiveActivityView: View {
 
 private struct ArchiveCompressionForm: View {
     @Binding var form: ArchiveFormState
+    @State private var showsPassword = false
     private let levels = ArchiveCompressionLevel.allCases
 
     private var levelIndex: Binding<Double> {
         Binding {
-            Double(levels.firstIndex(of: form.level) ?? 2)
+            Double(levels.firstIndex(of: form.level) ?? 3)
         } set: { value in
             form.level = levels[Int(value.rounded())]
         }
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Text(appLocalized: "Compression Level")
-                    Text(form.level.title).foregroundStyle(.secondary)
-                }
-                .font(.headline)
-                Slider(value: levelIndex, in: 0...Double(levels.count - 1), step: 1) {
-                    Text(appLocalized: "Compression Level")
-                }
-                .labelsHidden()
-                HStack(spacing: 0) {
-                    ForEach(Array(levels.enumerated()), id: \.element) { index, level in
-                        if index > 0 { Spacer(minLength: 0) }
-                        Text(level.title)
-                            .foregroundStyle(form.level == level ? .primary : .secondary)
-                    }
-                }
-                .font(.caption)
-                Text(appLocalized: "Higher compression levels can create smaller archives but take more time.")
-                    .font(.caption).foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+        VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 12) {
+                compressionLevel
 
-            Divider()
-
-            VStack(alignment: .leading, spacing: 10) {
-                Toggle(AppLocalization.localized("Split into Volumes"), isOn: $form.splitVolumes)
-                    .disabled(form.format == .tarGzip)
-                if form.format == .tarGzip {
-                    Text(appLocalized: "Split volumes are available for ZIP and 7Z only.")
-                        .font(.caption).foregroundStyle(.secondary)
-                } else if form.splitVolumes {
-                    Picker(AppLocalization.localized("Volume Size"), selection: $form.volumePreset) {
-                        ForEach(ArchiveVolumePreset.allCases, id: \.self) { preset in
-                            Text(verbatim: preset.title).tag(preset)
+                Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 8) {
+                    if form.format == .dmg {
+                        GridRow {
+                            Text(appLocalized: "Volume Name")
+                            inputField {
+                                TextField(AppLocalization.localized("Custom Name"), text: $form.volumeName)
+                            }
+                        }
+                    } else if form.format.supportsVolumes {
+                        GridRow {
+                            Text(appLocalized: "Split Volume Size")
+                            inputField {
+                                TextField(AppLocalization.localized("e.g. 5 MB"), text: $form.volumeSizeText)
+                                Menu {
+                                    Button(AppLocalization.localized("Do Not Split")) { form.volumeSizeText = "" }
+                                    ForEach(["5 MB", "100 MB", "700 MiB", "4.7 GB", "4095 MiB"], id: \.self) { size in
+                                        Button(size) { form.volumeSizeText = size }
+                                    }
+                                } label: {
+                                    Image(systemName: "chevron.down")
+                                }
+                                .menuStyle(.borderlessButton)
+                                .menuIndicator(.hidden)
+                                .fixedSize()
+                                .frame(width: 20, height: 20)
+                                .accessibilityLabel(AppLocalization.localized("Volume Size"))
+                            }
+                            .disabled(form.windowsSelfExtracting)
                         }
                     }
-                    if form.volumePreset == .custom {
-                        HStack {
-                            TextField(AppLocalization.localized("Volume Size"), text: $form.customVolumeSize)
-                            Picker(AppLocalization.localized("Size Unit"), selection: $form.volumeUnit) {
-                                ForEach(ArchiveVolumeUnit.allCases, id: \.self) { unit in
-                                    Text(verbatim: unit.rawValue).tag(unit)
+                    if form.format.supportsPassword {
+                        GridRow {
+                            Text(appLocalized: "Password")
+                            inputField {
+                                Group {
+                                    if showsPassword {
+                                        TextField(AppLocalization.localized("Password"), text: $form.password)
+                                    } else {
+                                        SecureField(AppLocalization.localized("Password"), text: $form.password)
+                                    }
+                                }
+                                .labelsHidden()
+                                Button {
+                                    showsPassword.toggle()
+                                } label: {
+                                    Image(systemName: showsPassword ? "eye.slash" : "eye")
+                                        .frame(width: 20, height: 20)
+                                        .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+                                .foregroundStyle(.secondary)
+                                .accessibilityLabel(AppLocalization.localized(showsPassword ? "Hide Password" : "Show Password"))
+                            }
+                        }
+                        GridRow {
+                            Text(appLocalized: "Confirm Password")
+                            inputField {
+                                Group {
+                                    if showsPassword {
+                                        TextField(AppLocalization.localized("Confirm Password"), text: $form.confirmation)
+                                    } else {
+                                        SecureField(AppLocalization.localized("Confirm Password"), text: $form.confirmation)
+                                    }
+                                }
+                                .labelsHidden()
+                            }
+                        }
+                    }
+                    if form.format == .dmg {
+                        GridRow {
+                            Text(appLocalized: "Disk Image Format")
+                            Picker(AppLocalization.localized("Disk Image Format"), selection: $form.diskImageFormat) {
+                                ForEach(ArchiveDiskImageFormat.allCases, id: \.self) { format in
+                                    Text(format.title).tag(format)
                                 }
                             }
                             .labelsHidden()
-                            .frame(width: 100)
                         }
                     }
-                    Text(appLocalized: "Keep all volumes together. Open the .001 file to extract.")
-                        .font(.caption).foregroundStyle(.secondary)
+                }
+                .textFieldStyle(.roundedBorder)
+                .controlSize(.regular)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    if form.format == .zip {
+                        Toggle(AppLocalization.localized("Use AES-256 Encryption"), isOn: $form.zipUsesAES256)
+                            .disabled(form.password.isEmpty)
+                    } else if form.format == .sevenZip {
+                        Toggle(AppLocalization.localized("Encrypt File Names"), isOn: $form.encryptFileNames)
+                            .disabled(form.password.isEmpty)
+                        Toggle(AppLocalization.localized("Solid Compression"), isOn: $form.solid)
+                        Toggle(AppLocalization.localized("Windows Self-Extracting Archive"), isOn: $form.windowsSelfExtracting)
+                    }
                     if let error = form.volumeSizeError {
                         Text(error).font(.caption).foregroundStyle(.red)
                     }
-                }
-                if form.format == .sevenZip {
-                    Toggle(AppLocalization.localized("Solid Compression"), isOn: $form.solid)
-                    Text(appLocalized: "Compresses files together for smaller archives. Extracting individual files may take longer.")
-                        .font(.caption).foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                    if let error = form.passwordError {
+                        Text(error).font(.caption).foregroundStyle(.red)
+                    }
+                    if form.format == .dmg && !ArchiveService.isValidVolumeName(form.volumeName) {
+                        Text(appLocalized: "Enter a volume name without slashes, colons or line breaks (up to 255 UTF-8 bytes).")
+                            .font(.caption).foregroundStyle(.red)
+                    }
                 }
             }
-
-            Divider()
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 14))
 
             VStack(alignment: .leading, spacing: 8) {
+                if form.format != .dmg {
+                    Toggle(AppLocalization.localized("Exclude Mac Resource Files"), isOn: $form.excludeMacResourceFiles)
+                }
                 Toggle(AppLocalization.localized("Verify After Compression"), isOn: $form.verifyAfterCompression)
-                Text(appLocalized: "Check the archive for errors after compression. This takes additional time.")
-                    .font(.caption).foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                Toggle(AppLocalization.localized("Delete Source Files After Compression"), isOn: $form.deletesSourcesAfterSuccess)
+                Toggle(AppLocalization.localized("Compress Each Item Separately"), isOn: $form.separately)
             }
-
-            Divider()
-
-            VStack(alignment: .leading, spacing: 10) {
-                Toggle(AppLocalization.localized("Password Protection"), isOn: $form.encrypted)
-                    .disabled(form.format == .tarGzip)
-                Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 10) {
-                    GridRow {
-                        Text(appLocalized: "Password")
-                        SecureField(AppLocalization.localized("Password"), text: $form.password)
-                            .labelsHidden()
-                    }
-                    GridRow {
-                        Text(appLocalized: "Confirm Password")
-                        SecureField(AppLocalization.localized("Confirm Password"), text: $form.confirmation)
-                            .labelsHidden()
-                    }
-                }
-                .disabled(!form.encrypted)
-                if form.format == .tarGzip {
-                    Text(appLocalized: "TAR.GZ does not support passwords.")
-                        .font(.caption).foregroundStyle(.secondary)
-                } else if form.encrypted {
-                    Text(appLocalized: form.format == .sevenZip
-                         ? "AES-256 protects file contents and file names."
-                         : "AES-256 protects file contents. File names remain visible.")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-                if let error = form.passwordError {
-                    Text(error).font(.caption).foregroundStyle(.red)
-                }
+            .padding(.horizontal, 2)
+        }
+        .toggleStyle(.checkbox)
+        .onChange(of: form.password) { form.encrypted = !form.password.isEmpty }
+        .onChange(of: form.diskImageFormat) {
+            if form.diskImageFormat == .readOnly { form.level = .store }
+            else if form.level == .store { form.level = .normal }
+        }
+        .onChange(of: form.windowsSelfExtracting) {
+            if form.windowsSelfExtracting {
+                form.volumeSizeText = ""
+                form.splitVolumes = false
             }
         }
-        .textFieldStyle(.roundedBorder)
+    }
+
+    private func inputField<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        HStack(spacing: 6, content: content)
+            .textFieldStyle(.plain)
+            .padding(.horizontal, 8)
+            .frame(maxWidth: .infinity, minHeight: 28)
+            .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 6))
+            .overlay {
+                RoundedRectangle(cornerRadius: 6)
+                    .strokeBorder(.separator.opacity(0.5), lineWidth: 1)
+            }
+    }
+
+    private var compressionLevel: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text(appLocalized: "Compression Level")
+                Text(form.level.title)
+            }
+            .font(.headline)
+            Slider(value: levelIndex, in: 0...Double(levels.count - 1), step: 1) {
+                Text(appLocalized: "Compression Level")
+            }
+            .labelsHidden()
+            .disabled(form.format == .dmg && form.diskImageFormat != .zlib)
+            HStack(spacing: 0) {
+                ForEach(Array(levels.enumerated()), id: \.element) { index, level in
+                    if index > 0 { Spacer(minLength: 0) }
+                    Text(level.title)
+                        .foregroundStyle(form.level == level ? .primary : .secondary)
+                }
+            }
+            .font(.caption)
+            if form.format == .dmg && form.diskImageFormat != .zlib {
+                Text(appLocalized: "Compression level is available for Zlib disk images only.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }
     }
 }
 

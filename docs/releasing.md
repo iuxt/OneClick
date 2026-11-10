@@ -12,12 +12,27 @@
 
 ## 发布命令
 
-先提交并推送需要发布的代码及工作流，再创建 tag：
+版本命令与发布工作流共用 `scripts/version.py`，以项目中主应用和 Finder 扩展一致的 `MARKETING_VERSION` 为准：
 
 ```bash
+./build.sh version       # 显示当前版本，例如 2.3.2
+./build.sh bump-version  # 递增补丁：2.3.2 -> 2.3.3
+./build.sh bump-minor    # 递增次版本：2.3.2 -> 2.4.0
+./build.sh bump-major    # 递增主版本：2.3.2 -> 3.0.0
+```
+
+后三个命令分别独立演示，升级次版本或主版本会清零低位。递增命令同步修改两个 target 的 Debug/Release 配置，并输出新版本，不构建、安装、提交或创建 tag。
+
+先递增版本，提交并推送需要发布的代码及工作流，再用同一版本创建 tag：
+
+```bash
+./build.sh bump-version
+VERSION=$(./build.sh version)
+git add OneClick.xcodeproj/project.pbxproj
+git commit -m "Bump version to $VERSION"
 git push origin HEAD
-git tag -a v2.3.4 -m "Release v2.3.4"
-git push origin v2.3.4
+git tag -a "v$VERSION" -m "Release v$VERSION"
+git push origin "v$VERSION"
 ```
 
 tag 可以指向任意分支的提交，构建内容以 tag 指向的提交为准；该提交必须包含发布工作流。
@@ -29,12 +44,12 @@ tag 可以指向任意分支的提交，构建内容以 tag 指向的提交为�
 | `v2.4.0-beta.2` | Pre-release | `2.4.0` |
 | `v2.4.0-rc.1` | Pre-release | `2.4.0` |
 
-版本格式限定为 `vX.Y.Z` 或 `vX.Y.Z-{alpha,beta,rc}.N`，数字不允许多余的前导零。其他以 `v` 开头的 tag 会触发工作流，但在校验步骤失败。应用和扩展的版本号由 tag 自动覆盖，无需手动修改项目中的 `MARKETING_VERSION`；构建号使用 UTC 构建时间。附件名称保留完整版本后缀。
+版本格式限定为 `vX.Y.Z` 或 `vX.Y.Z-{alpha,beta,rc}.N`，数字不允许多余的前导零。tag 的 `X.Y.Z` 必须与该提交的项目版本一致，否则在构建前失败；其他以 `v` 开头的非法 tag 也会校验失败。预发布时，在当前项目版本后添加 `-alpha.N`、`-beta.N` 或 `-rc.N`，例如项目版本为 `2.4.0` 时使用 `v2.4.0-rc.1`。应用和扩展使用同一个基础版本，构建号继续使用 UTC 构建时间，附件名称保留完整版本后缀。
 
 ## 流程与产物
 
-1. 使用 `macos-15` runner 和 Xcode 26.3，校验 tag。
-2. 编译 Release，目标为 **Apple Silicon（arm64），macOS 15.6+**。
+1. 使用共享脚本校验 tag 和项目版本，随后在 `xcode-27` runner 上选择 Xcode 27。
+2. 编译 Release，目标为 **Apple Silicon（arm64），macOS 27+**。
 3. 为扩展和主应用生成本地 entitlement、移除 App Group 声明，依次执行 ad-hoc 签名，验证签名完整性。
 4. 创建 DMG、应用 ZIP 及 SHA-256 校验文件。
 5. 发布 GitHub Release，自动生成更新说明并附上首次安装说明。

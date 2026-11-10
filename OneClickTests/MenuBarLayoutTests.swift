@@ -7,7 +7,7 @@ import Testing
 struct MenuBarLayoutTests {
     @Test func mainIconHasAnExplicitMenuBarSize() {
         let view = NSHostingView(rootView: OneClickMenuBarLabel())
-        #expect(view.fittingSize == NSSize(width: 18, height: 18))
+        #expect(view.fittingSize == NSSize(width: 22, height: 22))
     }
 
 }

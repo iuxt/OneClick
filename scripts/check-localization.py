@@ -6,9 +6,9 @@ default, both catalogs of the project):
 
 1. The catalog is valid JSON with the expected top-level shape.
 2. Every key carries a translation for each language in --languages
-   (default: es). Keys whose source string holds no letters at all — bare
-   format specifiers such as "%@" or "%lld" — have nothing to translate and
-   are reported as skipped instead of missing.
+   (default: zh-Hans, ja, es, fr). Keys whose source string holds no letters
+   at all — bare format specifiers such as "%@" or "%lld" — have nothing
+   to translate and are reported as skipped instead of missing.
 3. Every translation uses exactly the same format specifiers, in the same
    order, as the source string (the `en` value, or the key itself when the
    catalog has no explicit `en` entry).
@@ -92,7 +92,7 @@ def check_catalog(path: Path, languages: list[str]) -> tuple[list[str], list[str
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("catalogs", nargs="*", default=list(DEFAULT_CATALOGS))
-    parser.add_argument("--languages", nargs="+", default=["es"])
+    parser.add_argument("--languages", nargs="+", default=["zh-Hans", "ja", "es", "fr"])
     args = parser.parse_args()
 
     root = Path(__file__).resolve().parent.parent

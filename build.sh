@@ -3,6 +3,14 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+case "${1:-}" in
+    version|bump-version|bump-minor|bump-major)
+        exec python3 "$ROOT_DIR/scripts/version.py" "$@"
+        ;;
+    '') ;;
+    *) printf '用法：./build.sh [version|bump-version|bump-minor|bump-major]\n' >&2; exit 1 ;;
+esac
+
 CONFIGURATION="${CONFIGURATION:-Release}"
 BUILD_MODE="${BUILD_MODE:-local}"
 SIGNING_IDENTITY="${SIGNING_IDENTITY:-}"

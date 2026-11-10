@@ -333,11 +333,12 @@
 			inputPaths = (
 				"$(SRCROOT)/scripts/embed-archive-tool.sh",
 				"$(SRCROOT)/Vendor/7zip/7zz",
+				"$(SRCROOT)/Vendor/7zip/7z.sfx",
 				"$(SRCROOT)/Vendor/7zip/7zz.entitlements",
 				"$(SRCROOT)/Vendor/7zip/License.txt",
 				"$(SRCROOT)/Vendor/7zip/COPYING.LESSER",
 				"$(SRCROOT)/Vendor/7zip/README.md",
-				"$(SRCROOT)/Vendor/7zip/7zip-26.05-src.tar.xz",
+				"$(SRCROOT)/Vendor/7zip/7zip-26.06-src.tar.xz",
 				"$(SRCROOT)/Vendor/pigz/pigz.c",
 				"$(SRCROOT)/Vendor/pigz/yarn.c",
 				"$(SRCROOT)/Vendor/pigz/yarn.h",
@@ -552,7 +553,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 27.0;
-				MARKETING_VERSION = 2.3.2;
+				MARKETING_VERSION = 3.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.wflixu.RClick;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -592,7 +593,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 27.0;
-				MARKETING_VERSION = 2.3.2;
+				MARKETING_VERSION = 3.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.wflixu.RClick;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -671,7 +672,7 @@
 					"@executable_path/../../../../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 27.0;
-				MARKETING_VERSION = 2.3.2;
+				MARKETING_VERSION = 3.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.wflixu.RClick.FinderSyncExt;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -706,7 +707,7 @@
 					"@executable_path/../../../../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 27.0;
-				MARKETING_VERSION = 2.3.2;
+				MARKETING_VERSION = 3.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = cn.wflixu.RClick.FinderSyncExt;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;

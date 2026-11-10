@@ -158,10 +158,10 @@ Keka to be installed.
 bundled pigz 2.8 encoder for TAR.GZ compression, without an intermediate TAR
 file. Cancellation terminates both helpers, and both must succeed before the
 archive is published. System tar also handles TAR-family extraction.
-An unmodified, bundled official
-7-Zip 26.05 universal macOS executable handles configurable ZIP/7Z compression,
-encrypted compression and ZIP/7Z/RAR
-extraction. Each is launched by `Process` with separate arguments and no shell.
+A bundled 7-Zip 26.06 universal macOS executable handles configurable ZIP/7Z
+compression, encrypted compression and ZIP/7Z/RAR extraction. It is assembled
+from the official arm64 and x86_64 binaries without modifying either architecture
+slice. Each helper is launched by `Process` with separate arguments and no shell.
 The host and helper run without App Sandbox or sandbox-inheritance entitlements. Operations run off
 the main actor and stream bounded diagnostic output. File data is handled by the
 tools, not buffered in Swift memory. The build includes the 7-Zip licenses and

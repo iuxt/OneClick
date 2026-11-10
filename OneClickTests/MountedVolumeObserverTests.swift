@@ -50,7 +50,7 @@ struct MountedVolumeObserverTests {
             reads += 1
             return volumes
         }, update: { updates.append($0) })
-        weak var weakObserver = observer
+        weak let weakObserver = observer
         #expect(reads == 1)
         #expect(updates.last == [URL(fileURLWithPath: "/")])
         let nas = URL(fileURLWithPath: "/Volumes/Reconnected NAS")
