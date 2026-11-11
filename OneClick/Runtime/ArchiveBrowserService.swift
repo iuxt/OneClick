@@ -2,12 +2,13 @@ import Darwin
 import Foundation
 
 nonisolated enum ArchiveBrowserError: LocalizedError, Equatable {
-    case listingTooLarge, previewTooLarge, entryUnavailable, invalidListing
+    case listingTooLarge, previewTooLarge, entryUnavailable, extractionUnavailable, invalidListing
     var errorDescription: String? {
         switch self {
         case .listingTooLarge: AppLocalization.localized("This archive has too many entries to browse. Extract it to view all files.")
         case .previewTooLarge: AppLocalization.localized("Preview is limited to files up to 64 MiB. Extract the archive to open this file.")
         case .entryUnavailable: AppLocalization.localized("This entry cannot be previewed. Folders, links, duplicate names and unsafe paths are excluded.")
+        case .extractionUnavailable: AppLocalization.localized("This item cannot be dragged out. Links, duplicate names and unsafe paths are excluded.")
         case .invalidListing: AppLocalization.localized("The archive directory could not be read safely.")
         }
     }
@@ -34,6 +35,10 @@ nonisolated struct ArchiveEntry: Identifiable, Equatable, Sendable {
     var canPreview: Bool {
         !isDirectory && !isLink && !normalizedPath.isEmpty && !path.hasPrefix("/") && !path.contains("\\")
             && !path.contains("\0") && !normalizedPath.components(separatedBy: "/").contains("..")
+    }
+    var canExtract: Bool {
+        !isLink && !normalizedPath.isEmpty && !path.hasPrefix("/") && !path.contains("\\") && !path.contains("\0")
+            && !normalizedPath.components(separatedBy: "/").contains(where: { $0.isEmpty || $0 == "." || $0 == ".." })
     }
 }
 

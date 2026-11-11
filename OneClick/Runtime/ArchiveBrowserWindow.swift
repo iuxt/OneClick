@@ -82,6 +82,7 @@ final class ArchiveBrowserModel: ObservableObject {
     private var previewDirectory: URL?
     private var closed = false
     @Published private(set) var extracting = false
+    @Published private(set) var dragExtracting = false
     @Published private(set) var extractionError: String?
     @Published private(set) var verifying = false
     @Published private(set) var verificationPassed = false
@@ -89,6 +90,7 @@ final class ArchiveBrowserModel: ObservableObject {
     private var verificationTask: Task<Void, Never>?
     private var verificationNeedsPassword = false
     private var extractionTask: Task<Void, Never>?
+    private var dragExtractionTask: Task<Void, Error>?
     private let extractArchive: @MainActor (URL, String?) async throws -> URL
 
     init(url: URL, extractArchive: @escaping @MainActor (URL, String?) async throws -> URL = { url, password in
@@ -131,7 +133,7 @@ final class ArchiveBrowserModel: ObservableObject {
     }
 
     func load(password: String? = nil) {
-        guard !closed, !verifying, !extracting else { return }
+        guard !closed, !verifying, !extracting, !dragExtracting else { return }
         task?.cancel()
         self.password = password
         verificationPassed = false; verificationError = nil
@@ -243,7 +245,7 @@ final class ArchiveBrowserModel: ObservableObject {
     func navigate(to path: String) { selection = nil; folder = path; search = ""; showPreview() }
 
     func extract(closeWindow: @escaping () -> Void) {
-        guard !closed, !loading, !extracting, !verifying else { return }
+        guard !closed, !loading, !extracting, !verifying, !dragExtracting else { return }
         extracting = true
         extractionError = nil
         extractionTask = Task {
@@ -267,7 +269,7 @@ final class ArchiveBrowserModel: ObservableObject {
     }
 
     func verify() {
-        guard !closed, !loading, !extracting, !verifying else { return }
+        guard !closed, !loading, !extracting, !verifying, !dragExtracting else { return }
         verifying = true
         verificationPassed = false
         verificationError = nil
@@ -294,10 +296,36 @@ final class ArchiveBrowserModel: ObservableObject {
         }
     }
 
+    func canDrag(_ entry: ArchiveEntry) -> Bool {
+        !closed && !loading && !extracting && !verifying && !dragExtracting && entry.canExtract
+    }
+
+    func extractDraggedEntry(_ entry: ArchiveEntry, to destination: URL) async throws {
+        guard canDrag(entry) else { throw ArchiveBrowserError.extractionUnavailable }
+        dragExtracting = true
+        extractionError = nil
+        let archive = url
+        let password = self.password
+        let extraction = Task { try await ArchiveDragExtraction.extract(archive, entry: entry, to: destination, password: password) }
+        dragExtractionTask = extraction
+        defer { dragExtracting = false; dragExtractionTask = nil }
+        do {
+            try await withTaskCancellationHandler { try await extraction.value } onCancel: { extraction.cancel() }
+        } catch {
+            if !closed, !(error is CancellationError) {
+                extractionError = error.localizedDescription
+                if let archiveError = error as? ArchiveError,
+                   [.passwordRequired, .incorrectPassword, .invalidPassword].contains(archiveError) { needsPassword = true }
+            }
+            throw error
+        }
+    }
+
     func close() {
         guard !closed else { return }
         closed = true
         task?.cancel(); previewTask?.cancel(); searchTask?.cancel(); extractionTask?.cancel(); verificationTask?.cancel()
+        dragExtractionTask?.cancel()
         password = nil
         if let previewDirectory { Task { await ArchivePreparedPreview.removeDirectory(previewDirectory) } }
     }
@@ -328,7 +356,7 @@ struct ArchiveBrowserView: View {
     var body: some View {
         VStack(spacing: 0) {
             toolbar
-            if model.extracting {
+            if model.extracting || model.dragExtracting {
                 HStack(spacing: 10) {
                     ProgressView().controlSize(.small)
                     Text(appLocalized: "Extracting…").font(.callout.weight(.medium))
@@ -405,13 +433,13 @@ struct ArchiveBrowserView: View {
                 }.disabled(model.previewURL == nil || model.previewing)
                 toolbarAction("Extract All…", symbol: "archivebox", colors: [.yellow, .orange]) {
                     model.extract(closeWindow: close)
-                }.disabled(model.loading || model.extracting || model.verifying || model.error != nil)
+                }.disabled(model.loading || model.extracting || model.dragExtracting || model.verifying || model.error != nil)
                 toolbarAction("Verify Archive", symbol: "checkmark.shield", colors: [.cyan, .blue]) {
                     model.verify()
-                }.disabled(model.loading || model.extracting || model.verifying)
+                }.disabled(model.loading || model.extracting || model.dragExtracting || model.verifying)
                 toolbarAction("Refresh", symbol: "arrow.clockwise", colors: [.mint, .green]) {
                     model.reload()
-                }.disabled(model.loading || model.extracting || model.verifying)
+                }.disabled(model.loading || model.extracting || model.dragExtracting || model.verifying)
                 toolbarAction(expandAll ? "Collapse All" : "Expand All", symbol: expandAll ? "chevron.down" : "chevron.right",
                               colors: [.purple, .blue]) {
                     expandAll.toggle()

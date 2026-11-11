@@ -13,6 +13,7 @@ nonisolated private struct SystemArchiveAPI: @unchecked Sendable {
     let pathname: @convention(c) (OpaquePointer) -> UnsafePointer<CChar>?
     let size: @convention(c) (OpaquePointer) -> Int64
     let filetype: @convention(c) (OpaquePointer) -> UInt32
+    let permissions: @convention(c) (OpaquePointer) -> UInt16
     let hardlink: @convention(c) (OpaquePointer) -> UnsafePointer<CChar>?
     let mtimeIsSet: @convention(c) (OpaquePointer) -> Int32
     let mtime: @convention(c) (OpaquePointer) -> Int
@@ -40,6 +41,7 @@ nonisolated private struct SystemArchiveAPI: @unchecked Sendable {
         pathname = try symbol("archive_entry_pathname_utf8", as: type(of: pathname))
         size = try symbol("archive_entry_size", as: type(of: size))
         filetype = try symbol("archive_entry_filetype", as: type(of: filetype))
+        permissions = try symbol("archive_entry_perm", as: type(of: permissions))
         hardlink = try symbol("archive_entry_hardlink", as: type(of: hardlink))
         mtimeIsSet = try symbol("archive_entry_mtime_is_set", as: type(of: mtimeIsSet))
         mtime = try symbol("archive_entry_mtime", as: type(of: mtime))
@@ -122,5 +124,50 @@ nonisolated enum SystemArchiveReader {
                 }
             }
         }
+    }
+
+    /// Read selected regular files in one pass, without buffering them in memory.
+    /// Only validated application-created paths become filesystem destinations.
+    static func extract(_ url: URL, entries: [ArchiveEntry], to directory: URL) throws {
+        let fm = FileManager.default
+        for entry in entries where entry.isDirectory {
+            try Task.checkCancellation()
+            try fm.createDirectory(at: directory.appendingPathComponent(entry.normalizedPath), withIntermediateDirectories: true)
+        }
+        var remaining = Dictionary(uniqueKeysWithValues: entries.filter { !$0.isDirectory }.map { ($0.path, $0) })
+        try withReader(url: url) { api, reader in
+            var entry: OpaquePointer?
+            var buffer = [UInt8](repeating: 0, count: 65_536)
+            while true {
+                try Task.checkCancellation()
+                let status = api.next(reader, &entry)
+                if status == 1 { break }
+                guard status == 0, let entry, let path = api.pathname(entry) else { throw failure(api, reader) }
+                guard let selected = remaining.removeValue(forKey: String(cString: path)) else {
+                    guard api.skip(reader) >= 0 else { throw failure(api, reader) }
+                    continue
+                }
+                guard api.filetype(entry) == 0o100000, api.hardlink(entry) == nil else { throw ArchiveBrowserError.extractionUnavailable }
+                let output = directory.appendingPathComponent(selected.normalizedPath)
+                try fm.createDirectory(at: output.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try Data().write(to: output, options: .withoutOverwriting)
+                let handle = try FileHandle(forWritingTo: output)
+                defer { try? handle.close() }
+                while true {
+                    try Task.checkCancellation()
+                    let count = api.read(reader, &buffer, buffer.count)
+                    if count == 0 { break }
+                    guard count > 0 else { throw failure(api, reader) }
+                    try handle.write(contentsOf: Data(buffer.prefix(count)))
+                }
+                // libarchive omits trailing sparse holes from archive_read_data.
+                // Restore the logical length without allocating those holes.
+                try handle.truncate(atOffset: UInt64(selected.size))
+                var attributes: [FileAttributeKey: Any] = [.posixPermissions: Int(api.permissions(entry) & 0o777) | 0o600]
+                if let modified = selected.modifiedDate { attributes[.modificationDate] = modified }
+                try fm.setAttributes(attributes, ofItemAtPath: output.path)
+            }
+        }
+        guard remaining.isEmpty else { throw ArchiveBrowserError.extractionUnavailable }
     }
 }

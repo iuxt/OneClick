@@ -643,6 +643,13 @@ nonisolated enum ArchiveService {
         ["zip", "zip.001", "zipx", "7z", "7z.001", "rar", "jar", "war", "apk", "ipa", "xpi"].contains(ArchiveFormat.suffix(for: url) ?? "")
     }
 
+    /// The caller validates the selected subtree and supplies a private directory.
+    static func extractEntry(at archive: URL, path: String, to directory: URL, password: String?, progress: ArchiveProgress) throws {
+        try run(executable: sevenZipURL(),
+                arguments: ["x", "-y", "-spd", "-ssc", "-bsp1", "-bb0", "-sccUTF-8", "-snld0", "-o" + directory.path, "--", archive.path, path],
+                directory: archive.deletingLastPathComponent(), password: password, progress: progress)
+    }
+
     private static func makeWindowsSelfExtracting(_ archive: URL) throws -> URL {
         let module = Bundle.main.bundleURL.appendingPathComponent("Contents/Resources/7zip/7z.sfx")
         guard FileManager.default.fileExists(atPath: module.path) else { throw ArchiveError.toolUnavailable }

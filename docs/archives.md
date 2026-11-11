@@ -119,6 +119,12 @@ Text up to 2 MiB is shown in a selectable text pane, images display inline, and
 Preview content is limited to 64 MiB, including incorrectly declared sizes.
 **Extract All…** uses the existing extraction workflow with destination
 authorization and collision protection.
+Drag a file or folder from the file list into Finder or onto the desktop to
+extract only that item. Folders retain their contents and directory structure.
+Extraction begins after dropping and is not subject to the preview size limit.
+Existing destination items are never overwritten. Encrypted items use the
+window's password; if prompted, unlock and drag the item again. Closing the
+browser cancels unfinished drag extraction and removes its temporary output.
 **Verify Archive** tests the archive's integrity without extracting files or
 changing the archive. The browser shows activity followed by success or error
 details. Encrypted archives prompt for a password and retry verification after

@@ -1,6 +1,41 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+"This item cannot be dragged out. Links, duplicate names and unsafe paths are excluded." : {
+  "extractionState": "manual",
+  "localizations": {
+    "en": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "This item cannot be dragged out. Links, duplicate names and unsafe paths are excluded."
+      }
+    },
+    "zh-Hans": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "无法拖出此项目。不支持链接、重复名称和不安全路径。"
+      }
+    },
+    "ja": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "この項目はドラッグして取り出せません。リンク、重複した名前、安全でないパスは対象外です。"
+      }
+    },
+    "es": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "No se puede extraer este elemento arrastrándolo. Se excluyen los enlaces, los nombres duplicados y las rutas no seguras."
+      }
+    },
+    "fr": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Cet élément ne peut pas être extrait par glisser-déposer. Les liens, les noms en double et les chemins non sécurisés sont exclus."
+      }
+    }
+  }
+},
 "Verify Archive" : {
   "extractionState": "manual",
   "localizations": {

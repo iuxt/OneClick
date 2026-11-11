@@ -29,6 +29,8 @@ struct ArchiveOutlineView: NSViewRepresentable {
         outline.allowsMultipleSelection = false
         outline.allowsEmptySelection = true
         outline.allowsColumnReordering = false
+        outline.setDraggingSourceOperationMask(.copy, forLocal: false)
+        outline.setDraggingSourceOperationMask(.copy, forLocal: true)
         outline.autosaveExpandedItems = false
         outline.setAccessibilityLabel(AppLocalization.localized("Archive"))
         for (key, title, width, minimum) in [
@@ -140,6 +142,11 @@ struct ArchiveOutlineView: NSViewRepresentable {
         func outlineView(_ outlineView: NSOutlineView, isItemExpandable item: Any) -> Bool {
             guard let node = item as? Node else { return false }
             return node.entry.isDirectory && !(snapshot.children[node.entry.normalizedPath] ?? []).isEmpty
+        }
+
+        func outlineView(_ outlineView: NSOutlineView, pasteboardWriterForItem item: Any) -> (any NSPasteboardWriting)? {
+            guard let node = item as? Node, parent.model.canDrag(node.entry) else { return nil }
+            return ArchiveDragPromise(entry: node.entry, model: parent.model).provider()
         }
 
         func outlineView(_ outlineView: NSOutlineView, viewFor tableColumn: NSTableColumn?, item: Any) -> NSView? {
