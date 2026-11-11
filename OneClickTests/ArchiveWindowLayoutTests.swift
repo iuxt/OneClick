@@ -30,7 +30,7 @@ struct ArchiveWindowLayoutTests {
         defer { window.performClose(nil) }
         try await settle(window)
         #expect(!window.styleMask.contains(.resizable))
-        #expect(abs(window.contentLayoutRect.width - 440) <= 1)
+        #expect(abs(window.contentLayoutRect.width - 400) <= 1)
         #expect(window.contentLayoutRect.height > 350)
         #expect(window.frame.height <= (window.screen?.visibleFrame.height ?? 10000) + 1)
         let closeButton = try #require(window.standardWindowButton(.closeButton))
@@ -45,7 +45,7 @@ struct ArchiveWindowLayoutTests {
     @Test func formatAndValidationChangesResizeContentWithinScreenLimit() async throws {
         let model = ArchiveViewModel(requests: [.init(operation: .compress, urls: [URL(fileURLWithPath: "/tmp/example.txt")])])
         defer { model.cancel() }
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 440, height: 500),
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 500),
                               styleMask: [.titled, .closable], backing: .buffered, defer: false)
         let host = NSHostingView(rootView: AnyView(EmptyView()))
         window.contentView = host
@@ -55,8 +55,8 @@ struct ArchiveWindowLayoutTests {
             var form = ArchiveFormState()
             form.format = format
             let root = ArchiveView(model: model, maximumContentHeight: 700, contentHeightChanged: { height in
-                window.setContentSize(NSSize(width: 440, height: ceil(height)))
-            }, close: {}, minimumContentWidth: 440, form: form)
+                window.setContentSize(NSSize(width: 400, height: ceil(height)))
+            }, close: {}, minimumContentWidth: 400, form: form)
             host.rootView = AnyView(root.id(UUID()))
             try await settle(window)
             heights.append(window.contentLayoutRect.height)
@@ -71,8 +71,8 @@ struct ArchiveWindowLayoutTests {
         expanded.password = "password"
         expanded.confirmation = "different"
         host.rootView = AnyView(ArchiveView(model: model, maximumContentHeight: 450, contentHeightChanged: { height in
-            window.setContentSize(NSSize(width: 440, height: ceil(height)))
-        }, close: {}, minimumContentWidth: 440, form: expanded).id(UUID()))
+            window.setContentSize(NSSize(width: 400, height: ceil(height)))
+        }, close: {}, minimumContentWidth: 400, form: expanded).id(UUID()))
         try await settle(window)
         #expect(window.contentLayoutRect.height <= 451)
         #expect(window.contentLayoutRect.height >= 449)

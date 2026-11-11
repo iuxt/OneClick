@@ -35,7 +35,7 @@ private final class ArchiveWindowController: NSWindowController, NSWindowDelegat
         self.onClose = onClose
         let window = NSWindow()
         let sizesToContent = model.rows.contains { $0.needsConfiguration }
-        let minimumWidth: CGFloat = sizesToContent ? 440 : 500
+        let minimumWidth: CGFloat = sizesToContent ? 400 : 500
         window.title = AppLocalization.localized("Archives")
         window.styleMask = sizesToContent
             ? [.titled, .closable, .miniaturizable]
@@ -54,7 +54,7 @@ private final class ArchiveWindowController: NSWindowController, NSWindowDelegat
             close: { [weak window] in window?.performClose(nil) },
             minimumContentWidth: minimumWidth
         ))
-        window.setContentSize(NSSize(width: sizesToContent ? 440 : 520, height: model.preferredWindowHeight))
+        window.setContentSize(NSSize(width: sizesToContent ? minimumWidth : 520, height: model.preferredWindowHeight))
         window.contentMinSize = NSSize(width: minimumWidth, height: 280)
         window.center()
         super.init(window: window)
@@ -718,6 +718,8 @@ private struct ArchiveFormatPicker: View {
                         .tag(format)
                 }
             }
+            .pickerStyle(.inline)
+            .labelsHidden()
         } label: {
             Label(format.rawValue, systemImage: format == .dmg ? "externaldrive" : "doc.zipper")
         }
