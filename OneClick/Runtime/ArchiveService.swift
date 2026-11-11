@@ -785,31 +785,38 @@ nonisolated enum ArchiveService {
     /// Split ZIP/7Z archives are tested through their first volume; 7-Zip reads the rest.
     static func verifyArchive(at archive: URL, operation: ArchiveOperation, password: String? = nil,
                               progress: ArchiveProgress = ArchiveProgress()) throws {
-        progress.setVerifying(true)
-        defer { progress.setVerifying(false) }
-        let directory = archive.deletingLastPathComponent()
         do {
-            try Task.checkCancellation()
-            if operation.isDiskImage {
-                var arguments = ["verify", archive.path, "-puppetstrings"]
-                if password != nil { arguments.append("-stdinpass") }
-                try run(executable: URL(fileURLWithPath: "/usr/bin/hdiutil"), arguments: arguments,
-                        directory: directory, password: password, progress: progress, passwordTerminator: "\0")
-            } else if operation == .tarGzip {
-                // Validate gzip's payload CRC as well as the enclosed TAR structure.
-                try run(executable: URL(fileURLWithPath: "/usr/bin/gzip"), arguments: ["-t", "--", archive.path],
-                        directory: directory, password: nil, progress: progress)
-                try Task.checkCancellation()
-                try run(executable: URL(fileURLWithPath: "/usr/bin/tar"), arguments: ["-tf", archive.path],
-                        directory: directory, password: nil, progress: progress)
-            } else {
-                try run(executable: sevenZipURL(), arguments: ["t", "-y", "-bsp1", "-bb0", "-sccUTF-8", "--", archive.path],
-                        directory: directory, password: password, progress: progress)
-            }
+            try testArchive(at: archive, operation: operation, password: password, progress: progress)
         } catch is CancellationError {
             throw CancellationError()
         } catch {
             throw ArchiveError.verificationFailed(error.localizedDescription)
+        }
+    }
+
+    /// Test without publishing or changing the archive. Preserve password errors
+    /// so the browser can request a password and retry.
+    static func testArchive(at archive: URL, operation: ArchiveOperation, password: String? = nil,
+                            progress: ArchiveProgress = ArchiveProgress()) throws {
+        progress.setVerifying(true)
+        defer { progress.setVerifying(false) }
+        let directory = archive.deletingLastPathComponent()
+        try Task.checkCancellation()
+        if operation.isDiskImage {
+            var arguments = ["verify", archive.path, "-puppetstrings"]
+            if password != nil { arguments.append("-stdinpass") }
+            try run(executable: URL(fileURLWithPath: "/usr/bin/hdiutil"), arguments: arguments,
+                    directory: directory, password: password, progress: progress, passwordTerminator: "\0")
+        } else if operation == .tarGzip {
+            // Validate gzip's payload CRC as well as the enclosed TAR structure.
+            try run(executable: URL(fileURLWithPath: "/usr/bin/gzip"), arguments: ["-t", "--", archive.path],
+                    directory: directory, password: nil, progress: progress)
+            try Task.checkCancellation()
+            try run(executable: URL(fileURLWithPath: "/usr/bin/tar"), arguments: ["-tf", archive.path],
+                    directory: directory, password: nil, progress: progress)
+        } else {
+            try run(executable: sevenZipURL(), arguments: ["t", "-y", "-bsp1", "-bb0", "-sccUTF-8", "--", archive.path],
+                    directory: directory, password: password, progress: progress)
         }
     }
 

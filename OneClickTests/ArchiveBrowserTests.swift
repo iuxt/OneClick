@@ -23,6 +23,9 @@ struct ArchiveBrowserTests {
         try Data("different".utf8).write(to: folder.appendingPathComponent("notes 1-other.txt"))
         let password = operation.isEncryptedCompression ? "test-password" : nil
         let archive = try await ArchiveService.perform(ArchiveRequest(operation: operation, urls: [folder]), password: password)
+        let archiveBytes = try Data(contentsOf: archive)
+        try await ArchiveBrowserService.verify(archive, password: password)
+        #expect(try Data(contentsOf: archive) == archiveBytes)
         let listed = try await ArchiveBrowserService.list(archive, password: password)
         let entry = try #require(listed.first { $0.name == file.lastPathComponent })
         #expect(entry.size == contents.count)
@@ -47,6 +50,88 @@ struct ArchiveBrowserTests {
             let encryptedEntry = try #require(visible.first { $0.name == file.lastPathComponent })
             await #expect(throws: ArchiveError.passwordRequired) { try await ArchiveBrowserService.preview(archive, entry: encryptedEntry) }
         }
+        if operation.isEncryptedCompression {
+            await #expect(throws: ArchiveError.passwordRequired) { try await ArchiveBrowserService.verify(archive) }
+            await #expect(throws: ArchiveError.incorrectPassword) { try await ArchiveBrowserService.verify(archive, password: "incorrect") }
+        }
+    }
+
+    @Test(arguments: [ArchiveOperation.zip, .sevenZip, .tarGzip])
+    func verificationRejectsDamagedArchivesWithoutChangingThem(operation: ArchiveOperation) async throws {
+        let root = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let file = root.appendingPathComponent("notes.txt")
+        try Data(String(repeating: "verify contents\n", count: 100).utf8).write(to: file)
+        let archive = try await ArchiveService.perform(ArchiveRequest(operation: operation, urls: [file]))
+        var bytes = try Data(contentsOf: archive)
+        bytes = bytes.prefix(bytes.count / 2)
+        try bytes.write(to: archive)
+        await #expect(throws: (any Error).self) { try await ArchiveBrowserService.verify(archive) }
+        #expect(try Data(contentsOf: archive) == bytes)
+        #expect(Set(try FileManager.default.contentsOfDirectory(atPath: root.path)) == [file.lastPathComponent, archive.lastPathComponent])
+    }
+
+    @Test(arguments: [ArchiveOperation.zip, .sevenZip])
+    func verificationTestsAllSplitVolumes(operation: ArchiveOperation) async throws {
+        let root = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let file = root.appendingPathComponent("notes.txt")
+        try Data((0..<16_384).map { _ in UInt8.random(in: 0...255) }).write(to: file)
+        let archive = try await ArchiveService.perform(ArchiveRequest(operation: operation, urls: [file], volumeSize: 1_024))
+        try await ArchiveBrowserService.verify(archive)
+        let second = archive.deletingPathExtension().appendingPathExtension("002")
+        try FileManager.default.removeItem(at: second)
+        await #expect(throws: (any Error).self) { try await ArchiveBrowserService.verify(archive) }
+    }
+
+    @Test func verificationHonorsCancellationAndRejectsInvalidPasswords() async throws {
+        let root = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let archive = root.appendingPathComponent("test.zip")
+        try Data().write(to: archive)
+        await #expect(throws: ArchiveError.invalidPassword) { try await ArchiveBrowserService.verify(archive, password: "bad\npassword") }
+        let progress = ArchiveProgress()
+        progress.cancel()
+        await #expect(throws: CancellationError.self) { try await ArchiveBrowserService.verify(archive, progress: progress) }
+    }
+
+    @Test @MainActor func verificationRetriesAfterUnlockAndClearsOnRefresh() async throws {
+        let root = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let file = root.appendingPathComponent("notes.txt")
+        try Data("encrypted contents".utf8).write(to: file)
+        let archive = try await ArchiveService.perform(ArchiveRequest(operation: .encryptedZip, urls: [file]), password: "test-password")
+        let model = ArchiveBrowserModel(url: archive)
+        defer { model.close() }
+        model.load()
+        try await waitUntil { !model.loading }
+        model.verify()
+        #expect(model.verifying)
+        model.extract { Issue.record("Extraction must not start during verification") }
+        #expect(!model.extracting)
+        try await waitUntil { !model.verifying }
+        #expect(model.needsPassword)
+        #expect(!model.verificationPassed)
+        #expect(model.verificationError == ArchiveError.passwordRequired.localizedDescription)
+        model.load(password: "wrong-password")
+        try await waitUntil { !model.loading && !model.verifying }
+        #expect(model.needsPassword)
+        #expect(model.verificationError == ArchiveError.incorrectPassword.localizedDescription)
+        model.load(password: "test-password")
+        try await waitUntil { !model.loading && !model.verifying }
+        #expect(model.verificationPassed)
+        #expect(model.verificationError == nil)
+        #expect(!model.needsPassword)
+        model.reload()
+        #expect(!model.verificationPassed)
+        try await waitUntil { !model.loading }
+        model.verify()
+        model.close()
+        try await waitUntil { !model.verifying }
+        #expect(!model.verificationPassed)
+        #expect(model.verificationError == nil)
+        model.verify()
+        #expect(!model.verifying)
     }
 
     @Test func sevenZipListingReadsOptionalDatesAndFractionalSeconds() throws {

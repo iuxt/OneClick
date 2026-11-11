@@ -119,6 +119,10 @@ Text up to 2 MiB is shown in a selectable text pane, images display inline, and
 Preview content is limited to 64 MiB, including incorrectly declared sizes.
 **Extract All…** uses the existing extraction workflow with destination
 authorization and collision protection.
+**Verify Archive** tests the archive's integrity without extracting files or
+changing the archive. The browser shows activity followed by success or error
+details. Encrypted archives prompt for a password and retry verification after
+unlocking. Closing the browser cancels verification; refreshing clears its result.
 
 Under **File Associations**, select ZIP, 7Z, RAR, TAR or TGZ and click
 **Associate Selected Formats**. macOS may request consent. Launching OneClick

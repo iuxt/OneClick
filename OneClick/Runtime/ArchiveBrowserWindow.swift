@@ -83,6 +83,11 @@ final class ArchiveBrowserModel: ObservableObject {
     private var closed = false
     @Published private(set) var extracting = false
     @Published private(set) var extractionError: String?
+    @Published private(set) var verifying = false
+    @Published private(set) var verificationPassed = false
+    @Published private(set) var verificationError: String?
+    private var verificationTask: Task<Void, Never>?
+    private var verificationNeedsPassword = false
     private var extractionTask: Task<Void, Never>?
     private let extractArchive: @MainActor (URL, String?) async throws -> URL
 
@@ -126,9 +131,10 @@ final class ArchiveBrowserModel: ObservableObject {
     }
 
     func load(password: String? = nil) {
-        guard !closed else { return }
+        guard !closed, !verifying, !extracting else { return }
         task?.cancel()
         self.password = password
+        verificationPassed = false; verificationError = nil
         error = nil; needsPassword = false; loading = true
         task = Task { [weak self] in
             guard let self else { return }
@@ -151,6 +157,7 @@ final class ArchiveBrowserModel: ObservableObject {
                    [.passwordRequired, .incorrectPassword, .invalidPassword].contains(archiveError) { needsPassword = true }
             }
             loading = false
+            if error == nil, verificationNeedsPassword, password != nil { verify() }
         }
     }
 
@@ -236,7 +243,7 @@ final class ArchiveBrowserModel: ObservableObject {
     func navigate(to path: String) { selection = nil; folder = path; search = ""; showPreview() }
 
     func extract(closeWindow: @escaping () -> Void) {
-        guard !closed, !extracting else { return }
+        guard !closed, !loading, !extracting, !verifying else { return }
         extracting = true
         extractionError = nil
         extractionTask = Task {
@@ -259,10 +266,38 @@ final class ArchiveBrowserModel: ObservableObject {
         }
     }
 
+    func verify() {
+        guard !closed, !loading, !extracting, !verifying else { return }
+        verifying = true
+        verificationPassed = false
+        verificationError = nil
+        verificationNeedsPassword = false
+        let password = self.password
+        verificationTask = Task { [weak self] in
+            guard let self else { return }
+            defer { verifying = false }
+            do {
+                try await ArchiveBrowserService.verify(url, password: password)
+                try Task.checkCancellation()
+                verificationPassed = true
+            } catch is CancellationError {
+                // Closing the browser cancels the archive test process.
+            } catch {
+                guard !closed, !Task.isCancelled else { return }
+                verificationError = error.localizedDescription
+                if let archiveError = error as? ArchiveError,
+                   [.passwordRequired, .incorrectPassword, .invalidPassword].contains(archiveError) {
+                    needsPassword = true
+                    verificationNeedsPassword = true
+                }
+            }
+        }
+    }
+
     func close() {
         guard !closed else { return }
         closed = true
-        task?.cancel(); previewTask?.cancel(); searchTask?.cancel(); extractionTask?.cancel()
+        task?.cancel(); previewTask?.cancel(); searchTask?.cancel(); extractionTask?.cancel(); verificationTask?.cancel()
         password = nil
         if let previewDirectory { Task { await ArchivePreparedPreview.removeDirectory(previewDirectory) } }
     }
@@ -302,6 +337,21 @@ struct ArchiveBrowserView: View {
             }
             if let error = model.extractionError {
                 Label(error, systemImage: "exclamationmark.triangle").foregroundStyle(.red).padding(12)
+            }
+            if model.verifying {
+                HStack(spacing: 10) {
+                    ProgressView().controlSize(.small)
+                    Text(appLocalized: "Verifying archive…").font(.callout.weight(.medium))
+                    Spacer()
+                }.padding(12)
+            } else if model.verificationPassed {
+                Label(AppLocalization.localized("Archive verification passed. No errors found."), systemImage: "checkmark.shield")
+                    .foregroundStyle(.green).padding(12)
+            } else if let error = model.verificationError {
+                VStack(alignment: .leading, spacing: 4) {
+                    Label(AppLocalization.localized("Archive verification failed."), systemImage: "exclamationmark.triangle")
+                    Text(error).font(.callout).textSelection(.enabled)
+                }.foregroundStyle(.red).padding(12)
             }
             if model.needsPassword {
                 HStack {
@@ -355,10 +405,13 @@ struct ArchiveBrowserView: View {
                 }.disabled(model.previewURL == nil || model.previewing)
                 toolbarAction("Extract All…", symbol: "archivebox", colors: [.yellow, .orange]) {
                     model.extract(closeWindow: close)
-                }.disabled(model.loading || model.extracting || model.error != nil)
+                }.disabled(model.loading || model.extracting || model.verifying || model.error != nil)
+                toolbarAction("Verify Archive", symbol: "checkmark.shield", colors: [.cyan, .blue]) {
+                    model.verify()
+                }.disabled(model.loading || model.extracting || model.verifying)
                 toolbarAction("Refresh", symbol: "arrow.clockwise", colors: [.mint, .green]) {
                     model.reload()
-                }.disabled(model.loading || model.extracting)
+                }.disabled(model.loading || model.extracting || model.verifying)
                 toolbarAction(expandAll ? "Collapse All" : "Expand All", symbol: expandAll ? "chevron.down" : "chevron.right",
                               colors: [.purple, .blue]) {
                     expandAll.toggle()

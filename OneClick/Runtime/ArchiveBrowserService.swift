@@ -40,6 +40,17 @@ nonisolated struct ArchiveEntry: Identifiable, Equatable, Sendable {
 nonisolated enum ArchiveBrowserService {
     static let previewLimit = 64 * 1_024 * 1_024
 
+    @concurrent
+    static func verify(_ url: URL, password: String? = nil,
+                       progress: ArchiveProgress = ArchiveProgress()) async throws {
+        try await withTaskCancellationHandler {
+            try validate(url, password: password)
+            let operation: ArchiveOperation = ["tar.gz", "tgz"].contains(ArchiveFormat.suffix(for: url) ?? "") ? .tarGzip : .extract
+            try ArchiveService.testArchive(at: url, operation: operation, password: password, progress: progress)
+            try Task.checkCancellation()
+        } onCancel: { progress.cancel() }
+    }
+
     /// Ask the split-container reader how many parts belong to this archive;
     /// unrelated or orphaned numbered files must never be swept up by a glob.
     @concurrent
