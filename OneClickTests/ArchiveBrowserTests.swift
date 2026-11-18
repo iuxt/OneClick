@@ -150,9 +150,14 @@ struct ArchiveBrowserTests {
         Size = 0
         Folder = +
         Modified = 2025-03-04 05:06:07
+        Created = 2025-03-04 05:06:07.75
+
+        Path = malformed-date.txt
+        Size = 0
+        Modified = 2025-03-04 05:06:07.invalid
 
         """.replacingOccurrences(of: "Modified =\n", with: "Modified = \n"))
-        #expect(entries.count == 3)
+        #expect(entries.count == 4)
         let calendar = Calendar(identifier: .gregorian)
         let modified = try #require(calendar.date(from: DateComponents(year: 2025, month: 3, day: 4, hour: 5, minute: 6, second: 7)))
         let created = try #require(calendar.date(from: DateComponents(year: 2024, month: 1, day: 2, hour: 3, minute: 4, second: 5)))
@@ -162,7 +167,8 @@ struct ArchiveBrowserTests {
         #expect(entries[1].createdDate == nil)
         #expect(entries[2].isDirectory)
         #expect(entries[2].modifiedDate == modified)
-        #expect(entries[2].createdDate == nil)
+        #expect(entries[2].createdDate == modified.addingTimeInterval(0.75))
+        #expect(entries[3].modifiedDate == nil)
         let indexed = try ArchiveBrowserModel.directoryEntries(entries)
         #expect(indexed.first { $0.normalizedPath == "folder" }?.modifiedDate == modified)
     }
@@ -233,18 +239,21 @@ struct ArchiveBrowserTests {
         model.selection = "source/file2.txt"
         model.sortOrder = [.init(field: .size, order: .reverse)]
         model.sortOrder = [.init(field: .size)]
-        try await waitUntil { model.visibleEntries.map(\.name) == ["file10.txt", "file2.txt"] }
+        try await waitUntil { model.outline.roots.map(\.name) == ["file10.txt", "file2.txt"] }
         #expect(model.selectedEntry?.path == "source/file2.txt")
         model.search = "file2"
-        try await waitUntil { model.visibleEntries.map(\.name) == ["file2.txt"] }
+        try await waitUntil { model.outline.roots.map(\.name) == ["file2.txt"] }
         model.search = "file"
-        try await waitUntil { model.visibleEntries.map(\.name) == ["file10.txt", "file2.txt"] }
+        try await waitUntil { model.outline.roots.map(\.name) == ["file10.txt", "file2.txt"] }
+        model.filter = .folders
+        try await waitUntil { model.outline.roots.isEmpty }
+        model.filter = .all
         model.navigate(to: "")
-        try await waitUntil { model.visibleEntries.map(\.name) == ["source"] }
+        try await waitUntil { model.outline.roots.map(\.name) == ["source"] }
         model.navigate(to: "source")
-        try await waitUntil { model.visibleEntries.map(\.name) == ["file10.txt", "file2.txt"] }
+        try await waitUntil { model.outline.roots.map(\.name) == ["file10.txt", "file2.txt"] }
         model.sortOrder = [.init()]
-        #expect(model.visibleEntries.map(\.name) == ["file2.txt", "file10.txt"])
+        #expect(model.outline.roots.map(\.name) == ["file2.txt", "file10.txt"])
     }
 
     @Test func unsafeAndOversizedEntriesCannotBePreviewed() async throws {
@@ -330,6 +339,8 @@ struct ArchiveBrowserTests {
         let search = try await index.outline(folder: "", query: "large", filter: .all, sortOrder: [.init()])
         #expect(search.roots.map(\.path) == ["source/nested/large.json"])
         #expect(search.children.isEmpty)
+        let defaultOrder = try await index.outline(folder: "", query: "file", filter: .files, sortOrder: [])
+        #expect(defaultOrder.roots.map(\.name) == ["file2.txt", "file10.txt"])
     }
 
     @Test @MainActor func rapidNavigationAndSelectionKeepLatestPreview() async throws {
@@ -348,10 +359,10 @@ struct ArchiveBrowserTests {
         try await waitUntil { !model.loading }
         #expect(model.error == nil)
         model.navigate(to: "source")
-        #expect(model.visibleEntries.map(\.name) == ["first.txt", "second.txt"])
+        #expect(model.outline.roots.map(\.name) == ["first.txt", "second.txt"])
         model.search = "first"
         model.search = "second"
-        try await waitUntil { model.visibleEntries.map(\.name) == ["second.txt"] }
+        try await waitUntil { model.outline.roots.map(\.name) == ["second.txt"] }
         model.search = ""
         model.selection = "source/first.txt"
         model.showPreview()

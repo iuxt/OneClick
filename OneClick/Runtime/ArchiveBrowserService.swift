@@ -121,10 +121,22 @@ nonisolated enum ArchiveBrowserService {
         dateFormatter.timeZone = .current
         dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
         dateFormatter.isLenient = false
+        // Archive entries often share a timestamp to the second. Keep the
+        // cache local and bounded, and parse fractional seconds per entry.
+        var datesBySecond: [Substring: Date] = [:]
         func date(_ text: String?) -> Date? {
             guard let text, !text.isEmpty else { return nil }
             let parts = text.split(separator: ".", maxSplits: 1, omittingEmptySubsequences: false)
-            guard parts[0].count == 19, let base = dateFormatter.date(from: String(parts[0])) else { return nil }
+            let second = parts[0]
+            guard second.count == 19 else { return nil }
+            let base: Date
+            if let cached = datesBySecond[second] {
+                base = cached
+            } else {
+                guard let parsed = dateFormatter.date(from: String(second)) else { return nil }
+                base = parsed
+                if datesBySecond.count < 4_096 { datesBySecond[second] = base }
+            }
             guard parts.count == 2 else { return base }
             guard !parts[1].isEmpty, parts[1].allSatisfy({ $0.isASCII && $0.isNumber }),
                   let fraction = Double("0." + parts[1]) else { return nil }
@@ -132,6 +144,7 @@ nonisolated enum ArchiveBrowserService {
         }
         func finish() throws {
             guard !fields.isEmpty else { return }
+            try Task.checkCancellation()
             guard let path = fields["Path"], let sizeText = fields["Size"], let size = Int64(sizeText), size >= 0 else {
                 throw ArchiveBrowserError.invalidListing
             }

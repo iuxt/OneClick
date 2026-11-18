@@ -1,72 +1,60 @@
-//
-//  ActionSettingsView.swift
-//  OneClick
-//
-//  Created by 李旭 on 2024/4/9.
-//
-
 import SwiftUI
 
-@available(macOS 27, *)
 struct ActionSettingsTabView: View {
-    @EnvironmentObject var appState: AppState
+    @EnvironmentObject private var appState: AppState
+    @State private var confirmingRestore = false
 
     var body: some View {
-        Form {
-            Section {
-                Toggle(isOn: $appState.foldActionsMenu) {
-                    Text(appLocalized: "Collapse actions menu")
-                }
+        SettingsSection {
+            SettingsRow {
+                SettingsSwitch("Collapse actions menu", isOn: $appState.foldActionsMenu)
                     .onChange(of: appState.foldActionsMenu) {
                         NotificationCenter.default.post(name: .menuConfigShouldUpdate, object: nil)
                     }
             }
-
-            Section {
-                ActionSettingsList(archives: false)
-            } footer: {
-                HStack {
-                    Spacer()
-                    Button(AppLocalization.localized("Restore Defaults")) {
-                        appState.resetActionItems(archives: false)
-                    }
-                }
-            }
         }
-        .formStyle(.grouped)
+
+        ActionSettingsList(archives: false) {
+            Button(AppLocalization.localized("Restore Defaults")) { confirmingRestore = true }
+        }
+        .alert(Text(appLocalized: "Restore Default Actions?"), isPresented: $confirmingRestore) {
+            Button(AppLocalization.localized("Cancel"), role: .cancel) {}
+            Button(AppLocalization.localized("Restore Defaults"), role: .destructive) {
+                appState.resetActionItems(archives: false)
+            }
+        } message: {
+            Text(appLocalized: "This resets which actions are enabled and restores their original order.")
+        }
     }
 }
 
-@available(macOS 27, *)
-struct ActionSettingsList: View {
-    @EnvironmentObject var appState: AppState
+struct ActionSettingsList<Actions: View>: View {
+    @EnvironmentObject private var appState: AppState
     let archives: Bool
+    @ViewBuilder var actions: () -> Actions
 
     var body: some View {
-        List {
-            ForEach($appState.actions.filter { $0.wrappedValue.isArchive == archives }) { $item in
-                LabeledContent {
-                    Toggle(AppLocalization.localized("Enabled"), isOn: $item.enabled)
-                        .toggleStyle(.checkbox)
-                        .labelsHidden()
-                        .onChange(of: item.enabled) {
-                            appState.toggleActionItem()
-                            Messager.shared.sendRunningNotification()
-                        }
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "line.3.horizontal")
-                            .foregroundColor(.secondary)
-                        Label(item.displayName, systemImage: item.icon)
-                    }
-                }
-                .listRowInsets(EdgeInsets(top: 8, leading: 2, bottom: 8, trailing: 2))
+        SettingsCollection(
+            title: "Menu Items",
+            items: appState.actions.filter { $0.isArchive == archives },
+            move: { appState.moveActions(from: $0, to: $1, archives: archives) },
+            actions: actions
+        ) { item, reordering in
+            SettingsItemLabel(title: item.displayName) {
+                Image(systemName: item.icon).foregroundStyle(.secondary)
             }
-            .onMove { source, destination in
-                appState.moveActions(from: source, to: destination, archives: archives)
-                Messager.shared.sendRunningNotification()
+            Spacer(minLength: 8)
+            if !reordering {
+                Toggle(item.displayName, isOn: Binding(
+                    get: { appState.getActionItem(rid: item.id)?.enabled ?? item.enabled },
+                    set: { enabled in
+                        guard let index = appState.actions.firstIndex(where: { $0.id == item.id }) else { return }
+                        appState.actions[index].enabled = enabled
+                        appState.toggleActionItem()
+                    }
+                ))
+                .labelsHidden()
             }
         }
-        .frame(minHeight: 180)
     }
 }

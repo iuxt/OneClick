@@ -32,29 +32,38 @@ struct ArchiveAssociationView: View {
     @State private var result: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 20) {
-                ForEach(ArchiveAssociationFormat.all) { format in
+        SettingsSection(
+            title: "Archive Formats",
+            footer: "Choose formats to open with OneClick by default. Double-clicking an associated archive opens the file browser and preview window."
+        ) {
+            Button(AppLocalization.localized("Associate Selected Formats"), systemImage: "link") { associate() }
+                .buttonStyle(.borderedProminent)
+                .disabled(selected.isEmpty || associating)
+        } content: {
+            ForEach(ArchiveAssociationFormat.all) { format in
+                SettingsRow {
                     Toggle(format.id, isOn: Binding(
                         get: { selected.contains(format.id) },
                         set: { if $0 { selected.insert(format.id) } else { selected.remove(format.id) } }
                     ))
                     .toggleStyle(.checkbox)
+                    .disabled(associating)
+                    Spacer()
+                    if associated.contains(format.id) {
+                        Label(AppLocalization.localized("Associated"), systemImage: "checkmark.circle.fill")
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
-            Text(appLocalized: "Choose formats to open with OneClick by default. Double-clicking an associated archive opens the file browser and preview window.")
-                .font(.caption).foregroundStyle(.secondary)
-            HStack {
-                Button(AppLocalization.localized("Associate Selected Formats"), systemImage: "link") { associate() }
-                    .disabled(selected.isEmpty || associating)
-                if associating { ProgressView().controlSize(.small) }
-                Spacer()
-                if !associated.isEmpty {
-                    Text(AppLocalization.localized("Associated") + ": " + associated.sorted().joined(separator: ", "))
-                        .font(.caption).foregroundStyle(.secondary)
+            if associating {
+                SettingsRow {
+                    ProgressView().controlSize(.small)
+                    Text(appLocalized: "Working on settings…")
                 }
             }
-            if let result { Text(result).font(.caption).textSelection(.enabled) }
+            if let result {
+                SettingsRow { Text(result).font(.callout).textSelection(.enabled) }
+            }
         }
         .task(id: isActive) {
             if isActive { await refresh() }
@@ -70,10 +79,11 @@ struct ArchiveAssociationView: View {
     private func associate() {
         associating = true
         result = nil
+        let formats = selected
         Task {
             var failures: [String] = []
             var updated: Set<String> = []
-            for format in ArchiveAssociationFormat.all where selected.contains(format.id) {
+            for format in ArchiveAssociationFormat.all where formats.contains(format.id) {
                 guard let type = UTType(format.typeID) else { failures.append(format.id); continue }
                 do {
                     try await NSWorkspace.shared.setDefaultApplication(at: Bundle.main.bundleURL, toOpen: type)

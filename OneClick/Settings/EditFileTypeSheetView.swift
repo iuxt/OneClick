@@ -30,8 +30,6 @@ struct EditFileTypeSheetView: View {
     @State private var showSelectApp = false
     @State private var showSelectTemplate = false
 
-    let messager = Messager.shared
-
     private static let legacyIconSymbols: [String: String] = [
         "icon-file-json": "curlybraces",
         "icon-file-txt": "doc.text",
@@ -67,156 +65,122 @@ struct EditFileTypeSheetView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            Text(appLocalized: isAdding ? "Add File Type" : "Edit File Type")
-                .font(.headline)
-                .padding(.top, 20)
-                .padding(.bottom, 12)
-
-            Form {
-                Section {
-                    TextField(AppLocalization.localized("Display Name"), text: $name)
-                        .textFieldStyle(.roundedBorder)
-                } header: {
-                    Text(appLocalized: "Name")
+        SettingsSheet(title: isAdding ? "Add File Type" : "Edit File Type") {
+            SettingsEditor {
+                SettingsSection {
+                    SettingsRow {
+                        SettingsTextField(title: "Display Name", text: $name)
+                    }
+                    SettingsRow {
+                        SettingsTextField(title: "File Extension", text: $ext, prompt: Text(verbatim: "txt, md, json"))
+                    }
                 }
 
-                Section {
-                    TextField(AppLocalization.localized("File Extension"), text: $ext)
-                        .textFieldStyle(.roundedBorder)
-                } header: {
-                    Text(appLocalized: "File Extension")
-                } footer: {
-                    Text(appLocalized: "For example: txt, md, json")
-                        .foregroundColor(.secondary)
-                }
-
-                Section {
-                    HStack {
-                        if let templateUrl = template {
-                            Text(templateUrl.lastPathComponent)
-                            Button {
-                                template = nil
-                            } label: {
-                                Image(systemName: "xmark.circle.fill")
-                            }
-                            .buttonStyle(.plain)
+                SettingsSection(
+                    "Template",
+                    footer: template == nil && FileCreationPolicy.builtInTemplate(for: ext) != nil
+                        ? "A built-in blank document is used by default. Custom templates are optional."
+                        : nil
+                ) {
+                    SettingsRow {
+                        if let template {
+                            Text(template.lastPathComponent)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                                .help(template.path)
+                        } else {
+                            Text(appLocalized: "No Template Selected")
                         }
-                        Button {
+                        Spacer()
+                        Button(AppLocalization.localized(template == nil ? "Choose Template File" : "Change Template")) {
                             showSelectTemplate = true
-                        } label: {
-                            Text(appLocalized: template == nil ? "Choose Template File" : "Change Template")
                         }
-                        .fileImporter(
-                            isPresented: $showSelectTemplate,
-                            allowedContentTypes: [.content],
-                            allowsMultipleSelection: false
-                        ) { result in
-                            switch result {
-                            case .success(let files):
-                                if let url = files.first {
-                                    template = url
-                                }
-                            case .failure:
-                                break
+                        if template != nil {
+                            SettingsIconButton(title: "Clear Selection", symbol: "xmark.circle") { template = nil }
+                        }
+                    }
+                }
+
+                SettingsSection(
+                    "Open New Files With",
+                    footer: "New files open with the selected application. Without a selection, they are revealed in Finder."
+                ) {
+                    SettingsRow {
+                        if let openApp {
+                            SettingsItemLabel(title: openApp.deletingPathExtension().lastPathComponent) {
+                                SettingsIcon(source: .application(openApp))
                             }
+                        } else {
+                            Text(verbatim: "Finder")
                         }
-                    }
-                } header: {
-                    Text(appLocalized: "Template")
-                } footer: {
-                    if template == nil, FileCreationPolicy.builtInTemplate(for: ext) != nil {
-                        Text(appLocalized: "A built-in blank document is used by default. Custom templates are optional.")
-                    }
-                }
-
-                Section {
-                    Picker(AppLocalization.localized("Fallback Icon"), selection: $icon) {
-                        if !Self.iconChoices.contains(where: { $0.symbol == icon }) {
-                            Text(appLocalized: "Current Icon").tag(icon)
-                        }
-                        ForEach(Self.iconChoices, id: \.symbol) { choice in
-                            Label(AppLocalization.localized(choice.title), systemImage: choice.symbol)
-                                .tag(choice.symbol)
-                        }
-                    }
-                    LabeledContent(AppLocalization.localized("Menu Preview")) {
-                        SettingsIcon(source: openApp.map { .application($0) } ?? .fileType(ext, fallback: icon))
-                            .frame(width: 24, height: 24)
-                            .accessibilityHidden(true)
-                    }
-                } header: {
-                    Text(appLocalized: "Icon")
-                } footer: {
-                    Text(appLocalized: "Uses the chosen app’s icon or the file type’s system icon automatically. The fallback icon is used when neither is available.")
-                        .foregroundColor(.secondary)
-                }
-
-                Section {
-                    HStack {
-                        if let appUrl = openApp {
-                            Image(nsImage: IconCache.shared.icon(for: appUrl))
-                                .resizable()
-                                .frame(width: 20, height: 20)
-                            Text(appUrl.lastPathComponent)
-                        }
-
-                        Button {
+                        Spacer()
+                        Button(AppLocalization.localized(openApp == nil ? "Choose Default App" : "Change App")) {
                             showSelectApp = true
-                        } label: {
-                            Text(appLocalized: openApp == nil ? "Choose Default App" : "Change App")
                         }
-                        .fileImporter(
-                            isPresented: $showSelectApp,
-                            allowedContentTypes: [.application],
-                            allowsMultipleSelection: false
-                        ) { result in
-                            switch result {
-                            case .success(let files):
-                                if let url = files.first {
-                                    openApp = url
-                                }
-                            case .failure:
-                                break
-                            }
-                        }
-
                         if openApp != nil {
-                            Button {
-                                openApp = nil
-                            } label: {
-                                Image(systemName: "xmark.circle.fill")
-                            }
-                            .buttonStyle(.plain)
+                            SettingsIconButton(title: "Clear Selection", symbol: "xmark.circle") { openApp = nil }
                         }
                     }
-                } header: {
-                    Text(appLocalized: "Open New Files With")
-                } footer: {
-                    Text(appLocalized: "New files open with the selected application. Without a selection, they are revealed in Finder.")
+                }
+
+                SettingsSection(
+                    "Icon",
+                    footer: "Uses the chosen app’s icon or the file type’s system icon automatically. The fallback icon is used when neither is available."
+                ) {
+                    SettingsRow {
+                        SettingsPicker("Fallback Icon", selection: $icon) {
+                            if !Self.iconChoices.contains(where: { $0.symbol == icon }) {
+                                Text(appLocalized: "Current Icon").tag(icon)
+                            }
+                            ForEach(Self.iconChoices, id: \.symbol) { choice in
+                                Label(AppLocalization.localized(choice.title), systemImage: choice.symbol)
+                                    .tag(choice.symbol)
+                            }
+                        }
+                    }
+                    SettingsRow {
+                        LabeledContent(AppLocalization.localized("Menu Preview")) {
+                            SettingsIcon(source: openApp.map { .application($0) } ?? .fileType(ext, fallback: icon))
+                                .frame(width: 24, height: 24)
+                                .accessibilityHidden(true)
+                        }
+                    }
                 }
             }
-            .formStyle(.grouped)
-
-            if isSaving { ProgressView().controlSize(.small).padding(.bottom, 8) }
-            if let saveError { Text(saveError).foregroundStyle(.red).padding(.horizontal) }
-            HStack {
-                Button(AppLocalization.localized("Cancel")) {
-                    dismiss()
-                }
-                .buttonStyle(.glass)
-                .keyboardShortcut(.escape)
-
-                Button(AppLocalization.localized(isAdding ? "Add" : "Save")) {
-                    saveTask = Task { await saveChanges() }
-                }
-                .buttonStyle(.glassProminent)
-                .keyboardShortcut(.return)
-                .disabled(name.isEmpty || ext.isEmpty)
+        } footer: {
+            if isSaving { ProgressView().controlSize(.small) }
+            if let saveError {
+                Label(saveError, systemImage: "exclamationmark.triangle")
+                    .foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            .padding(.bottom, 20)
+            Spacer(minLength: 8)
+            Button(AppLocalization.localized("Cancel")) { dismiss() }
+                .keyboardShortcut(.cancelAction)
+            Button(AppLocalization.localized(isAdding ? "Add" : "Save")) {
+                saveTask = Task { await saveChanges() }
+            }
+            .buttonStyle(.borderedProminent)
+            .keyboardShortcut(.defaultAction)
+            .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || ext.isEmpty)
         }
-        .frame(width: 440, height: 580)
+        .frame(width: 590, height: 580)
+        .fileImporter(isPresented: $showSelectTemplate, allowedContentTypes: [.content]) { result in
+            switch result {
+            case .success(let url):
+                template = url
+                saveError = nil
+            case .failure(let error): saveError = error.localizedDescription
+            }
+        }
+        .fileImporter(isPresented: $showSelectApp, allowedContentTypes: [.application]) { result in
+            switch result {
+            case .success(let url):
+                openApp = url
+                saveError = nil
+            case .failure(let error): saveError = error.localizedDescription
+            }
+        }
         .disabled(isSaving)
         .interactiveDismissDisabled(isSaving)
         .onDisappear { saveTask?.cancel() }
@@ -229,32 +193,33 @@ struct EditFileTypeSheetView: View {
         defer { isSaving = false }
         do {
             let normalizedExtension = try FileCreationPolicy.normalizedExtension(ext)
+            let existing = appState.getFileType(rid: file.id)
+            let previousTemplate = existing?.template ?? file.template
             let savedTemplate: URL?
             if let template {
                 guard let templatesDir else { throw CocoaError(.fileNoSuchFile) }
-                savedTemplate = try await FileActionWorker.importTemplate(from: template, into: templatesDir, existing: file.template)
+                savedTemplate = try await FileActionWorker.importTemplate(from: template, into: templatesDir, existing: previousTemplate)
             } else {
                 savedTemplate = nil
             }
             if Task.isCancelled {
-                if let savedTemplate, savedTemplate != file.template {
+                if let savedTemplate, savedTemplate != previousTemplate {
                     _ = await FileActionWorker.remove([savedTemplate.deletingLastPathComponent().path])
                 }
                 return
             }
-            var updated = isAdding
-                ? NewFile(ext: ext, name: name, idx: appState.newFiles.count, icon: icon)
-                : file
+            var updated = existing ?? file
+            if existing == nil && isAdding { updated.idx = appState.newFiles.count }
             updated.name = name
             updated.ext = normalizedExtension
             updated.icon = icon
             updated.openApp = openApp
             updated.template = savedTemplate
-            if isAdding {
-                appState.addNewFile(updated)
-            } else if let index = appState.newFiles.firstIndex(where: { $0.id == file.id }) {
+            if let index = appState.newFiles.firstIndex(where: { $0.id == file.id }) {
                 appState.newFiles[index] = updated
                 appState.sync()
+            } else if isAdding {
+                appState.addNewFile(updated)
             }
             if let error = appState.lastSaveError { saveError = error }
             else { dismiss() }

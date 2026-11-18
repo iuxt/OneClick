@@ -4,7 +4,7 @@ extension EnvironmentValues {
     @Entry var isSettingsPageActive = true
 }
 
-/// Keep visited Forms alive so navigation does not recreate their controls,
+/// Keep visited pages alive so navigation does not recreate their controls,
 /// reload icons or discard scroll positions. Unvisited pages cost nothing.
 @available(macOS 27, *)
 struct SettingsPageStack<Content: View>: View {

@@ -388,6 +388,7 @@ struct ArchiveServiceTests {
         #expect(initial.exclusionList == ArchiveCompressionSettings.defaultExclusionList)
         #expect(initial.threadCount == 0)
         #expect(initial.effectiveThreadCount == ArchiveCompressionSettings.maximumThreadCount)
+        #expect(initial.parallelZIPThreadCount == min(4, ArchiveCompressionSettings.maximumThreadCount))
 
         defaults.set(true, forKey: "archiveExcludeFiles")
         defaults.set("*.tmp\n\n*.tmp\r\n .DS_Store ", forKey: "archiveExclusionList")
@@ -395,10 +396,12 @@ struct ArchiveServiceTests {
         let saved = ArchiveCompressionSettings.load(from: defaults)
         #expect(saved.exclusionPatterns == ["*.tmp", ".DS_Store"])
         #expect(saved.effectiveThreadCount == 1)
+        #expect(saved.parallelZIPThreadCount == 1)
         for invalid in [-1, Int.max] {
             defaults.set(invalid, forKey: "archiveCompressionThreads")
             #expect(ArchiveCompressionSettings.load(from: defaults).effectiveThreadCount == ArchiveCompressionSettings.maximumThreadCount)
         }
+        #expect(ArchiveCompressionSettings.load(from: defaults).parallelZIPThreadCount == ArchiveCompressionSettings.maximumThreadCount)
         defaults.set("", forKey: "archiveExclusionList")
         #expect(ArchiveCompressionSettings.load(from: defaults).exclusionPatterns.isEmpty)
     }

@@ -917,7 +917,10 @@ private struct ArchiveCompressionForm: View {
 
             VStack(alignment: .leading, spacing: 8) {
                 if form.format != .dmg {
+                    let tarMetadataHelp = "This can speed up TAR.GZ compression of folders with many small files. Resource forks and extended attributes are omitted."
                     Toggle(AppLocalization.localized("Exclude Mac Resource Files"), isOn: $form.excludeMacResourceFiles)
+                        .help(form.format == .tarGzip ? AppLocalization.localized(tarMetadataHelp) : "")
+                        .accessibilityHint(form.format == .tarGzip ? AppLocalization.localized(tarMetadataHelp) : "")
                 }
                 Toggle(AppLocalization.localized("Verify After Compression"), isOn: $form.verifyAfterCompression)
                 Toggle(AppLocalization.localized("Delete Source Files After Compression"), isOn: $form.deletesSourcesAfterSuccess)

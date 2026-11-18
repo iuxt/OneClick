@@ -6,10 +6,7 @@
 //
 
 import AppKit
-import Cocoa
-import Combine
 import FinderSync
-import Foundation
 import OSLog
 import SwiftUI
 import UniformTypeIdentifiers
@@ -29,101 +26,42 @@ struct GeneralSettingsTabView: View {
     @State private var managingSettings = false
     @State private var managementMessage: String?
     @State private var managementFailed = false
+    @State private var confirmingReset = false
+    @State private var backupToImport: URL?
 
     @AppStorage(Key.showMenuBarExtra, store: .group) private var showMenuBarExtra = true
 
     @State private var finderSyncStatus: PermissionStatus = .unknown
 
 
-    let messager = Messager.shared
-
     var body: some View {
-        Form {
-            if section == .startup {
-                Section {
-                    LaunchAtLogin.Toggle {
-                        Text(appLocalized: "Launch at login")
+        Group {
+            switch section {
+            case .startup:
+                SettingsSection {
+                    SettingsRow {
+                        LaunchAtLogin.Toggle { Text(appLocalized: "Launch at login") }
                     }
-
-                    Toggle(isOn: $showMenuBarExtra) {
-                        Text(appLocalized: "Show icon in menu bar")
+                    SettingsRow {
+                        SettingsSwitch("Show icon in menu bar", isOn: $showMenuBarExtra)
                     }
-                } header: {
-                    Text(appLocalized: "Main Controls")
                 }
-
-            }
-            if section == .permissions {
-                Section {
-                    // Finder 扩展状态
-                    LabeledContent {
-                        HStack(spacing: 8) {
-                            Text(finderSyncStatus.description)
-                                .foregroundColor(.secondary)
-                            Button(AppLocalization.localized("Settings…")) {
-                                openFinderExtensionSettings()
-                            }
+            case .permissions:
+                SettingsSection(
+                    footer: "Finder extension: enable \"OneClick\" under System Settings > General > Login Items & Extensions > Extensions."
+                ) {
+                    SettingsRow {
+                        SettingsItemLabel(title: AppLocalization.localized("Finder Extension"), detail: finderSyncStatus.description) {
+                            Image(systemName: finderSyncStatus.icon).foregroundStyle(finderSyncStatus.color)
                         }
-                    } label: {
-                        Label(AppLocalization.localized("Finder Extension"), systemImage: finderSyncStatus.icon)
-                            .foregroundColor(finderSyncStatus.color)
-                    }
-
-                } header: {
-                    Text(appLocalized: "Permissions")
-                } footer: {
-                    Text(appLocalized: "Finder extension: enable \"OneClick\" under System Settings > General > Login Items & Extensions > Extensions.")
-                        .foregroundColor(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
-            }
-            if section == .management {
-                Section {
-                    // 备份
-                    LabeledContent {
-                        HStack(spacing: 12) {
-                            Button(AppLocalization.localized("Export…")) {
-                                exportSettings()
-                            }
-                            Button(AppLocalization.localized("Import…")) {
-                                importSettings()
-                            }
-                        }
-                    } label: {
-                        Text(appLocalized: "Backup")
-                    }
-
-                    // 日志
-                    LabeledContent {
-                        Button(AppLocalization.localized("Export Logs…")) {
-                            exportLogs()
-                        }
-                    } label: {
-                        Text(appLocalized: "Logs")
-                    }
-
-                    // 重置所有设置
-                    HStack {
                         Spacer()
-                        Button(AppLocalization.localized("Reset All Settings…")) {
-                            resetAllSettings()
-                        }
-                        .foregroundColor(.red)
+                        Button(AppLocalization.localized("Settings…"), action: openFinderExtensionSettings)
                     }
-                } header: {
-                    Text(appLocalized: "Settings Management")
-                } footer: {
-                    Text(appLocalized: "Backups include app settings and templates. Login items and file associations are managed separately.")
-                        .fixedSize(horizontal: false, vertical: true)
                 }
-                .disabled(managingSettings)
-                if managingSettings {
-                    ProgressView(AppLocalization.localized("Working on settings…"))
-                }
+            case .management:
+                management
             }
         }
-        .formStyle(.grouped)
         .onForeground {
             if isActive && section == .permissions { updatePermissionStatus() }
         }
@@ -143,15 +81,65 @@ struct GeneralSettingsTabView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in
             if isActive && section == .permissions { updatePermissionStatus() }
         }
-        .alert(Text(appLocalized: managementFailed ? "Settings operation failed" : "Settings"), isPresented: Binding(
-            get: { managementMessage != nil }, set: { if !$0 { managementMessage = nil } }
-        )) {
-            Button(AppLocalization.localized("OK"), role: .cancel) { managementMessage = nil }
-        } message: { Text(managementMessage ?? "") }
-
     }
 
-    // MARK: - 权限状态检测
+    private var management: some View {
+        Group {
+            SettingsSection(
+                "Backup",
+                footer: "Backups include app settings and templates. Login items and file associations are managed separately."
+            ) {
+                SettingsRow {
+                    Text(appLocalized: "Export Settings")
+                    Spacer()
+                    Button(AppLocalization.localized("Export…"), action: exportSettings)
+                }
+                SettingsRow {
+                    Text(appLocalized: "Import Settings")
+                    Spacer()
+                    Button(AppLocalization.localized("Import…"), action: chooseSettingsBackup)
+                }
+            }
+            .disabled(managingSettings)
+
+            SettingsSection("Maintenance") {
+                SettingsRow {
+                    Text(appLocalized: "Logs")
+                    Spacer()
+                    Button(AppLocalization.localized("Export Logs…"), action: exportLogs)
+                }
+                SettingsRow {
+                    Text(appLocalized: "Restore Defaults")
+                    Spacer()
+                    Button(AppLocalization.localized("Reset All Settings…")) { confirmingReset = true }
+                }
+            }
+            .disabled(managingSettings)
+
+            if managingSettings {
+                ProgressView(AppLocalization.localized("Working on settings…"))
+                    .controlSize(.small)
+            } else if let managementMessage {
+                Label(managementMessage, systemImage: managementFailed ? "exclamationmark.triangle" : "checkmark.circle")
+                    .foregroundStyle(managementFailed ? Color.orange : Color.secondary)
+                    .textSelection(.enabled)
+            }
+        }
+        .alert(Text(appLocalized: "Reset All Settings?"), isPresented: $confirmingReset) {
+            Button(AppLocalization.localized("Cancel"), role: .cancel) {}
+            Button(AppLocalization.localized("Reset"), role: .destructive, action: resetAllSettings)
+        } message: {
+            Text(appLocalized: "This restores default app settings. Login items and file associations are kept. This action cannot be undone.")
+        }
+        .alert(Text(appLocalized: "Import Settings"), isPresented: Binding(
+            get: { backupToImport != nil }, set: { if !$0 { backupToImport = nil } }
+        ), presenting: backupToImport) { url in
+            Button(AppLocalization.localized("Cancel"), role: .cancel) {}
+            Button(AppLocalization.localized("Import…"), role: .destructive) { importSettings(from: url) }
+        } message: { url in
+            Text(url.lastPathComponent + "\n" + AppLocalization.localized("Importing a backup replaces the current app settings."))
+        }
+    }
 
     private func updatePermissionStatus() {
         // Finder 扩展状态
@@ -174,7 +162,7 @@ struct GeneralSettingsTabView: View {
         savePanel.nameFieldStringValue = "OneClick_Settings.plist"
         savePanel.begin { response in
             guard response == .OK, let url = savePanel.url else { return }
-            performManagement(at: url) {
+            performManagement {
                 let snapshot = AppConfigData(apps: appState.apps, actions: appState.actions,
                                              newFiles: appState.newFiles, commonDirs: appState.cdirs)
                 try await SettingsManagementService(config: appState.configService).export(snapshot, to: url)
@@ -183,21 +171,23 @@ struct GeneralSettingsTabView: View {
         }
     }
 
-    private func importSettings() {
+    private func chooseSettingsBackup() {
         let openPanel = NSOpenPanel()
         openPanel.allowedContentTypes = [.propertyList]
         openPanel.canChooseFiles = true
         openPanel.canChooseDirectories = false
         openPanel.allowsMultipleSelection = false
-        openPanel.message = AppLocalization.localized("Importing a backup replaces the current app settings.")
         openPanel.begin { response in
-            guard response == .OK, let url = openPanel.url else { return }
-            performManagement(at: url) {
-                let snapshot = try await SettingsManagementService(config: appState.configService).restore(from: url)
-                appState.applyConfiguration(snapshot)
-                InputMethodService.shared.reloadConfiguration()
-                return AppLocalization.localized("Settings imported.")
-            }
+            if response == .OK { backupToImport = openPanel.url }
+        }
+    }
+
+    private func importSettings(from url: URL) {
+        performManagement {
+            let snapshot = try await SettingsManagementService(config: appState.configService).restore(from: url)
+            appState.applyConfiguration(snapshot)
+            InputMethodService.shared.reloadConfiguration()
+            return AppLocalization.localized("Settings imported.")
         }
     }
 
@@ -207,7 +197,7 @@ struct GeneralSettingsTabView: View {
         savePanel.nameFieldStringValue = "OneClick_Log.txt"
         savePanel.begin { response in
             guard response == .OK, let url = savePanel.url else { return }
-            performManagement(at: url) {
+            performManagement {
                 try await SettingsBackupIO.exportLogs(to: url)
                 return AppLocalization.localized("Logs exported.")
             }
@@ -215,25 +205,15 @@ struct GeneralSettingsTabView: View {
     }
 
     private func resetAllSettings() {
-        let alert = NSAlert()
-        alert.messageText = AppLocalization.localized("Reset All Settings?")
-        alert.informativeText = AppLocalization.localized("This restores default app settings. Login items and file associations are kept. This action cannot be undone.")
-        alert.alertStyle = .warning
-        alert.addButton(withTitle: AppLocalization.localized("Reset"))
-        alert.addButton(withTitle: AppLocalization.localized("Cancel"))
-        alert.buttons[0].hasDestructiveAction = true
-
-        let response = alert.runModal()
-        if response == .alertFirstButtonReturn {
-            performManagement {
-                let snapshot = try SettingsManagementService(config: appState.configService).reset()
-                appState.applyConfiguration(snapshot)
-                InputMethodService.shared.reloadConfiguration()
-                return AppLocalization.localized("Default settings restored.")
-            }
+        performManagement {
+            let snapshot = try SettingsManagementService(config: appState.configService).reset()
+            appState.applyConfiguration(snapshot)
+            InputMethodService.shared.reloadConfiguration()
+            return AppLocalization.localized("Default settings restored.")
         }
     }
-    private func performManagement(at url: URL? = nil, operation: @escaping @MainActor () async throws -> String) {
+
+    private func performManagement(operation: @escaping @MainActor () async throws -> String) {
         guard !managingSettings else { return }
         managingSettings = true
         Task { @MainActor in

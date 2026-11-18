@@ -103,7 +103,12 @@ extension LaunchAtLogin {
 
         public var body: some View {
             VStack(alignment: .leading, spacing: 4) {
-                SwiftUI.Toggle(isOn: $launchAtLogin.isEnabled) { label }
+                HStack(spacing: 12) {
+                    label.accessibilityHidden(true)
+                    Spacer(minLength: 8)
+                    SwiftUI.Toggle(isOn: $launchAtLogin.isEnabled) { label }
+                        .labelsHidden()
+                }
                 if let warningKey = warningMessageKey {
                     SwiftUI.Label {
                         Text(AppLocalization.localized(warningKey))

@@ -1,110 +1,73 @@
-//
-//  CommonDirsSettingTabView.swift
-//  OneClick
-//
-//  Created by 李旭 on 2024/4/10.
-//
-
-import AppKit
-import Cocoa
-import FinderSync
-import Foundation
-import OSLog
 import SwiftUI
 import UniformTypeIdentifiers
 
-@available(macOS 27, *)
 struct CommonDirsSettingTabView: View {
-    @AppLog(category: "settings-general")
-    private var logger
-    
-    @EnvironmentObject var store: AppState
-    
-    @State private var showCommonDirImporter = false
-    
+    @EnvironmentObject private var appState: AppState
+    @State private var choosingFolder = false
+    @State private var folderError: String?
+
     var body: some View {
-        Form {
-            Section {
-                Toggle(isOn: $store.showCommonDirs) {
-                    Text(appLocalized: "Enable common folders")
-                }
-                    .onChange(of: store.showCommonDirs) {
-                        NotificationCenter.default.post(name: .menuConfigShouldUpdate, object: nil)
-                    }
-                Toggle(isOn: $store.foldCommonDirMenu) {
-                    Text(appLocalized: "Collapse common folders menu")
-                }
-                    .disabled(!store.showCommonDirs)
-                    .onChange(of: store.foldCommonDirMenu) {
-                        NotificationCenter.default.post(name: .menuConfigShouldUpdate, object: nil)
-                    }
+        SettingsSection {
+            SettingsRow {
+                SettingsSwitch("Enable common folders", isOn: $appState.showCommonDirs)
+                    .onChange(of: appState.showCommonDirs) { updateMenu() }
             }
-
-            Section {
-                HStack {
-                    Spacer()
-                    Button {
-                        showCommonDirImporter = true
-                    } label: {
-                        Label(AppLocalization.localized("Add Folder"), systemImage: "folder.badge.plus")
-                    }
-                }
-
-                ForEach(store.cdirs) { item in
-                    LabeledContent {
-                        Button {
-                            removeCommonDir(item)
-                        } label: {
-                            Image(systemName: "trash")
-                        }
-                        .buttonStyle(.borderless)
-                        .help(AppLocalization.localized("Remove Folder"))
-                        .accessibilityLabel(String(format: AppLocalization.localized("Remove folder %@"), item.url.path))
-                    } label: {
-                        Label {
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(item.displayName)
-                                Text(item.url.path)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(1)
-                                    .truncationMode(.middle)
-                            }
-                        } icon: {
-                            Image(systemName: item.icon.isEmpty ? "folder" : item.icon)
-                        }
-                        .help(item.url.path)
-                    }
-                }
-            } header: {
-                Text(appLocalized: "Added Folders")
+            SettingsRow {
+                SettingsSwitch("Collapse common folders menu", isOn: $appState.foldCommonDirMenu)
+                    .disabled(!appState.showCommonDirs)
+                    .onChange(of: appState.foldCommonDirMenu) { updateMenu() }
             }
         }
-        .formStyle(.grouped)
-        .fileImporter(
-            isPresented: $showCommonDirImporter,
-            allowedContentTypes: [.directory],
-            allowsMultipleSelection: false
-        ) { result in
+
+        SettingsCollection(
+            title: "Added Folders",
+            items: appState.cdirs,
+            emptyTitle: "No Folders Added",
+            emptyIcon: "folder",
+            move: { source, destination in
+                appState.cdirs.move(fromOffsets: source, toOffset: destination)
+                appState.sync()
+            }
+        ) {
+            Button(AppLocalization.localized("Add Folder"), systemImage: "plus") { choosingFolder = true }
+                .buttonStyle(.borderedProminent)
+        } row: { folder, reordering in
+            SettingsItemLabel(title: folder.displayName, detail: folder.url.path) {
+                Image(systemName: folder.icon.isEmpty ? "folder" : folder.icon)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 8)
+            if !reordering {
+                SettingsIconButton(title: "Remove Folder", symbol: "trash", subject: folder.displayName) {
+                    appState.cdirs.removeAll { $0.id == folder.id }
+                    appState.sync()
+                }
+            }
+        }
+        .fileImporter(isPresented: $choosingFolder, allowedContentTypes: [.directory]) { result in
             switch result {
-                case .success(let urls):
-                    if let url = urls.first {
-                        let commonDir = CommonDir(id: UUID().uuidString, name: url.lastPathComponent, url: url, icon: iconForDirectory(url: url))
-                        if !store.cdirs.contains(where: { $0.url == commonDir.url }) {
-                            store.cdirs.append(commonDir)
-                            store.sync()
-                        }
-                    }
-                case .failure(let error):
-                    logger.error("Failed to select common folder: \(error.localizedDescription)")
+            case .success(let url):
+                let folderURL = url.standardizedFileURL
+                guard !appState.cdirs.contains(where: { $0.url.standardizedFileURL == folderURL }) else {
+                    folderError = AppLocalization.localized("This folder has already been added.")
+                    return
+                }
+                appState.cdirs.append(CommonDir(
+                    id: UUID().uuidString, name: folderURL.lastPathComponent, url: folderURL, icon: iconForDirectory(url: folderURL)
+                ))
+                appState.sync()
+            case .failure(let error):
+                folderError = error.localizedDescription
             }
         }
+        .alert(Text(appLocalized: "Add Folder"), isPresented: Binding(
+            get: { folderError != nil }, set: { if !$0 { folderError = nil } }
+        )) {
+            Button(AppLocalization.localized("OK"), role: .cancel) { folderError = nil }
+        } message: { Text(folderError ?? "") }
     }
 
-    @MainActor private func removeCommonDir(_ item: CommonDir) {
-        if let index = store.cdirs.firstIndex(of: item) {
-            store.cdirs.remove(at: index)
-            store.sync()
-        }
+    private func updateMenu() {
+        NotificationCenter.default.post(name: .menuConfigShouldUpdate, object: nil)
     }
 }

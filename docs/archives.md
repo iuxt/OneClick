@@ -56,13 +56,18 @@ omitted. Empty lines and duplicate patterns are ignored. Exclusions default to
 off; the initial list contains `.DS_Store` and `__MACOSX`. Disabling exclusions
 retains the list. Extraction always restores the full archive contents.
 
-**Compression CPU Threads** defaults to **Automatic** (the available logical CPU
-count), or can be set from one to the available logical CPU count. ZIP and 7Z,
-including encrypted archives, pass this limit to 7-Zip; actual CPU use depends
-on the codec and input. TAR.GZ streams the system TAR writer into the bundled
-pigz parallel gzip encoder with the same thread limit.
+**Compression CPU Threads** defaults to **Automatic**. It uses up to four
+threads for eligible single-file ZIP archives created with pigz. For other
+compression paths, it uses the available logical CPU count. An explicit setting
+from one to the available logical CPU count applies to all these paths. Actual
+CPU use depends on the codec and input.
 Both settings apply to **Compress…** and the direct compression shortcuts.
 **Restore Defaults** also resets these settings.
+
+In **Compress…**, **Exclude Mac Resource Files** can speed up TAR.GZ compression
+of folders with many small files. It also omits resource forks and extended
+attributes from TAR.GZ archives. Clear the option when the archive must preserve
+them.
 
 ## Password protection
 

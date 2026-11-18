@@ -159,6 +159,10 @@ nonisolated struct ArchiveCompressionSettings: Sendable {
         threadCount <= 0 ? Self.maximumThreadCount : min(threadCount, Self.maximumThreadCount)
     }
 
+    var parallelZIPThreadCount: Int {
+        threadCount <= 0 ? min(4, Self.maximumThreadCount) : effectiveThreadCount
+    }
+
     var exclusionPatterns: [String] {
         let list = (excludeFiles ? exclusionList : "")
             + (excludeMacResourceFiles ? "\n.DS_Store\n__MACOSX\n._*" : "")
@@ -566,7 +570,7 @@ nonisolated enum ArchiveService {
             } else if shouldUseParallelZIP(request, settings: settings) {
                 let level = request.compressionLevel?.rawValue ?? ArchiveCompressionLevel.normal.rawValue
                 try runParallelZIP(arguments: ["-K", "-c", "-A", first.lastPathComponent,
-                                               "-p", String(settings.effectiveThreadCount), "-\(level)"],
+                                               "-p", String(settings.parallelZIPThreadCount), "-\(level)"],
                                    input: first, output: result, directory: parent, progress: progress)
             } else {
                 let executable = useSevenZip ? try sevenZipURL() : URL(fileURLWithPath: "/usr/bin/tar")

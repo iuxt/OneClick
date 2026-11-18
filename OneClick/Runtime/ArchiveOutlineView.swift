@@ -22,7 +22,7 @@ struct ArchiveOutlineView: NSViewRepresentable {
         outline.style = .plain
         outline.backgroundColor = .clear
         outline.usesAlternatingRowBackgroundColors = false
-        outline.rowHeight = 27
+        outline.rowHeight = 31
         outline.intercellSpacing = NSSize(width: 8, height: 0)
         outline.indentationPerLevel = 16
         outline.columnAutoresizingStyle = .noColumnAutoresizing

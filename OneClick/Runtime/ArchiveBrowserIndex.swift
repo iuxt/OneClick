@@ -25,24 +25,27 @@ nonisolated struct ArchiveBrowserIndex: Sendable {
     let entries: [ArchiveEntry]
     let byID: [String: ArchiveEntry]
     let children: [String: [ArchiveEntry]]
-    private let searchable: [(entry: ArchiveEntry, path: String)]
+    private let searchPaths: [String]
 
     init() {
-        entries = []; byID = [:]; children = [:]; searchable = []
+        entries = []; byID = [:]; children = [:]; searchPaths = []
     }
 
     private init(entries: [ArchiveEntry], byID: [String: ArchiveEntry],
-                 children: [String: [ArchiveEntry]], searchable: [(entry: ArchiveEntry, path: String)]) {
+                 children: [String: [ArchiveEntry]], searchPaths: [String]) {
         self.entries = entries; self.byID = byID
-        self.children = children; self.searchable = searchable
+        self.children = children; self.searchPaths = searchPaths
     }
 
     @concurrent
     static func build(_ listed: [ArchiveEntry]) async throws -> Self {
         let entries = try ArchiveBrowserModel.directoryEntries(listed)
-        // Cache path components before sorting instead of splitting strings in
-        // every comparison (and again on every SwiftUI body evaluation).
-        var named = entries.map { (entry: $0, name: $0.name, path: $0.normalizedPath, parent: $0.parent) }
+        var named = entries.map { entry in
+            let path = entry.normalizedPath
+            let parts = path.components(separatedBy: "/")
+            return (entry: entry, name: parts.last ?? entry.path, path: path,
+                    parent: parts.dropLast().joined(separator: "/"))
+        }
         try Task.checkCancellation()
         named.sort {
             if $0.entry.isDirectory != $1.entry.isDirectory { return $0.entry.isDirectory }
@@ -57,15 +60,17 @@ nonisolated struct ArchiveBrowserIndex: Sendable {
             byID[item.entry.id] = item.entry
         }
         return Self(entries: named.map(\.entry), byID: byID, children: children,
-                    searchable: named.map { ($0.entry, $0.path) })
+                    searchPaths: named.map(\.path))
     }
 
     @concurrent
-    func search(_ query: String) async throws -> [ArchiveEntry] {
+    func search(_ query: String, filter: ArchiveEntryFilter = .all) async throws -> [ArchiveEntry] {
         var result: [ArchiveEntry] = []
-        for item in searchable {
+        for (entry, path) in zip(entries, searchPaths) {
             try Task.checkCancellation()
-            if item.path.localizedStandardContains(query) { result.append(item.entry) }
+            if filter.includes(entry), query.isEmpty || path.localizedStandardContains(query) {
+                result.append(entry)
+            }
         }
         return result
     }
@@ -73,15 +78,19 @@ nonisolated struct ArchiveBrowserIndex: Sendable {
     @concurrent
     func outline(folder: String, query: String, filter: ArchiveEntryFilter,
                  sortOrder: [ArchiveEntrySortComparator]) async throws -> ArchiveBrowserOutline {
-        let comparators = sortOrder.isEmpty ? [ArchiveEntrySortComparator()] : sortOrder
+        let defaultOrder = ArchiveEntrySortComparator.isDefault(sortOrder)
         if !query.isEmpty || filter != .all {
-            let matches = query.isEmpty ? entries : try await search(query)
-            return ArchiveBrowserOutline(roots: try await Self.sorted(matches.filter(filter.includes), using: comparators))
+            let matches = try await search(query, filter: filter)
+            let roots = defaultOrder ? matches : try await Self.sorted(matches, using: sortOrder)
+            return ArchiveBrowserOutline(roots: roots)
+        }
+        if defaultOrder {
+            return ArchiveBrowserOutline(roots: children[folder] ?? [], children: children)
         }
         var sortedChildren: [String: [ArchiveEntry]] = [:]
         for (path, entries) in children {
             try Task.checkCancellation()
-            sortedChildren[path] = entries.sorted(using: comparators)
+            sortedChildren[path] = entries.sorted(using: sortOrder)
         }
         return ArchiveBrowserOutline(roots: sortedChildren[folder] ?? [], children: sortedChildren)
     }
@@ -101,6 +110,10 @@ nonisolated struct ArchiveEntrySortComparator: SortComparator, Sendable {
     enum Field: Hashable, Sendable { case name, size, modified, created }
     var field: Field = .name
     var order: SortOrder = .forward
+
+    static func isDefault(_ sortOrder: [Self]) -> Bool {
+        sortOrder.isEmpty || sortOrder == [Self()]
+    }
 
     func compare(_ lhs: ArchiveEntry, _ rhs: ArchiveEntry) -> ComparisonResult {
         if lhs.isDirectory != rhs.isDirectory { return lhs.isDirectory ? .orderedAscending : .orderedDescending }

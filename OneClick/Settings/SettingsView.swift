@@ -24,7 +24,6 @@ enum Tabs: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
     var titleKey: String { rawValue }
-    var pageTitleKey: String { titleKey }
 
     var icon: String {
         switch self {
@@ -68,15 +67,6 @@ enum SettingsModule: String, CaseIterable, Identifiable {
         }
     }
 
-    var icon: String {
-        switch self {
-        case .rightClickTools: "cursorarrow.click.2"
-        case .archives: "archivebox"
-        case .inputMethods: "character.bubble"
-        case .general: "gearshape"
-        }
-    }
-
     var color: Color {
         switch self {
         case .rightClickTools: .blue
@@ -101,31 +91,7 @@ enum SettingsModule: String, CaseIterable, Identifiable {
 @available(macOS 27, *)
 struct SettingsView: View {
     @State private var selectedTab: Tabs = .actions
-    @State private var isModuleExpanded = true
-    @State private var rememberedTabs: [SettingsModule: Tabs] = [:]
-    @EnvironmentObject var appState: AppState
-
-    private var selectedModule: SettingsModule { selectedTab.module }
-
-    private func selectModule(_ module: SettingsModule) {
-        guard module != selectedModule else {
-            isModuleExpanded.toggle()
-            return
-        }
-        isModuleExpanded = true
-        selectTab(rememberedTabs[module] ?? module.defaultTab)
-    }
-
-    private func selectTab(_ tab: Tabs) {
-        guard tab != selectedTab else { return }
-        rememberedTabs[selectedModule] = selectedTab
-        rememberedTabs[tab.module] = tab
-
-        // Keep controls, focus and scroll positions stable while switching pages.
-        var transaction = Transaction(animation: nil)
-        transaction.disablesAnimations = true
-        withTransaction(transaction) { selectedTab = tab }
-    }
+    @EnvironmentObject private var appState: AppState
 
     @ViewBuilder private func page(for tab: Tabs) -> some View {
         switch tab {
@@ -160,19 +126,31 @@ struct SettingsView: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            sidebar
-                .frame(width: 238)
+            sidebar.frame(width: 236)
             Divider()
             VStack(spacing: 0) {
                 pageHeader
-                Divider().padding(.horizontal, 28)
-                SettingsPageStack(selection: selectedTab) { page(for: $0) }
-                    .frame(maxWidth: 980, maxHeight: .infinity)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .buttonStyle(.glass)
+                Divider()
+                SettingsPageStack(selection: selectedTab) { tab in
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 24) {
+                            page(for: tab)
+                        }
+                        .frame(maxWidth: 780, alignment: .leading)
+                        .padding(.horizontal, 28)
+                        .padding(.top, 22)
+                        .padding(.bottom, 28)
+                        .frame(maxWidth: .infinity)
+                    }
+                }
+                .background(.primary.opacity(0.025))
             }
-            .frame(minWidth: 640)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color(nsColor: .windowBackgroundColor))
+            .buttonStyle(.bordered)
+            .toggleStyle(.switch)
+            .pickerStyle(.menu)
+            .labeledContentStyle(SettingsValueStyle())
         }
         .alert(
             Text(appLocalized: "Settings could not be saved"),
@@ -189,110 +167,68 @@ struct SettingsView: View {
 
     private var sidebar: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 10) {
+            HStack(spacing: 9) {
                 Image("Logo")
                     .resizable().scaledToFit()
-                    .frame(width: 36, height: 36)
+                    .frame(width: 28, height: 28)
                     .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("OneClick").font(.headline)
-                    Text(appLocalized: "Settings")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
+                Text(appLocalized: "Settings")
+                    .font(.system(size: 17, weight: .semibold))
+                    .accessibilityAddTraits(.isHeader)
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 20)
-            .padding(.bottom, 24)
+            .padding(.horizontal, 18)
+            .padding(.vertical, 12)
 
             ScrollView {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(appLocalized: "Feature Modules")
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 12)
-                        .padding(.bottom, 4)
+                VStack(alignment: .leading, spacing: 14) {
                     ForEach(SettingsModule.allCases) { module in
-                        if module == .general {
-                            Divider().padding(.horizontal, 12).padding(.vertical, 8)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(appLocalized: module.titleKey)
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                                .padding(.leading, 9)
+                                .padding(.bottom, 4)
+                                .accessibilityAddTraits(.isHeader)
+
+                            ForEach(module.tabs) { tab in
+                                SettingsNavigationButton(isSelected: selectedTab == tab) {
+                                    selectedTab = tab
+                                } label: {
+                                    HStack(spacing: 9) {
+                                        Image(systemName: tab.icon)
+                                            .foregroundStyle(selectedTab == tab ? Color.accentColor : module.color)
+                                            .frame(width: 18)
+                                            .accessibilityHidden(true)
+                                        Text(appLocalized: tab.titleKey)
+                                            .fontWeight(selectedTab == tab ? .semibold : .regular)
+                                        Spacer(minLength: 0)
+                                    }
+                                    .padding(.horizontal, 9)
+                                    .padding(.vertical, 6)
+                                }
+                            }
                         }
-                        moduleGroup(module)
                     }
                 }
-                .padding(.horizontal, 12)
+                .padding(.horizontal, 10)
                 .padding(.bottom, 16)
             }
+            .defaultScrollAnchor(.top)
         }
         .background(.regularMaterial)
     }
 
-    private func moduleGroup(_ module: SettingsModule) -> some View {
-        VStack(spacing: 3) {
-            SettingsNavigationButton(isSelected: selectedModule == module && !isModuleExpanded) { selectModule(module) } label: {
-                HStack(spacing: 10) {
-                    Image(systemName: module.icon)
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .frame(width: 27, height: 27)
-                        .background(module.color.gradient, in: RoundedRectangle(cornerRadius: 7))
-                        .accessibilityHidden(true)
-                    Text(AppLocalization.localized(module.titleKey))
-                        .font(.system(size: 13, weight: selectedModule == module ? .semibold : .medium))
-                        .fixedSize(horizontal: false, vertical: true)
-                    Spacer(minLength: 0)
-                    Image(systemName: selectedModule == module && isModuleExpanded ? "chevron.down" : "chevron.right")
-                        .font(.system(size: 9, weight: .semibold))
-                        .foregroundStyle(.tertiary)
-                        .accessibilityHidden(true)
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 8)
-            }
-            .accessibilityValue(AppLocalization.localized(selectedModule == module && isModuleExpanded ? "Expanded" : "Collapsed"))
-
-            if selectedModule == module && isModuleExpanded {
-                VStack(spacing: 2) {
-                    ForEach(module.tabs) { tab in
-                        SettingsNavigationButton(isSelected: selectedTab == tab) { selectTab(tab) } label: {
-                            HStack(spacing: 9) {
-                                Image(systemName: tab.icon)
-                                    .font(.system(size: 12))
-                                    .frame(width: 16)
-                                    .accessibilityHidden(true)
-                                Text(AppLocalization.localized(tab.pageTitleKey))
-                                    .font(.system(size: 12, weight: selectedTab == tab ? .semibold : .regular))
-                                    .fixedSize(horizontal: false, vertical: true)
-                                Spacer(minLength: 0)
-                            }
-                            .padding(.vertical, 8)
-                            .padding(.horizontal, 12)
-                        }
-                    }
-                }
-                .padding(.leading, 28)
-                .padding(.bottom, 6)
-            }
-        }
-    }
-
     private var pageHeader: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(AppLocalization.localized(selectedModule.titleKey))
-                .font(.callout)
-                .foregroundStyle(.secondary)
-            HStack(spacing: 12) {
-                Image(systemName: selectedTab.icon)
-                    .font(.system(size: 19, weight: .medium))
-                    .foregroundStyle(selectedModule.color)
-                    .accessibilityHidden(true)
-                Text(AppLocalization.localized(selectedTab.pageTitleKey))
-                    .font(.system(size: 25, weight: .bold))
-                    .accessibilityAddTraits(.isHeader)
-            }
+        HStack(spacing: 13) {
+            OneClickHeaderIcon(symbol: selectedTab.icon, color: selectedTab.module.color)
+            Text(appLocalized: selectedTab.titleKey)
+                .font(.system(size: 24, weight: .semibold))
+                .accessibilityAddTraits(.isHeader)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 30)
-        .padding(.top, 24)
-        .padding(.bottom, 22)
+        .frame(maxWidth: 780, alignment: .leading)
+        .padding(.horizontal, 28)
+        .padding(.vertical, 16)
+        .frame(maxWidth: .infinity)
     }
 }
 
