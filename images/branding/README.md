@@ -8,7 +8,7 @@ embedded bitmaps or decorative highlights. The breast runs off the bottom edge.
 
 - `oneclick-mark.svg`: editable source of the transparent color mark.
 - `oneclick-app-icon.svg`: generated close-up, clipped to an ivory rounded square.
-- `oneclick-mark-mono.svg`: independently editable 22 pt menu bar mark.
+- `oneclick-mark-mono.svg`: independently editable 20 pt menu bar mark.
 - `preview.png`: generated 512 px app icon preview.
 - `menu-bar-preview.png`: generated light/dark menu mark at 1×, 2× and 3×.
 
@@ -25,7 +25,7 @@ python3 -m venv .build/icon-tools
 
 CairoSVG also needs Cairo installed on the host (`brew install cairo` on macOS).
 The exporter renders each app icon size from SVG and produces vector PDFs for
-the settings logo and the adaptive menu bar template. The 22 pt menu bar mark
+the settings logo and the adaptive menu bar template. The 20 pt menu bar mark
 follows the app icon's close-up profile, with a broad beak and a cheek cutout
 that opens into the breast. Edit `oneclick-mark-mono.svg` independently to
 adjust the template and regenerate its previews.

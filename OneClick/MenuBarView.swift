@@ -47,7 +47,7 @@ struct OneClickMenuBarLabel: View {
         Image("MenuBar")
             .resizable()
             .scaledToFit()
-            .frame(width: 22, height: 22)
+            .frame(width: 20, height: 20)
             .accessibilityLabel("OneClick")
     }
 }
