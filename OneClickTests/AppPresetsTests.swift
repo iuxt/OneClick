@@ -53,10 +53,12 @@ struct AppPresetsTests {
     }
 
     @Test func symbolsReuseImagesWithinEachAppearance() throws {
-        let light = try #require(MenuSymbolIcon.image(named: "terminal", pointSize: 16, isDark: false))
-        #expect(light === MenuSymbolIcon.image(named: "terminal", pointSize: 16, isDark: false))
-        let dark = try #require(MenuSymbolIcon.image(named: "terminal", pointSize: 16, isDark: true))
+        let light = try #require(MenuSymbolIcon.image(named: "terminal", isDark: false))
+        #expect(light === MenuSymbolIcon.image(named: "terminal", isDark: false))
+        let dark = try #require(MenuSymbolIcon.image(named: "terminal", isDark: true))
         #expect(light !== dark)
-        #expect(dark === MenuSymbolIcon.image(named: "terminal", pointSize: 16, isDark: true))
+        #expect(dark === MenuSymbolIcon.image(named: "terminal", isDark: true))
+        let standard = try #require(MenuSymbolIcon.image(named: "terminal", style: .standard(pointSize: 16), isDark: false))
+        #expect(standard.size.width > light.size.width)
     }
 }

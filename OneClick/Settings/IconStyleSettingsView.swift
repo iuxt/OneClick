@@ -33,7 +33,7 @@ struct AppIconStyleSection: View {
                             HStack(spacing: 8) {
                                 if appState.appIconStyle != RCAppIconStyle.none.rawValue {
                                     if appState.appIconStyle == RCAppIconStyle.simple.rawValue,
-                                       let icon = AppPresets.simpleIcon(forAppPath: app.url.path) {
+                                       let icon = AppPresets.simpleIcon(forAppPath: app.url.path, style: .standard(pointSize: 16)) {
                                         Image(nsImage: icon).resizable().scaledToFit()
                                             .frame(width: 18, height: 18)
                                             .accessibilityHidden(true)

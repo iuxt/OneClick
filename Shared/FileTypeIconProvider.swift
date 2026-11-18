@@ -30,7 +30,11 @@ final class FileTypeIconProvider: @unchecked Sendable {
     ///   - ext: 文件扩展名（可能带点，如 ".txt"）
     ///   - fallbackSymbol: 图标名称，可能是旧 PNG 名("icon-file-txt")或新 SF Symbol 名("doc.text")
     /// - Returns: 图标 NSImage
-    func icon(for ext: String, fallbackSymbol: String = "doc") -> NSImage? {
+    func icon(
+        for ext: String,
+        fallbackSymbol: String = "doc",
+        symbolStyle: MenuSymbolIcon.Style = .finderMenu
+    ) -> NSImage? {
         // 0. 内存缓存命中
         if let cached = cache[ext] {
             return cached
@@ -61,8 +65,8 @@ final class FileTypeIconProvider: @unchecked Sendable {
         // 3. SF Symbol 回退：先解析旧 PNG 图标名映射，再尝试直接匹配。
         //    MenuSymbolIcon caches separately for each system appearance.
         let resolvedSymbol = iconFallbackMap[fallbackSymbol] ?? fallbackSymbol
-        return MenuSymbolIcon.image(named: resolvedSymbol, pointSize: iconSize)
-            ?? MenuSymbolIcon.image(named: "doc", pointSize: iconSize)
+        return MenuSymbolIcon.image(named: resolvedSymbol, style: symbolStyle)
+            ?? MenuSymbolIcon.image(named: "doc", style: symbolStyle)
     }
 
     /// 清除缓存（菜单配置更新时调用）
@@ -81,7 +85,7 @@ final class FileTypeIconProvider: @unchecked Sendable {
                 cache[ext] = image.resized(to: NSSize(width: iconSize, height: iconSize))
             }
         }
-        return icon(for: ext, fallbackSymbol: fallbackSymbol)
+        return icon(for: ext, fallbackSymbol: fallbackSymbol, symbolStyle: .standard(pointSize: iconSize))
     }
 
     @concurrent
@@ -155,42 +159,6 @@ final class FileTypeIconProvider: @unchecked Sendable {
         return image.resized(to: NSSize(width: iconSize, height: iconSize))
     }
 
-}
-
-// MARK: - Menu Symbol Icon
-
-/// Finder renders these images across process boundaries. Cache explicit colors per
-/// appearance so repeated builds are cheap and switching appearance never reuses
-/// a symbol colored for the previous theme.
-nonisolated enum MenuSymbolIcon {
-    nonisolated private struct Key: Hashable {
-        let name: String
-        let pointSize: CGFloat?
-        let isDark: Bool
-    }
-
-    private static let lock = NSLock()
-    nonisolated(unsafe) private static var cache: [Key: NSImage] = [:]
-
-    static func image(named name: String, pointSize: CGFloat? = nil) -> NSImage? {
-        let isDark = (CFPreferencesCopyAppValue("AppleInterfaceStyle" as CFString, kCFPreferencesAnyApplication) as? String) == "Dark"
-        return image(named: name, pointSize: pointSize, isDark: isDark)
-    }
-
-    static func image(named name: String, pointSize: CGFloat?, isDark: Bool) -> NSImage? {
-        let key = Key(name: name, pointSize: pointSize, isDark: isDark)
-        lock.lock()
-        defer { lock.unlock() }
-        if let cached = cache[key] { return cached }
-        var config = NSImage.SymbolConfiguration(paletteColors: [isDark ? NSColor.white : NSColor.black])
-        if let pointSize {
-            config = config.applying(NSImage.SymbolConfiguration(pointSize: pointSize, weight: .regular))
-        }
-        guard let image = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
-            .withSymbolConfiguration(config) else { return nil }
-        cache[key] = image
-        return image
-    }
 }
 
 // MARK: - NSImage Resize Helper

@@ -92,14 +92,12 @@ enum AppPresets {
         return name
     }
 
-    static func simpleIcon(forAppPath appPath: String?) -> NSImage? {
-        guard let appPath, !appPath.isEmpty else { return nil }
-        return simpleIcon(symbolName: symbolName(forAppPath: appPath))
-    }
-
-    private static func simpleIcon(symbolName: String?) -> NSImage? {
-        guard let symbolName else { return nil }
-        return MenuSymbolIcon.image(named: symbolName, pointSize: 16)
+    static func simpleIcon(
+        forAppPath appPath: String?,
+        style: MenuSymbolIcon.Style = .finderMenu
+    ) -> NSImage? {
+        guard let appPath, !appPath.isEmpty, let symbolName = symbolName(forAppPath: appPath) else { return nil }
+        return MenuSymbolIcon.image(named: symbolName, style: style)
     }
 
     /// Metadata I/O can run in the background; image rendering stays on main.

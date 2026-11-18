@@ -375,16 +375,11 @@ class FinderSyncExt: FIFinderSync, @unchecked Sendable {
             }
         }
         if let icon = NSImage(named: app.icon) { return icon }
-        return templateSymbol(app.icon)
-    }
-
-    /// 加载 SF Symbol，缓存按名称、尺寸与外观区分。
-    private func templateSymbol(_ name: String) -> NSImage? {
-        MenuSymbolIcon.image(named: name)
+        return MenuSymbolIcon.image(named: app.icon)
     }
 
     /// 从 Assets 或 SF Symbol 加载图标（带缓存）
-    private func loadIcon(named iconName: String, accessibilityDescription description: String) -> NSImage? {
+    private func loadIcon(named iconName: String) -> NSImage? {
         let cacheKey = "load:\(iconName)"
         if let cached = iconCache[cacheKey] { return cached }
         if let icon = NSImage(named: iconName) {
@@ -393,9 +388,9 @@ class FinderSyncExt: FIFinderSync, @unchecked Sendable {
             return icon
         }
         // SF Symbol 兜底：MenuSymbolIcon 使用外观感知缓存。
-        if let icon = templateSymbol(iconName) { return icon }
+        if let icon = MenuSymbolIcon.image(named: iconName) { return icon }
         if let fallback = iconFallbackMap[iconName] {
-            return templateSymbol(fallback)
+            return MenuSymbolIcon.image(named: fallback)
         }
         return nil
     }
@@ -465,7 +460,7 @@ class FinderSyncExt: FIFinderSync, @unchecked Sendable {
                 }
                 let actionsItem = NSMenuItem(title: actionsTitle, action: nil, keyEquivalent: "")
                 actionsItem.submenu = actionsSubMenu
-                actionsItem.image = templateSymbol("ellipsis.circle")
+                actionsItem.image = MenuSymbolIcon.image(named: "ellipsis.circle")
                 menu.addItem(actionsItem)
             } else {
                 // 不折叠：直接显示菜单项
@@ -484,7 +479,7 @@ class FinderSyncExt: FIFinderSync, @unchecked Sendable {
                 for action in archiveActions { submenu.addItem(makeActionItem(action)) }
                 let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
                 item.submenu = submenu
-                item.image = templateSymbol("archivebox")
+                item.image = MenuSymbolIcon.image(named: "archivebox")
                 menu.addItem(item)
             } else {
                 for action in archiveActions { menu.addItem(makeActionItem(action)) }
@@ -504,7 +499,7 @@ class FinderSyncExt: FIFinderSync, @unchecked Sendable {
                 }
                 let appsItem = NSMenuItem(title: appsTitle, action: nil, keyEquivalent: "")
                 appsItem.submenu = appsSubMenu
-                appsItem.image = templateSymbol("square.and.arrow.up.on.square")
+                appsItem.image = MenuSymbolIcon.image(named: "arrow.up.forward.app")
                 menu.addItem(appsItem)
             } else {
                 // 不折叠：直接显示菜单项
@@ -527,7 +522,7 @@ class FinderSyncExt: FIFinderSync, @unchecked Sendable {
                 }
                 let newFilesItem = NSMenuItem(title: newFilesTitle, action: nil, keyEquivalent: "")
                 newFilesItem.submenu = newFilesSubMenu
-                newFilesItem.image = templateSymbol("doc.badge.plus")
+                newFilesItem.image = MenuSymbolIcon.image(named: "doc.badge.plus")
                 menu.addItem(newFilesItem)
             } else {
                 // 不折叠：直接显示菜单项
@@ -550,7 +545,7 @@ class FinderSyncExt: FIFinderSync, @unchecked Sendable {
                 }
                 let commonDirsItem = NSMenuItem(title: commonDirsTitle, action: nil, keyEquivalent: "")
                 commonDirsItem.submenu = commonDirsSubMenu
-                commonDirsItem.image = templateSymbol("folder")
+                commonDirsItem.image = MenuSymbolIcon.image(named: "folder")
                 menu.addItem(commonDirsItem)
             } else {
                 // 不折叠：直接显示菜单项
@@ -616,9 +611,11 @@ class FinderSyncExt: FIFinderSync, @unchecked Sendable {
         let item = NSMenuItem(title: title, action: #selector(handleActionClick(_:)), keyEquivalent: "")
         item.tag = hashForAction(action)
         item.target = self
-        if let icon = templateSymbol(action.icon) {
-            item.image = icon
-        }
+        // Replace the built-in copy icon for existing configurations too.
+        let symbolName = action.id == Self.copyPathActionId && action.icon == "doc.on.doc"
+            ? "rectangle.portrait.on.rectangle.portrait"
+            : action.icon
+        item.image = MenuSymbolIcon.image(named: symbolName)
         // 主程序离线时只有复制路径是快链路，其余动作需要主程序的授权与执行，置灰
         if !isHostAppRunning && action.id != Self.copyPathActionId {
             item.isEnabled = false
@@ -673,7 +670,7 @@ class FinderSyncExt: FIFinderSync, @unchecked Sendable {
         let item = NSMenuItem(title: commonDir.name, action: #selector(handleCommonDirClick(_:)), keyEquivalent: "")
         item.tag = hashForCommonDir(commonDir)
         item.target = self
-        item.image = loadIcon(named: commonDir.icon, accessibilityDescription: commonDir.name)
+        item.image = loadIcon(named: commonDir.icon)
         // 打开目录需要主程序执行，离线置灰
         if !isHostAppRunning {
             item.isEnabled = false
