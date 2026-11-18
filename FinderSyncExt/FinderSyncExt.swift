@@ -631,7 +631,7 @@ class FinderSyncExt: FIFinderSync, @unchecked Sendable {
             let selected = FIFinderSyncController.default().selectedItemURLs() ?? []
             let hasSelection = currentMenuKind == .contextualMenuForItems && !selected.isEmpty
             item.isEnabled = isHostAppRunning && hasSelection
-            if action.id == "extract" || action.id == "extract-and-delete" {
+            if RCAction.archiveExtractionIDs.contains(action.id) {
                 item.isEnabled = item.isEnabled && selected.allSatisfy { ArchiveFormat.suffix(for: $0) != nil }
             }
         }

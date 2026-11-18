@@ -393,21 +393,22 @@ final class ActionServiceTests {
         #expect(archives.requests.allSatisfy { $0.error != nil })
     }
 
-    @Test func extractAndDeleteDispatchesEachArchiveOnlyFromSelectionMenus() async {
+    @Test(arguments: [ArchiveOperation.extract, .extractAndDelete, .autoExtract])
+    func extractionDispatchesEachArchiveOnlyFromSelectionMenus(operation: ArchiveOperation) async {
         let permission = MockPermission()
         permission.hasAccessResult = true
         let archives = MockArchives()
         let state = MockState()
-        state.actions = [.extractAndDelete]
+        state.actions = RCAction.all.filter { $0.id == operation.rawValue }
         let service = ActionService(state: state, permission: permission, confirmation: MockConfirmation(), archives: archives)
         let target = ["/tmp/literal%20.zip", "/tmp/other.7z"]
         for trigger in ["ctx-container", "toolbar", "ctx-sidebar"] {
-            await service.actionHandler(rid: "extract-and-delete", target: target, trigger: trigger)
+            await service.actionHandler(rid: operation.rawValue, target: target, trigger: trigger)
             #expect(archives.requests.isEmpty)
         }
-        await service.actionHandler(rid: "extract-and-delete", target: target, trigger: "ctx-items")
+        await service.actionHandler(rid: operation.rawValue, target: target, trigger: "ctx-items")
         #expect(archives.requests.map(\.urls) == target.map { [URL(fileURLWithPath: $0)] })
-        #expect(archives.requests.allSatisfy { $0.operation == .extractAndDelete && $0.error == nil })
+        #expect(archives.requests.allSatisfy { $0.operation == operation && $0.error == nil })
     }
 
     @Test func checksumActionKeepsLiteralPercentPathsAndRequestsPermission() async {

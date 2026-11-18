@@ -21,6 +21,10 @@ sources also stop deletion. Source directories are removed only when empty, so
 new files appearing during deletion are not recursively removed.
 Select archives
 and choose **Extract Here** to extract each into its own folder beside the archive.
+Choose **Auto Extract** to skip that extra folder when the archive contains just
+one top-level file or folder. Archives with multiple top-level items still get
+their own folder. The original archive is kept and existing items are not replaced.
+The extra folder is also kept if removing it could change where a symbolic link points.
 Choose **Extract and Delete Archive** to delete each selected archive after its
 contents have been extracted successfully. Failed or cancelled extraction keeps
 the original archive. Password prompts and batch processing work the same way as
@@ -182,7 +186,7 @@ the main actor and stream bounded diagnostic output. File data is handled by the
 tools, not buffered in Swift memory. The build includes the 7-Zip licenses and
 complete corresponding source archive under `Contents/Resources/7zip/`.
 
-Ordinary **Extract Here** batches run at most two archives concurrently, with
+**Extract Here** and **Auto Extract** batches run at most two archives concurrently, with
 aggregate progress and cancellation of all active jobs. Password-protected
 archives can be retried after the other jobs finish. Compression and explicit
 source-deletion batches run sequentially to avoid multiplying compression

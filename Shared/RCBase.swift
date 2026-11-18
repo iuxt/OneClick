@@ -210,13 +210,14 @@ struct RCAction: @MainActor RCBase {
 
 extension RCAction {
 
-    nonisolated static let archiveIDs: Set<String> = [
+    nonisolated static let archiveExtractionIDs: Set<String> = ["extract", "auto-extract", "extract-and-delete"]
+    nonisolated static let archiveIDs: Set<String> = archiveExtractionIDs.union([
         "compress", "compress-zip", "compress-7z", "compress-targz",
         "compress-zip-separately", "compress-7z-separately",
         "compress-zip-and-delete", "compress-7z-and-delete",
         "compress-zip-separately-and-delete", "compress-7z-separately-and-delete",
-        "compress-zip-encrypted", "compress-7z-encrypted", "extract", "extract-and-delete",
-    ]
+        "compress-zip-encrypted", "compress-7z-encrypted",
+    ])
     var isArchive: Bool { Self.archiveIDs.contains(id) }
 
     static let copyPath = RCAction(id: "copy-path", name: "Copy Path", enabled: true, idx: 0, icon: "doc.on.doc")
@@ -240,6 +241,7 @@ extension RCAction {
     static let compressZipSeparatelyAndDelete = RCAction(id: "compress-zip-separately-and-delete", name: "Compress to Separate ZIPs and Delete Originals", idx: 15, icon: "archivebox")
     static let compressSevenZipSeparatelyAndDelete = RCAction(id: "compress-7z-separately-and-delete", name: "Compress to Separate 7Zs and Delete Originals", idx: 16, icon: "archivebox")
     static let extractAndDelete = RCAction(id: "extract-and-delete", name: "Extract and Delete Archive", idx: 17, icon: "shippingbox")
+    static let autoExtract = RCAction(id: "auto-extract", name: "Auto Extract", idx: 18, icon: "shippingbox")
 
     static let all: [RCAction] = [
         .copyPath, .deleteDirect, .airdrop, .hideFileDir, .unhideFileDir, .checksum,
@@ -247,7 +249,7 @@ extension RCAction {
         .compressZipSeparately, .compressSevenZipSeparately,
         .compressZipAndDelete, .compressSevenZipAndDelete,
         .compressZipSeparatelyAndDelete, .compressSevenZipSeparatelyAndDelete,
-        .extractAndDelete,
+        .extractAndDelete, .autoExtract,
     ]
 }
 
@@ -451,6 +453,7 @@ extension RCAction {
         case "compress": return AppLocalization.localized("Compress…")
         case "compress-targz": return AppLocalization.localized("Compress to TAR.GZ")
         case "extract": return AppLocalization.localized("Extract Here")
+        case "auto-extract": return AppLocalization.localized("Auto Extract")
         case "extract-and-delete": return AppLocalization.localized("Extract and Delete Archive")
         case "compress-zip-encrypted": return AppLocalization.localized("Compress to Encrypted ZIP…")
         case "compress-7z-encrypted": return AppLocalization.localized("Compress to Encrypted 7Z…")

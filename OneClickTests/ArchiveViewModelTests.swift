@@ -137,9 +137,10 @@ struct ArchiveViewModelTests {
         #expect(activity.state.overallFraction == 1)
     }
 
-    @Test func extractionRunsTwoJobsAndRefillsOnlyTheFreedSlot() async throws {
+    @Test(arguments: [ArchiveOperation.extract, .autoExtract])
+    func extractionRunsTwoJobsAndRefillsOnlyTheFreedSlot(operation: ArchiveOperation) async throws {
         let gate = ArchiveBatchGate()
-        let requests = (0..<4).map { ArchiveRequest(operation: .extract, urls: [URL(fileURLWithPath: "/tmp/batch-\($0).zip")]) }
+        let requests = (0..<4).map { ArchiveRequest(operation: operation, urls: [URL(fileURLWithPath: "/tmp/batch-\($0).zip")]) }
         let model = ArchiveViewModel(requests: requests, performArchive: { request, _, _, _ in
             try await gate.perform(request)
         })

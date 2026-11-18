@@ -65,6 +65,7 @@ final class ActionEntity {
             ActionEntity(id: "compress-zip-separately-and-delete", name: "Compress to Separate ZIPs and Delete Originals", icon: "archivebox", isEnabled: true, sortOrder: 15),
             ActionEntity(id: "compress-7z-separately-and-delete", name: "Compress to Separate 7Zs and Delete Originals", icon: "archivebox", isEnabled: true, sortOrder: 16),
             ActionEntity(id: "extract-and-delete", name: "Extract and Delete Archive", icon: "shippingbox", isEnabled: true, sortOrder: 17),
+            ActionEntity(id: "auto-extract", name: "Auto Extract", icon: "shippingbox", isEnabled: true, sortOrder: 18),
         ]
     }
 }

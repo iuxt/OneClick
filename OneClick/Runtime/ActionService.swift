@@ -135,7 +135,8 @@ final class ActionService {
             await showArchives(target,
                                operation: rcitem.id == "compress-zip-separately-and-delete" ? .zip : .sevenZip,
                                separately: true, deletesSourcesAfterSuccess: true)
-        case "compress", "compress-zip", "compress-7z", "compress-targz", "compress-zip-encrypted", "compress-7z-encrypted", "extract", "extract-and-delete":
+        case "compress", "compress-zip", "compress-7z", "compress-targz", "compress-zip-encrypted", "compress-7z-encrypted",
+             "extract", "auto-extract", "extract-and-delete":
             guard trigger == "ctx-items", let operation = ArchiveOperation(rawValue: rcitem.id) else { return }
             await showArchives(target, operation: operation)
         default:

@@ -87,7 +87,7 @@ final class ConfigService {
             .compressZipSeparately, .compressSevenZipSeparately,
             .compressZipAndDelete, .compressSevenZipAndDelete,
             .compressZipSeparatelyAndDelete, .compressSevenZipSeparatelyAndDelete,
-            .extractAndDelete,
+            .extractAndDelete, .autoExtract,
         ]
         for var action in newActions where !data.actions.isEmpty && !data.actions.contains(where: { $0.id == action.id }) {
             action.idx = (data.actions.map(\.idx).max() ?? -1) + 1

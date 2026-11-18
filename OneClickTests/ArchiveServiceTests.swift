@@ -481,6 +481,74 @@ struct ArchiveServiceTests {
         #expect(try Data(contentsOf: marker) == data)
     }
 
+    @Test(arguments: [ArchiveOperation.zip, .encryptedSevenZip])
+    func autoExtractPlacesSingleFileBesideArchiveWithoutReplacingIt(operation: ArchiveOperation) async throws {
+        let root = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = root.appendingPathComponent("文档 %20.txt")
+        let data = Data("archived contents".utf8)
+        try data.write(to: source)
+        let password = operation.isEncryptedCompression ? "test-password" : nil
+        let archive = try await ArchiveService.perform(.init(operation: operation, urls: [source]), password: password)
+        try FileManager.default.removeItem(at: source)
+        let request = ArchiveRequest(operation: .autoExtract, urls: [archive])
+
+        let output = try await ArchiveService.perform(request, password: password)
+        #expect(output.lastPathComponent == source.lastPathComponent)
+        #expect(try Data(contentsOf: output) == data)
+        let existing = Data("keep existing".utf8)
+        try existing.write(to: output)
+        let duplicate = try await ArchiveService.perform(request, password: password)
+        #expect(duplicate.lastPathComponent == "文档 %20 (2).txt")
+        #expect(try Data(contentsOf: duplicate) == data)
+        #expect(try Data(contentsOf: output) == existing)
+        #expect(FileManager.default.fileExists(atPath: archive.path))
+    }
+
+    @Test func autoExtractPublishesOneTopLevelFolderWithAllDescendants() async throws {
+        let root = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let archive = root.appendingPathComponent("different-name.tar")
+        try tarFixture([
+            TarEntry(name: "Folder.name/nested/first.txt", body: "first"),
+            TarEntry(name: "Folder.name/.second", body: "second"),
+            TarEntry(name: "Folder.name/link", type: "2", link: ".second"),
+        ]).write(to: archive)
+        let request = ArchiveRequest(operation: .autoExtract, urls: [archive])
+
+        let output = try await ArchiveService.perform(request)
+        #expect(output.lastPathComponent == "Folder.name")
+        #expect(try Data(contentsOf: output.appendingPathComponent("nested/first.txt")) == Data("first".utf8))
+        #expect(try Data(contentsOf: output.appendingPathComponent("link")) == Data("second".utf8))
+        let duplicate = try await ArchiveService.perform(request)
+        #expect(duplicate.lastPathComponent == "Folder.name (2)")
+    }
+
+    @Test func autoExtractKeepsWrapperForMultipleTopLevelItemsIncludingHiddenFiles() async throws {
+        let root = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let archive = root.appendingPathComponent("bundle.tar")
+        try tarFixture([TarEntry(name: "first.txt", body: "first"), TarEntry(name: ".second", body: "second")]).write(to: archive)
+
+        let output = try await ArchiveService.perform(.init(operation: .autoExtract, urls: [archive]))
+        #expect(output.lastPathComponent == "bundle")
+        #expect(Set(try FileManager.default.contentsOfDirectory(atPath: output.path)) == ["first.txt", ".second"])
+    }
+
+    @Test func autoExtractKeepsWrapperWhenLinkPointsOutsideSingleFolder() async throws {
+        let root = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let archive = root.appendingPathComponent("bundle.tar")
+        try tarFixture([TarEntry(name: "folder/link", type: "2", link: "../neighbor")]).write(to: archive)
+        try Data("outside".utf8).write(to: root.appendingPathComponent("neighbor"))
+
+        let output = try await ArchiveService.perform(.init(operation: .autoExtract, urls: [archive]))
+        #expect(output.lastPathComponent == "bundle")
+        let link = output.appendingPathComponent("folder/link")
+        #expect(try FileManager.default.destinationOfSymbolicLink(atPath: link.path) == "../neighbor")
+        #expect(!FileManager.default.fileExists(atPath: link.path))
+    }
+
     @Test func concurrentJobsNeverReplaceEachOther() async throws {
         let root = try temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
@@ -494,13 +562,14 @@ struct ArchiveServiceTests {
         #expect(outputs.allSatisfy { FileManager.default.fileExists(atPath: $0.path) })
     }
 
-    @Test func corruptInputFailsAndCleansStaging() async throws {
+    @Test(arguments: [ArchiveOperation.extract, .autoExtract])
+    func corruptInputFailsAndCleansStaging(operation: ArchiveOperation) async throws {
         let root = try temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
         let source = root.appendingPathComponent("broken.zip")
         try Data("not an archive".utf8).write(to: source)
         await #expect(throws: (any Error).self) {
-            try await ArchiveService.perform(ArchiveRequest(operation: .extract, urls: [source]))
+            try await ArchiveService.perform(ArchiveRequest(operation: operation, urls: [source]))
         }
         #expect(try FileManager.default.contentsOfDirectory(atPath: root.path) == ["broken.zip"])
     }

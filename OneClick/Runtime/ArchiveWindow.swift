@@ -298,7 +298,8 @@ final class ArchiveViewModel: ObservableObject {
             // multiple CPUs, and deletion jobs must retain their ordered safety
             // checks (including when the same source is selected twice).
             let limit = indices.allSatisfy {
-                self.rows[$0].request.operation == .extract && !self.rows[$0].request.deletesSourcesAfterSuccess
+                let request = self.rows[$0].request
+                return request.operation.isExtraction && request.operation != .extractAndDelete && !request.deletesSourcesAfterSuccess
             } ? 2 : 1
             await withTaskGroup(of: Void.self) { group in
                 var pending = indices.makeIterator()

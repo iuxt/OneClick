@@ -11,6 +11,7 @@ nonisolated enum ArchiveOperation: String, Sendable, CaseIterable {
     case dmg = "compress-dmg"
     case encryptedDmg = "compress-dmg-encrypted"
     case extract = "extract"
+    case autoExtract = "auto-extract"
     case extractAndDelete = "extract-and-delete"
 
     var title: String {
@@ -23,6 +24,7 @@ nonisolated enum ArchiveOperation: String, Sendable, CaseIterable {
         case .encryptedSevenZip: "Compress to Encrypted 7Z…"
         case .dmg, .encryptedDmg: "Create Disk Image"
         case .extract: "Extract Here"
+        case .autoExtract: "Auto Extract"
         case .extractAndDelete: "Extract and Delete Archive"
         }
         return AppLocalization.localized(key)
@@ -39,7 +41,7 @@ nonisolated enum ArchiveOperation: String, Sendable, CaseIterable {
 
     var isEncryptedCompression: Bool { self == .encryptedZip || self == .encryptedSevenZip || self == .encryptedDmg }
     var isDiskImage: Bool { self == .dmg || self == .encryptedDmg }
-    var isExtraction: Bool { self == .extract || self == .extractAndDelete }
+    var isExtraction: Bool { RCAction.archiveExtractionIDs.contains(rawValue) }
 }
 
 nonisolated enum ArchiveCompressionFormat: String, CaseIterable, Sendable {
@@ -515,8 +517,8 @@ nonisolated enum ArchiveService {
                                            sourceSnapshot: sourceSnapshot, progress: progress)
             }
             var result: URL
-            let name: String
-            let ext: String
+            var name: String
+            var ext: String
             let arguments: [String]
             let useSevenZip: Bool
             if request.operation.isExtraction {
@@ -602,6 +604,15 @@ nonisolated enum ArchiveService {
                 // Test the final executable container as well as the 7Z payload.
                 try verifyArchive(at: result, operation: request.operation, password: password, progress: progress)
             }
+            if request.operation == .autoExtract, let item = try singleExtractedItem(in: result) {
+                result = item
+                if !item.hasDirectoryPath && !item.pathExtension.isEmpty {
+                    name = item.deletingPathExtension().lastPathComponent
+                    ext = "." + item.pathExtension
+                } else {
+                    name = item.lastPathComponent
+                }
+            }
             // Reserve each destination with an exclusive rename. A separate
             // existence check followed by rename can overwrite a concurrent job.
             var published: URL?
@@ -641,6 +652,31 @@ nonisolated enum ArchiveService {
         } onCancel: {
             progress.cancel()
         }
+    }
+
+    private static func singleExtractedItem(in directory: URL) throws -> URL? {
+        let fm = FileManager.default
+        let keys: Set<URLResourceKey> = [.isDirectoryKey, .isRegularFileKey, .isSymbolicLinkKey]
+        guard let items = try? fm.contentsOfDirectory(at: directory, includingPropertiesForKeys: Array(keys)),
+              items.count == 1, let item = items.first,
+              let values = try? item.resourceValues(forKeys: keys), values.isSymbolicLink != true else { return nil }
+        if values.isRegularFile == true { return item }
+        guard values.isDirectory == true else { return nil }
+
+        var scanFailed = false
+        guard let descendants = fm.enumerator(at: item, includingPropertiesForKeys: [.isSymbolicLinkKey], errorHandler: { _, _ in
+            scanFailed = true
+            return false
+        }) else { return nil }
+        for case let entry as URL in descendants {
+            try Task.checkCancellation()
+            guard let values = try? entry.resourceValues(forKeys: [.isSymbolicLinkKey]) else { return nil }
+            if values.isSymbolicLink == true {
+                guard let target = try? fm.destinationOfSymbolicLink(atPath: entry.path),
+                      !target.hasPrefix("/"), !target.split(separator: "/").contains("..") else { return nil }
+            }
+        }
+        return scanFailed ? nil : item
     }
 
     static func usesSevenZip(for url: URL) -> Bool {

@@ -143,12 +143,12 @@ struct ConfigServiceSaveTests {
             "compress-zip-separately", "compress-7z-separately",
             "compress-zip-and-delete", "compress-7z-and-delete",
             "compress-zip-separately-and-delete", "compress-7z-separately-and-delete",
-            "extract-and-delete",
+            "extract-and-delete", "auto-extract",
         ])
         #expect(first.actions.dropFirst().allSatisfy { $0.enabled })
-        #expect(first.actions.map(\.idx) == Array(0..<14))
+        #expect(first.actions.map(\.idx) == Array(0..<15))
         _ = service.load()
-        #expect(try context.fetch(FetchDescriptor<ActionEntity>()).count == 14)
+        #expect(try context.fetch(FetchDescriptor<ActionEntity>()).count == 15)
 
         var disabled = first
         for index in disabled.actions.indices.dropFirst() {
