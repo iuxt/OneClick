@@ -25,8 +25,7 @@ python3 -m venv .build/icon-tools
 
 CairoSVG also needs Cairo installed on the host (`brew install cairo` on macOS).
 The exporter renders each app icon size from SVG and produces vector PDFs for
-the settings logo and the adaptive menu bar template. The menu bar has its own
-rounded silhouette, shorter crest, broader beak and larger eye, drawn directly
-on a tightly cropped canvas displayed at 22 pt. Its enclosed cheek cutout remains legible on light and dark
-bars. Edit `oneclick-mark-mono.svg` independently; the exporter preserves it and
-regenerates the template PDF and previews.
+the settings logo and the adaptive menu bar template. The 22 pt menu bar mark
+follows the app icon's close-up profile, with a broad beak and a cheek cutout
+that opens into the breast. Edit `oneclick-mark-mono.svg` independently to
+adjust the template and regenerate its previews.

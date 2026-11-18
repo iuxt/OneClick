@@ -10,4 +10,9 @@ struct MenuBarLayoutTests {
         #expect(view.fittingSize == NSSize(width: 22, height: 22))
     }
 
+    @Test func menuBarAssetHasNativeStatusBarSize() throws {
+        let image = try #require(NSImage(named: "MenuBar"))
+        #expect(image.size == NSSize(width: 22, height: 22))
+        #expect(image.isTemplate)
+    }
 }
